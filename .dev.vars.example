@@ -1,0 +1,10 @@
+# Kopier til .dev.vars for lokal utvikling.
+# Lokalt finnes ingen Access-JWT; denne brukeren later som den er innlogget.
+# Brukes KUN når ACCESS_AUD er tom (dvs. aldri i produksjon).
+DEV_USER_EMAIL=jonas@flow.example
+# Bytt bruker per forespørsel med headeren X-Dev-User: jonas@flow.example (kun lokalt).
+
+# BarentsWatch AIS (valgfritt lokalt). I produksjon settes disse som secrets i Cloudflare,
+# aldri i koden: Workers & Pages → flow → Settings → Variables and Secrets.
+# BW_CLIENT_ID=
+# BW_CLIENT_SECRET=

@@ -1,0 +1,45 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "flow",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+
+  // React-appen bygges av Vite og serveres som statiske filer.
+  // /api/* går alltid til Workeren; alt annet som ikke er en fil gir index.html (SPA).
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // D1-databasen og R2-bøtta opprettes i dashbordet (se README), og database-ID-en limes inn her.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "flow-db",
+      "database_id": "SETT-INN-DATABASE-ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "PHOTOS", "bucket_name": "flow-photos" }
+  ],
+
+  // Én Durable Object for hele kaia: WebSocket-hub for chat og statusendringer.
+  "durable_objects": {
+    "bindings": [{ "name": "QUAY_ROOM", "class_name": "QuayRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["QuayRoom"] }],
+
+  "vars": {
+    "TIMEZONE": "Europe/Oslo"
+  },
+  // ACCESS_TEAM_DOMAIN, ACCESS_AUD og ADMIN_EMAILS settes i dashbordet (Settings → Variables and Secrets).
+  // keep_vars hindrer at deploy fra GitHub sletter dem.
+  "keep_vars": true,
+
+  // AIS fra BarentsWatch hvert minutt, og nattlig rydding av bilder som aldri ble lagret i en kaibok.
+  // Nøklene er secrets (BW_CLIENT_ID, BW_CLIENT_SECRET) og settes i Cloudflare-dashbordet
+  // eller med `npx wrangler secret put BW_CLIENT_ID`; de skal aldri inn i koden.
+  "triggers": { "crons": ["* * * * *", "17 3 * * *"] }
+}

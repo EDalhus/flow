@@ -1,0 +1,11 @@
+.krow {
+  color: inherit; text-align: left; cursor: pointer; width: 100%;
+  display: grid; grid-template-columns: 70px minmax(150px, 1.2fr) minmax(120px, 1fr) minmax(170px, 1.4fr) 90px 50px;
+  gap: 14px; align-items: center; padding: 14px 18px;
+  border: none; border-top: 1px solid rgba(255, 255, 255, .05); background: transparent;
+}
+.krow:hover { background: rgba(255, 255, 255, .05); }
+@media (max-width: 1100px) {
+  .krow { grid-template-columns: 70px 1fr; }
+  .krow .hide-s, .hide-s { display: none !important; }
+}

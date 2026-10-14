@@ -1,0 +1,27 @@
+/* Kart-forsiden: kartet fyller skjermen, glasspaneler ligger oppå (Main-tavla). */
+.kart { position: relative; height: 100vh; min-height: 820px; overflow: hidden; background: var(--bg); }
+.kart .ov { position: absolute; z-index: 5; }
+.kart-top { top: 20px; left: 24px; right: 24px; z-index: 20 !important; }
+.kart-title { top: 104px; left: 428px; display: flex; flex-direction: column; gap: 14px; pointer-events: none; }
+.kart-left { top: 96px; left: 24px; bottom: 24px; width: 380px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.kart-right { top: 96px; right: 24px; bottom: 24px; width: 380px; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.kart-zoom { left: 428px; bottom: 228px; display: flex; gap: 8px; }
+.kart-tl { left: 428px; right: 428px; bottom: 24px; min-height: 188px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+.kart-attr { position: absolute; right: 424px; bottom: 8px; font-size: 11px; color: var(--fg-45); z-index: 4; }
+.kart-alerts { top: 84px; right: 424px; z-index: 30 !important; }
+
+.vessel { position: absolute; padding: 0; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 8px; transform: translate(-18px, -18px); }
+.vessel-label { background: rgba(11, 14, 17, .72); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, .1); border-radius: 999px; padding: 3px 10px; font-size: 12px; white-space: nowrap; color: var(--fg); }
+
+@media (max-width: 1100px) {
+  .kart { height: auto; overflow: visible; }
+  .kart-mapwrap { position: relative !important; height: 620px !important; }
+  .kart .ov { position: static; width: auto; margin: 12px; max-height: none; }
+  .kart .kart-title { position: absolute; margin: 0; top: 96px; left: 20px; }
+  .kart .kart-top { position: absolute; margin: 0; left: 12px; right: 12px; top: 12px; }
+  .kart .kart-zoom { position: absolute; margin: 0; left: 20px; top: 540px; }
+  .kart .kart-tl { height: auto; }
+  .kart .kart-alerts { position: absolute; top: 76px; right: 12px; margin: 0; }
+  .kart-attr { right: 12px; }
+  .ov-hide { display: none !important; }
+}

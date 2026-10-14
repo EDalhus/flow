@@ -1,0 +1,160 @@
+import { z } from 'zod';
+import { CATEGORIES, CREW_ROLES, FLAGS, USER_ROLES } from './domain/types.ts';
+
+// Felles validering for API og skjemaer i frontend.
+
+const id = z.string().trim().min(1).max(64);
+const text = (max: number) => z.string().trim().max(max);
+const optionalText = (max: number) => text(max).nullable().optional().transform(v => (v ? v : null));
+const dateTime = z.iso.datetime({ offset: true }).transform(v => new Date(v).toISOString());
+const date = z.iso.date();
+
+export const crewRole = z.enum(CREW_ROLES);
+export const category = z.enum(CATEGORIES);
+export const flag = z.enum(FLAGS);
+
+// ---------------------------------------------------------------- anløp
+
+export const goodsLine = z.object({
+  sku_id: id,
+  quantity: z.int().min(1).max(100_000),
+  /** Utelates → inn ved levering, ut ved henting. */
+  direction: z.enum(['inn', 'ut']).optional(),
+});
+
+export const crewSlot = z.object({
+  crew_role: crewRole,
+  user_id: id.nullable().optional().transform(v => v ?? null),
+});
+
+const portCallFields = {
+  boat_id: id,
+  type: z.enum(['levering', 'henting']),
+  quay_id: id,
+  eta: dateTime,
+  etd: dateTime,
+  seller_id: id.nullable().optional(),
+  boat_crane: z.boolean().optional(),
+  notes: optionalText(2000),
+  goods: z.array(goodsLine).max(20),
+  crew: z.array(crewSlot).max(20),
+  responsible_user_id: id.nullable().optional(),
+};
+
+const etdAfterEta = (d: { eta?: string; etd?: string }) => !d.eta || !d.etd || Date.parse(d.etd) > Date.parse(d.eta);
+const etdMessage = { message: 'ETD må være etter ETA.', path: ['etd'] };
+
+export const portCallCreate = z
+  .object({ ...portCallFields, goods: portCallFields.goods.default([]), crew: portCallFields.crew.default([]) })
+  .refine(etdAfterEta, etdMessage);
+export type PortCallCreate = z.infer<typeof portCallCreate>;
+/** Det klienten sender (før standardverdier og transformasjoner). */
+export type PortCallCreateInput = z.input<typeof portCallCreate>;
+
+// Mannskap og ansvarlig endres via crewPut (egne tilgangsregler).
+const { crew: _crew, responsible_user_id: _responsible, ...patchFields } = portCallFields;
+
+export const portCallPatch = z
+  .object({ ...patchFields, version: z.int().min(1) })
+  .partial()
+  .required({ version: true })
+  .refine(etdAfterEta, etdMessage);
+export type PortCallPatch = z.infer<typeof portCallPatch>;
+export type PortCallPatchInput = z.input<typeof portCallPatch>;
+
+export const crewPut = z.object({
+  version: z.int().min(1),
+  slots: z.array(crewSlot).max(20),
+  responsible_user_id: id.nullable().optional(),
+});
+export type CrewPut = z.infer<typeof crewPut>;
+
+export const portCallCancel = z.object({ reason: text(500).min(3, 'Skriv en kort begrunnelse.') });
+
+export const rangeQuery = z
+  .object({ from: date, to: date })
+  .refine(r => r.to >= r.from, { message: '"to" må være samme dag eller etter "from".', path: ['to'] })
+  .refine(r => (Date.parse(r.to) - Date.parse(r.from)) / 86_400_000 <= 92, { message: 'Maks 92 dager per spørring.', path: ['to'] });
+
+// ---------------------------------------------------------------- chat
+
+export const messageCreate = z.object({ body: text(4000).min(1, 'Meldingen er tom.') });
+export const notificationsRead = z.object({ ids: z.array(id).max(200).optional(), all: z.boolean().optional() });
+
+// ---------------------------------------------------------------- kaibok
+
+const rating = z.int().min(1).max(5);
+
+export const quayLogCreate = z
+  .object({
+    had_deviation: z.boolean(),
+    categories: z.array(category).max(CATEGORIES.length).default([]),
+    description: text(4000).default(''),
+    ratings: z.object({ punctuality: rating, cooperation: rating, equipment: rating }),
+    boat_note: optionalText(1000),
+    photo_ids: z.array(id).max(20).default([]),
+  })
+  .superRefine((d, ctx) => {
+    if (d.had_deviation && !d.categories.length && !d.description) {
+      ctx.addIssue({ code: 'custom', message: 'Velg minst én kategori eller skriv en beskrivelse av avviket.', path: ['description'] });
+    }
+    if (!d.had_deviation && d.categories.length) {
+      ctx.addIssue({ code: 'custom', message: 'Kategorier kan bare settes når det er avvik.', path: ['categories'] });
+    }
+  });
+export type QuayLogCreate = z.infer<typeof quayLogCreate>;
+export type QuayLogCreateInput = z.input<typeof quayLogCreate>;
+
+export const quayLogQuery = z.object({
+  days: z.coerce.number().int().min(1).max(730).default(60),
+  filter: z.enum(['alle', 'avvik', 'ok']).default('alle'),
+  q: text(100).optional(),
+});
+
+// ---------------------------------------------------------------- båter
+
+const phone = text(40).regex(/^[+\d][\d\s-]*$/, 'Ugyldig telefonnummer.');
+
+export const boatCreate = z.object({
+  name: text(100).min(1),
+  imo: z.string().trim().regex(/^\d{7}$/, 'IMO er 7 siffer.').nullable().optional(),
+  mmsi: z.string().trim().regex(/^\d{9}$/, 'MMSI er 9 siffer.').nullable().optional(),
+  callsign: optionalText(20),
+  agent_id: id.nullable().optional(),
+  ship_contact: optionalText(100),
+  ship_phone: phone.nullable().optional(),
+  note: optionalText(2000),
+});
+export const boatPatch = boatCreate.partial();
+
+export const flagOverride = z.object({ flag, reason: text(500).min(3, 'Skriv en begrunnelse for overstyringen.') });
+
+export const agentCreate = z.object({ name: text(100).min(1), phone: phone.nullable().optional() });
+
+// ---------------------------------------------------------------- folk
+
+export const userCreate = z.object({
+  email: z.email().transform(v => v.toLowerCase()),
+  name: text(100).min(1),
+  short_name: text(40).min(2),
+  initials: text(4).min(1),
+  title: optionalText(60),
+  phone: phone.nullable().optional(),
+  roles: z.array(z.enum(USER_ROLES)).min(1).max(USER_ROLES.length),
+  skills: z.array(crewRole).max(CREW_ROLES.length).default([]),
+});
+export const userPatch = userCreate.partial().extend({ active: z.boolean().optional() });
+
+export const shiftsPut = z.object({
+  entries: z.array(z.object({ user_id: id, crew_role: crewRole })).max(100),
+});
+
+// ---------------------------------------------------------------- rapporter
+
+export const reportQuery = z.object({
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+  product_id: id.optional(),
+  direction: z.enum(['begge', 'inn', 'ut']).default('begge'),
+});
+
+export const settingsPut = z.record(z.string(), z.unknown());
