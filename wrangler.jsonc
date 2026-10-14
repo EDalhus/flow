@@ -12,14 +12,10 @@
     "run_worker_first": ["/api/*"]
   },
 
-  // D1-databasen og R2-bøtta opprettes i dashbordet (se README), og database-ID-en limes inn her.
+  // Uten ID oppretter Cloudflare databasen (flow-db) og bøtta (flow-photos) automatisk ved første deploy,
+  // og finner dem igjen på navn ved senere deploys og migrasjoner.
   "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "flow-db",
-      "database_id": "SETT-INN-DATABASE-ID",
-      "migrations_dir": "migrations"
-    }
+    { "binding": "DB", "database_name": "flow-db", "migrations_dir": "migrations" }
   ],
   "r2_buckets": [
     { "binding": "PHOTOS", "bucket_name": "flow-photos" }

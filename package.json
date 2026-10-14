@@ -14,7 +14,7 @@
     "db:seed": "wrangler d1 execute DB --local --file seed/seed.sql",
     "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate && npm run db:seed",
     "seed:gen": "node seed/generate.ts > seed/seed.sql",
-    "deploy:cf": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc && node scripts/seed-demo.mjs && wrangler deploy"
+    "deploy:cf": "node scripts/deploy.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.2",

@@ -23,25 +23,11 @@ Koden deployes fra GitHub med Cloudflare Workers Builds. Ingenting må kjøres l
 
 Alt gjøres i [Cloudflare-dashbordet](https://dash.cloudflare.com) og på GitHub.
 
-### 1.1 Opprett databasen (D1)
+### 1.1 Database og bildelager
 
-1. **Storage & Databases → D1 SQL Database → Create**.
-2. Navn: `flow-db`. Velg plassering *Western Europe* om du får spørsmål.
-3. Kopier **Database ID** fra oversikten.
-4. Åpne `wrangler.jsonc` på GitHub, klikk blyanten og erstatt `SETT-INN-DATABASE-ID` med ID-en:
-   ```jsonc
-   "database_id": "1234abcd-…",
-   ```
-5. Commit endringen til `main`.
+Disse trenger du ikke opprette selv. D1-databasen `flow-db` og R2-bøtta `flow-photos` opprettes automatisk ved første deploy, og tabellene lages fra filene i `migrations/`. R2 må likevel være aktivert på kontoen (**Storage & Databases → R2 Object Storage**); gratisnivået holder.
 
-Tabellene lages automatisk ved deploy, fra filene i `migrations/`.
-
-### 1.2 Opprett bildelageret (R2)
-
-1. **Storage & Databases → R2 Object Storage**. Første gang må R2 aktiveres på kontoen; gratisnivået holder.
-2. **Create bucket**, navn `flow-photos`, standard plassering. Bøtta skal ikke være offentlig; bildene serveres gjennom Workeren bak innlogging.
-
-### 1.3 Koble GitHub-repoet
+### 1.2 Koble GitHub-repoet
 
 1. **Workers & Pages → Create → Import a repository** (Workers Builds). Velg GitHub-repoet.
 2. Fyll inn:
@@ -57,11 +43,14 @@ Tabellene lages automatisk ved deploy, fra filene i `migrations/`.
 3. Valgfritt, bare første gang: under **Build variables**, legg til `SEED_DEMO` = `1` for å få eksempeldataene fra designet (båter, anløp, kaibøker og oppdiktede rapporttall for 2025/2026). De legges bare inn hvis databasen er tom, så eksisterende data blir aldri overskrevet. Fjern variabelen etterpå.
 4. **Save and Deploy**.
 
-Deploy-kommandoen gjør tre ting i rekkefølge:
+> **Viktig:** Deploy command må være `npm run deploy:cf`, ikke standardverdien `npx wrangler deploy`. Ellers kjøres ikke databasemigrasjonene. Feltet finnes under **Settings → Build → Deploy command**.
 
-1. Kjører nye databasemigrasjoner (`wrangler d1 migrations apply DB --remote`).
-2. Legger inn eksempeldata, hvis `SEED_DEMO=1` og databasen er tom.
-3. Deployer Workeren (`wrangler deploy`).
+Deploy-kommandoen (`scripts/deploy.mjs`) gjør dette i rekkefølge:
+
+1. Kjører nye databasemigrasjoner. Ved aller første deploy finnes ikke databasen ennå, og steget hoppes over.
+2. Deployer Workeren. Første gang opprettes D1 og R2 automatisk.
+3. Kjører migrasjonene igjen. Det gjør ingenting hvis alt allerede er kjørt, men lager tabellene ved første deploy.
+4. Legger inn eksempeldata, hvis `SEED_DEMO=1` og databasen er tom.
 
 > **Hvis bygget feiler med en tilgangsfeil på D1 eller R2:** API-tokenet til Workers Builds mangler rettigheter. Gå til Workerens **Settings → Build → API token** og gi tokenet *D1: Edit* og *Workers R2 Storage: Edit*, eller lag et nytt token med malen «Edit Cloudflare Workers» pluss D1.
 >
@@ -184,8 +173,9 @@ wrangler.jsonc     bindinger: D1, R2, Durable Object, cron, statiske filer
 | «Cloudflare Access er ikke konfigurert» | `ACCESS_AUD` eller `ACCESS_TEAM_DOMAIN` mangler (steg 3). |
 | «Ugyldig eller utløpt innlogging» | Feil AUD-tag eller teamdomene, eller Access er ikke slått på for adressen du bruker (steg 2). |
 | «… har ikke tilgang til Flow» | Personen er sluppet inn av Access, men ikke lagt inn under **Brukere** (steg 4). |
-| Bygget feiler på `d1 migrations apply` | Database-ID-en mangler i `wrangler.jsonc` (steg 1.1), eller byggtokenet mangler D1-rettighet. |
-| Bygget feiler med R2-feil | Bøtta `flow-photos` finnes ikke (steg 1.2). |
+| Appen svarer med databasefeil («no such table») | Deploy command er ikke `npm run deploy:cf`, så migrasjonene har ikke kjørt (steg 1.2). |
+| Bygget feiler på `d1 migrations apply` | Byggtokenet mangler D1-rettighet (steg 1.2). |
+| Bygget feiler med R2-feil | R2 er ikke aktivert på kontoen (steg 1.1). |
 | Kartpillen viser «BarentsWatch-nøkler mangler» | Legg inn secrets (steg 3). |
 | Kartpillen viser «Ingen båter i kaiboka har MMSI ennå» | Legg inn MMSI på båtene (steg 5). |
 
