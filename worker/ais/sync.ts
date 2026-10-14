@@ -40,7 +40,7 @@ export async function syncAis(env: Env, now = new Date(), fetcher: Fetcher = fet
   const base = { checked_at: now.toISOString(), boats: 0, positions: 0, arrived: [] as string[], departed: [] as string[] };
 
   if (!env.BW_CLIENT_ID || !env.BW_CLIENT_SECRET) {
-    const s = { ...base, ok: false, configured: false, message: 'BarentsWatch-nøkler mangler (BW_CLIENT_ID / BW_CLIENT_SECRET).' };
+    const s = { ...base, ok: false, configured: false, message: `BarentsWatch-nøkler mangler: ${[!env.BW_CLIENT_ID && 'BW_CLIENT_ID', !env.BW_CLIENT_SECRET && 'BW_CLIENT_SECRET'].filter(Boolean).join(' og ')}. Legg dem inn som Secret under Settings → Variables and Secrets (ikke under Build).` };
     await saveStatus(db, s);
     return s;
   }

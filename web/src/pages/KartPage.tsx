@@ -9,7 +9,8 @@ import { Topbar } from '../components/Topbar.tsx';
 import { FlagBadge, Loading, Rating, Segmented, StatusBadge } from '../components/ui.tsx';
 import { ATTRIBUTION, FlowMap, type MapHandle, type Project } from '../map/FlowMap.tsx';
 import { STATUS_STYLE, addDays, crewSummary, dayHeading, goodsShort, osloTime, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
-import { useAis, usePortCalls, useQuays, useSettings } from '../lib/queries.ts';
+import { useAis, useMe, usePortCalls, useQuays, useSettings } from '../lib/queries.ts';
+import { AisCheck } from '../components/AisCheck.tsx';
 import { VesselLayer, aisLive } from '../map/Vessels.tsx';
 import { useNow } from '../lib/useNow.ts';
 import './kart.css';
@@ -32,6 +33,9 @@ export function KartPage() {
   const [q, setQ] = useState('');
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [kaibok, setKaibok] = useState(false);
+  const [aisCheck, setAisCheck] = useState(false);
+  const me = useMe();
+  const isAdmin = !!me.data?.roles.includes('admin');
   const mapRef = useRef<MapHandle>(null);
 
   const list = calls.data?.calls ?? [];
@@ -86,7 +90,7 @@ export function KartPage() {
   const onTheWay = list.filter(c => c.status === 'paa_vei').length;
   const aisText = live
     ? `AIS live · ${vessels.length} fartøy · ${onTheWay} på vei til oss`
-    : ais.data?.status?.configured === false ? `AIS ikke tilkoblet · ${atQuay.length} ved kai`
+    : ais.data?.status?.configured === false ? `AIS ikke tilkoblet${isAdmin ? ' – klikk for å sjekke' : ''}`
     : ais.data?.status?.message ?? `AIS venter på data · ${atQuay.length} ved kai`;
 
   // Første gang AIS-data finnes: vis kaia og båtene som skal til oss.
@@ -158,10 +162,12 @@ export function KartPage() {
             <Clock size={16} />
             <span>{WEEKDAYS[new Date(`${today}T12:00:00Z`).getUTCDay()]} {Number(today.slice(8))}. {MONTHS[Number(today.slice(5, 7)) - 1]} · <span className="n">{osloTime(now)}</span></span>
           </span>
-          <span className="pill" title={ais.data?.status?.checked_at ? `Sist sjekket ${osloTime(ais.data.status.checked_at)}` : undefined} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 42, padding: '0 16px', backdropFilter: 'blur(16px)', background: 'rgba(17,21,25,.55)', fontSize: 14 }}>
+          <button type="button" className="pill" onClick={isAdmin ? () => setAisCheck(!aisCheck) : undefined} aria-expanded={isAdmin ? aisCheck : undefined}
+            title={`${ais.data?.status?.message ?? ''}${ais.data?.status?.checked_at ? ` (sjekket ${osloTime(ais.data.status.checked_at)})` : ''}${isAdmin ? ' – klikk for å sjekke' : ''}`.trim()}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 42, padding: '0 16px', backdropFilter: 'blur(16px)', background: 'rgba(17,21,25,.55)', fontSize: 14, cursor: isAdmin ? 'pointer' : 'default' }}>
             <span className={live ? 'dot ping' : 'dot'} style={{ width: 8, height: 8, background: live ? '#5BD68A' : '#A3ACB3' }} />
             {aisText}
-          </span>
+          </button>
           {alertSummary && (
             <button type="button" className="pill" onClick={() => setAlertsOpen(!alertsOpen)} aria-expanded={alertsOpen}
               style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 42, padding: '0 16px', backdropFilter: 'blur(16px)', background: 'rgba(120,42,38,.55)', borderColor: 'rgba(255,107,94,.25)', fontSize: 14 }}>
@@ -169,6 +175,7 @@ export function KartPage() {
             </button>
           )}
         </div>
+        {aisCheck && <div style={{ pointerEvents: 'auto' }}><AisCheck onClose={() => setAisCheck(false)} /></div>}
       </div>
 
       <aside className="ov glass scroll kart-left" aria-label="Anløp">

@@ -89,6 +89,16 @@ describe('AIS-synk', () => {
     expect(v.track.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('lar admin kjøre sjekk nå, uten å avsløre nøkkelverdier', async () => {
+    expect((await api('/ais/sync', { body: {} })).status).toBe(403); // jonas er ikke admin
+    const res = await api('/ais/sync', { as: 'admin', body: {} });
+    expect(res.status).toBe(200);
+    expect(res.json.secrets).toEqual({ BW_CLIENT_ID: false, BW_CLIENT_SECRET: false });
+    expect(res.json.result).toMatchObject({ ok: false, configured: false });
+    expect(res.json.result.message).toContain('BW_CLIENT_ID og BW_CLIENT_SECRET');
+    expect(res.json.result.message).toContain('ikke under Build');
+  });
+
   it('melder feil fra BarentsWatch uten å krasje', async () => {
     await env.DB.prepare(`INSERT OR IGNORE INTO boats (id, name, mmsi) VALUES ('b_ais2', 'Aisbåt 2', '257000002')`).run();
     const r = await syncAis(withKeys, new Date(), async () => new Response('nei', { status: 500 }));

@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import type { AisView } from '../../shared/api.ts';
 import { effectiveFlag } from '../../shared/domain/flags.ts';
 import type { Flag } from '../../shared/domain/types.ts';
-import { loadAisStatus } from '../ais/sync.ts';
+import { loadAisStatus, runAisSync } from '../ais/sync.ts';
+import { CAN, requireRole } from '../auth/access.ts';
 import type { AppEnv } from '../types.ts';
 
 const app = new Hono<AppEnv>();
@@ -25,6 +26,20 @@ app.get('/', async c => {
     track: (byMmsi.get(r.mmsi) ?? []).map(t => [t.lon, t.lat] as [number, number]),
   }));
   return c.json({ status: await loadAisStatus(db), vessels } satisfies AisView);
+});
+
+/**
+ * Kjør AIS-synk nå (admin). Viser om Workeren ser nøklene – bare ja/nei, aldri verdiene –
+ * og hva BarentsWatch svarte. Brukes til feilsøking fra kartet.
+ */
+app.post('/sync', requireRole(...CAN.admin), async c => {
+  const result = await runAisSync(c.env);
+  const mmsi = await c.env.DB.prepare('SELECT count(*) AS n FROM boats WHERE active = 1 AND mmsi IS NOT NULL').first<{ n: number }>();
+  return c.json({
+    result,
+    secrets: { BW_CLIENT_ID: !!c.env.BW_CLIENT_ID, BW_CLIENT_SECRET: !!c.env.BW_CLIENT_SECRET },
+    boats_with_mmsi: mmsi?.n ?? 0,
+  });
 });
 
 export default app;
