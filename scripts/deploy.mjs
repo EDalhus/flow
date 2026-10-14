@@ -1,5 +1,7 @@
 // Deploy-kommando for Workers Builds: `npm run deploy:cf`.
 //
+// 0. Bygger appen. Alltid, så en gjenopprettet byggcache aldri deployes, og så skriptet virker
+//    enten det står som Build command eller Deploy command i Workers Builds.
 // 1. Migrasjoner før deploy, så ny kode møter nytt skjema. Første gang finnes ikke databasen ennå;
 //    da hoppes dette over, og wrangler deploy oppretter den.
 // 2. wrangler deploy (oppretter D1 og R2 automatisk første gang).
@@ -8,6 +10,8 @@
 import { execFileSync } from 'node:child_process';
 
 const run = (cmd, args) => execFileSync(cmd, args, { stdio: 'inherit' });
+run('npm', ['run', 'build']);
+
 const migrate = () => run('npx', ['wrangler', 'd1', 'migrations', 'apply', 'DB', '--remote', '--config', 'wrangler.jsonc']);
 
 try {

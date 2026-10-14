@@ -43,7 +43,7 @@ Disse trenger du ikke opprette selv. D1-databasen `flow-db` og R2-bøtta `flow-p
 3. Valgfritt, bare første gang: under **Build variables**, legg til `SEED_DEMO` = `1` for å få eksempeldataene fra designet (båter, anløp, kaibøker og oppdiktede rapporttall for 2025/2026). De legges bare inn hvis databasen er tom, så eksisterende data blir aldri overskrevet. Fjern variabelen etterpå.
 4. **Save and Deploy**.
 
-> **Viktig:** Deploy command må være `npm run deploy:cf`, ikke standardverdien `npx wrangler deploy`. Ellers kjøres ikke databasemigrasjonene. Feltet finnes under **Settings → Build → Deploy command**.
+> **Viktig:** `npm run deploy:cf` må stå i **Deploy command**, ikke standardverdien `npx wrangler deploy`. Ellers kjøres ikke databasemigrasjonene. Skriptet bygger også appen selv, så det virker selv om det havner i Build command. Feltene finnes under **Settings → Build**.
 
 Deploy-kommandoen (`scripts/deploy.mjs`) gjør dette i rekkefølge:
 
