@@ -40,7 +40,7 @@ Disse trenger du ikke opprette selv. D1-databasen `flow-db` og R2-bøtta `flow-p
    | Deploy command | `npm run deploy:cf` |
    | Root directory | `/` |
 
-3. Valgfritt, bare første gang: under **Build variables**, legg til `SEED_DEMO` = `1` for å få eksempeldataene fra designet (båter, anløp, kaibøker og oppdiktede rapporttall for 2025/2026). De legges bare inn hvis databasen er tom, så eksisterende data blir aldri overskrevet. Fjern variabelen etterpå.
+3. Valgfritt: under **Build → Build variables** (ikke under Variables and Secrets), legg til `SEED_DEMO` = `1` for eksempeldataene fra designet (båter, anløp, kaibøker og rapporttall). `1` legger bare inn hvis databasen er tom. Har du allerede data, bruk `force` i stedet – det tømmer databasen først. Fjern variabelen etter at deployen er ferdig.
 4. **Save and Deploy**.
 
 > **Viktig:** `npm run deploy:cf` må stå i **Deploy command**, ikke standardverdien `npx wrangler deploy`. Ellers kjøres ikke databasemigrasjonene. Skriptet bygger også appen selv, så det virker selv om det havner i Build command. Feltene finnes under **Settings → Build**.
@@ -50,7 +50,7 @@ Deploy-kommandoen (`scripts/deploy.mjs`) gjør dette i rekkefølge:
 1. Kjører nye databasemigrasjoner. Ved aller første deploy finnes ikke databasen ennå, og steget hoppes over.
 2. Deployer Workeren. Første gang opprettes D1 og R2 automatisk.
 3. Kjører migrasjonene igjen. Det gjør ingenting hvis alt allerede er kjørt, men lager tabellene ved første deploy.
-4. Legger inn eksempeldata, hvis `SEED_DEMO=1` og databasen er tom.
+4. Legger inn eksempeldata hvis Build-variabelen `SEED_DEMO` er `1` (tom DB) eller `force` (tømmer først).
 
 > **Hvis bygget feiler med en tilgangsfeil på D1 eller R2:** API-tokenet til Workers Builds mangler rettigheter. Gå til Workerens **Settings → Build → API token** og gi tokenet *D1: Edit* og *Workers R2 Storage: Edit*, eller lag et nytt token med malen «Edit Cloudflare Workers» pluss D1.
 >
