@@ -3,9 +3,10 @@
 // Dokumentasjon: https://developer.barentswatch.no/docs/AIS/live-ais-api/
 
 export const TOKEN_URL = 'https://id.barentswatch.no/connect/token';
-export const LATEST_URL = 'https://live.ais.barentswatch.no/live/v1/latest/combined';
+/** Siste posisjon – se https://developer.barentswatch.no/docs/AIS/examples/ */
+export const LATEST_URL = 'https://live.ais.barentswatch.no/v1/latest/combined';
 
-/** Siste posisjon per MMSI (modelType "Simple"). */
+/** Siste posisjon per MMSI (default JSON-format fra Live AIS). */
 export interface AisPosition {
   mmsi: number;
   name?: string | null;
@@ -71,12 +72,14 @@ export async function fetchLatest(
     const res = await fetcher(LATEST_URL, {
       method: 'POST',
       headers: { authorization: `Bearer ${t}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ mmsi, modelType: 'Simple', modelFormat: 'Json' }),
+      body: JSON.stringify({ mmsi }),
     });
     // Tokenet kan være trukket tilbake; prøv én gang med nytt.
     if (res.status === 401 && retry) { resetTokenCache(); return call(false); }
     if (!res.ok) throw new Error(`BarentsWatch AIS svarte ${res.status}`);
-    return (await res.json()) as AisPosition[];
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('BarentsWatch AIS svarte uten posisjonsliste');
+    return data as AisPosition[];
   };
   return call(true);
 }
