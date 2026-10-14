@@ -102,6 +102,14 @@ describe('AIS-synk', () => {
   it('melder feil fra BarentsWatch uten å krasje', async () => {
     await env.DB.prepare(`INSERT OR IGNORE INTO boats (id, name, mmsi) VALUES ('b_ais2', 'Aisbåt 2', '257000002')`).run();
     const r = await syncAis(withKeys, new Date(), async () => new Response('nei', { status: 500 }));
-    expect(r).toMatchObject({ ok: false, configured: true, message: 'BarentsWatch-innlogging feilet (500)' });
+    expect(r).toMatchObject({ ok: false, configured: true, message: 'BarentsWatch-innlogging feilet (500).' });
+
+    // OAuth-feil forklares, og verdier med mellomrom/linjeskift renskes.
+    const r2 = await syncAis(withKeys, new Date(), async () => Response.json({ error: 'invalid_scope' }, { status: 400 }));
+    expect(r2.message).toBe('BarentsWatch-innlogging feilet (400 invalid_scope): klienten har ikke AIS-tilgang. Registrer en klient av typen «AIS» på Min side hos BarentsWatch.');
+    resetTokenCache();
+    const padded = { ...withKeys, BW_CLIENT_ID: '  test-id\n', BW_CLIENT_SECRET: 'test-hemmelighet\n' } as Env;
+    const bw = fakeBarentsWatch(() => []);
+    expect((await syncAis(padded, new Date(), bw.fetcher)).ok).toBe(true);
   });
 });

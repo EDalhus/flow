@@ -35,11 +35,26 @@ async function token(clientId: string, clientSecret: string, fetcher: Fetcher): 
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, scope: 'ais', grant_type: 'client_credentials' }),
   });
-  if (!res.ok) throw new Error(`BarentsWatch-innlogging feilet (${res.status})`);
+  if (!res.ok) throw new Error(await tokenError(res));
   const data = (await res.json()) as { access_token?: string; expires_in?: number };
   if (!data.access_token) throw new Error('BarentsWatch svarte uten access_token');
   cached = { token: data.access_token, expires: Date.now() + (data.expires_in ?? 3600) * 1000, key };
   return cached.token;
+}
+
+// OAuth-feilkoder fra id.barentswatch.no, forklart. Koden inneholder aldri nøkler.
+const OAUTH_ERRORS: Record<string, string> = {
+  invalid_client: 'klient-ID eller hemmelighet er feil. Klient-ID-en skal være nøyaktig som hos BarentsWatch, typisk «din@epost.no:klientnavn».',
+  invalid_scope: 'klienten har ikke AIS-tilgang. Registrer en klient av typen «AIS» på Min side hos BarentsWatch.',
+  unauthorized_client: 'klienten har ikke lov til å bruke client credentials. Sjekk klienttypen hos BarentsWatch.',
+  invalid_request: 'forespørselen ble avvist. Sjekk at klient-ID og hemmelighet ikke inneholder ekstra tegn.',
+};
+
+async function tokenError(res: Response): Promise<string> {
+  let code = '';
+  try { code = String(((await res.json()) as { error?: string }).error ?? ''); } catch { /* ikke JSON */ }
+  const why = OAUTH_ERRORS[code];
+  return `BarentsWatch-innlogging feilet (${res.status}${code ? ` ${code}` : ''})${why ? `: ${why}` : '.'}`;
 }
 
 export async function fetchLatest(
@@ -48,8 +63,11 @@ export async function fetchLatest(
   fetcher: Fetcher = fetch,
 ): Promise<AisPosition[]> {
   if (!mmsi.length) return [];
+  // Innlimte verdier får ofte et usynlig linjeskift eller mellomrom på slutten.
+  const clientId = creds.clientId.trim();
+  const clientSecret = creds.clientSecret.trim();
   const call = async (retry: boolean): Promise<AisPosition[]> => {
-    const t = await token(creds.clientId, creds.clientSecret, fetcher);
+    const t = await token(clientId, clientSecret, fetcher);
     const res = await fetcher(LATEST_URL, {
       method: 'POST',
       headers: { authorization: `Bearer ${t}`, 'content-type': 'application/json' },
