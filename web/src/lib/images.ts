@@ -1,5 +1,5 @@
 import type { PhotoUpload } from '../../../shared/api.ts';
-import { ApiError } from './api.ts';
+import { ApiError, chosenHeaders } from './api.ts';
 
 // Bilder skaleres ned og kodes på telefonen før opplasting: et mobilbilde på 4–8 MB blir
 // ca. 300–500 kB WebP. Det gir raskere opplasting på 4G og raske visninger senere.
@@ -45,7 +45,7 @@ export async function uploadPhoto(callId: string, file: File): Promise<PhotoUplo
   form.set('thumb', thumb.blob, `miniatyr.${ext(thumb.blob)}`);
   form.set('width', String(image.width));
   form.set('height', String(image.height));
-  const res = await fetch(`/api/port-calls/${callId}/photos`, { method: 'POST', body: form, credentials: 'same-origin' });
+  const res = await fetch(`/api/port-calls/${callId}/photos`, { method: 'POST', body: form, credentials: 'same-origin', headers: chosenHeaders() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, data);
   return data as PhotoUpload;

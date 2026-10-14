@@ -16,10 +16,27 @@ export class ApiError extends Error {
   }
 }
 
+// Uten Cloudflare Access velger brukeren selv hvem hen er; valget huskes i nettleseren.
+const CHOSEN_KEY = 'flow-as';
+export function chosenUser(): string | null {
+  try { return localStorage.getItem(CHOSEN_KEY); } catch { return null; }
+}
+export function chooseUser(email: string | null) {
+  try {
+    if (email) localStorage.setItem(CHOSEN_KEY, email);
+    else localStorage.removeItem(CHOSEN_KEY);
+  } catch { /* privat modus: valget gjelder bare denne fanen */ }
+}
+/** Header som forteller API-et hvem som er valgt (ignoreres når Access er på). */
+export const chosenHeaders = (): Record<string, string> => {
+  const c = chosenUser();
+  return c ? { 'X-Flow-As': c } : {};
+};
+
 export async function api<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method: init.method ?? (init.body === undefined ? 'GET' : 'POST'),
-    headers: init.body === undefined ? undefined : { 'content-type': 'application/json' },
+    headers: { ...chosenHeaders(), ...(init.body === undefined ? {} : { 'content-type': 'application/json' }) },
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
     credentials: 'same-origin',
   });

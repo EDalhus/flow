@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type { FlowEvent } from '../../../shared/events.ts';
+import { chosenUser } from './api.ts';
 
 // Én WebSocket per fane. Hendelser invaliderer berørte spørringer; ved gjenoppkobling
 // hentes alt på nytt, siden vi kan ha gått glipp av hendelser.
@@ -47,7 +48,8 @@ export function useRealtime(): Connection {
     const connect = () => {
       if (stopped) return;
       setState('kobler');
-      ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/ws`);
+      const as = chosenUser();
+      ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/ws${as ? `?as=${encodeURIComponent(as)}` : ''}`);
       ws.onopen = () => {
         if (attempt > 0) qc.invalidateQueries();
         attempt = 0;

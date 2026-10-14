@@ -56,13 +56,15 @@ Deploy-kommandoen (`scripts/deploy.mjs`) gjør dette i rekkefølge:
 >
 > **Bygg for andre grener enn `main`:** Slå av «Builds for non-production branches» under **Settings → Build**. Forhåndsversjoner deler den samme databasen, og migrasjoner kjøres bare fra `main`.
 
-Etter første deploy ligger appen på `https://flow.<ditt-subdomene>.workers.dev`. Den svarer «Cloudflare Access er ikke konfigurert» til du har gjort steg 2 og 3. Det er med vilje: uten Access slipper ingen inn.
+Etter første deploy ligger appen på `https://flow.<ditt-subdomene>.workers.dev` og kan brukes med en gang.
+
+> **Uten innlogging:** Så lenge Cloudflare Access ikke er satt opp (steg 2), kjører Flow i *åpen modus*. Alle som kjenner adressen kan se og endre alt. Man velger hvem man er ved å trykke på avataren øverst til høyre; valget huskes i nettleseren. Standardbrukeren heter «Flow» og er admin.
 
 ---
 
-## 2. Innlogging med Cloudflare Access
+## 2. Innlogging med Cloudflare Access (valgfritt, anbefalt)
 
-Flow slipper bare inn brukere som Access har verifisert. Workeren sjekker selv signaturen i `Cf-Access-Jwt-Assertion` mot teamdomenet og AUD-taggen, så appen kan ikke nås forbi Access.
+Access kan slås på når som helst, uten kodeendringer. Når `ACCESS_AUD` og `ACCESS_TEAM_DOMAIN` er satt, slipper Flow bare inn brukere som Access har verifisert, og brukervalget forsvinner. Workeren sjekker selv signaturen i `Cf-Access-Jwt-Assertion` mot teamdomenet og AUD-taggen, så appen kan ikke nås forbi Access.
 
 1. Gå til Workeren **flow → Settings → Domains & Routes**.
 2. Ved `workers.dev`: velg **Enable Cloudflare Access**. Gjør det samme for **Preview URLs**, eller slå preview-URL-er av.
@@ -84,9 +86,9 @@ Alt legges inn i dashbordet under **Workers & Pages → flow → Settings → Va
 
 | Navn | Type | Verdi |
 |---|---|---|
-| `ACCESS_TEAM_DOMAIN` | Text | Teamdomenet fra steg 2, f.eks. `firma.cloudflareaccess.com` |
-| `ACCESS_AUD` | Text | AUD-taggen fra steg 2 |
-| `ADMIN_EMAILS` | Text | Din e-post, eventuelt flere adskilt med komma. Disse blir admin ved første innlogging. |
+| `ACCESS_TEAM_DOMAIN` | Text | Bare med Access: teamdomenet fra steg 2, f.eks. `firma.cloudflareaccess.com` |
+| `ACCESS_AUD` | Text | Bare med Access: AUD-taggen fra steg 2 |
+| `ADMIN_EMAILS` | Text | Bare med Access: din e-post, eventuelt flere adskilt med komma. Disse blir admin ved første innlogging. |
 | `BW_CLIENT_ID` | **Secret** | Klient-ID fra BarentsWatch (se steg 5) |
 | `BW_CLIENT_SECRET` | **Secret** | Klienthemmelighet fra BarentsWatch |
 
@@ -94,14 +96,15 @@ Nye verdier gjelder fra neste forespørsel; ny deploy trengs ikke.
 
 ---
 
-## 4. Første innlogging og brukere
+## 4. Brukere
 
-1. Åpne appen og logg inn med en e-post fra `ADMIN_EMAILS`. Brukeren opprettes automatisk som admin.
-2. Gå til **Brukere** i menyen; den vises bare for admin. Legg til alle som skal bruke Flow:
-   - **E-post:** samme e-post som i Access-policyen.
-   - **Roller:** se tabellen under.
-   - **Kan stå som:** trucksjåfør, anhuker eller kaikran. Dette styrer hvem som kan velges i mannskapslistene.
-3. En person som ikke er lagt inn, får beskjed om å be en administrator legge dem til, selv om Access slipper dem gjennom.
+Gå til **Brukere** i menyen; den vises bare for admin. Legg til alle som skal bruke Flow:
+
+- **E-post:** med Access må den være den samme som i Access-policyen.
+- **Roller:** se tabellen under.
+- **Kan stå som:** trucksjåfør, anhuker eller kaikran. Dette styrer hvem som kan velges i mannskapslistene.
+
+Uten Access velger hver person seg selv i lista bak avataren. Med Access logger personene inn med e-posten sin. Den første innloggingen med en e-post fra `ADMIN_EMAILS` oppretter en admin, og personer som ikke er lagt inn får beskjed om å be en administrator legge dem til.
 
 | Rolle | Kan |
 |---|---|
@@ -170,7 +173,7 @@ wrangler.jsonc     bindinger: D1, R2, Durable Object, cron, statiske filer
 
 | Melding / symptom | Løsning |
 |---|---|
-| «Cloudflare Access er ikke konfigurert» | `ACCESS_AUD` eller `ACCESS_TEAM_DOMAIN` mangler (steg 3). |
+| «Cloudflare Access er delvis konfigurert» | `ACCESS_AUD` er satt, men `ACCESS_TEAM_DOMAIN` mangler (steg 3). Fjern begge for åpen modus. |
 | «Ugyldig eller utløpt innlogging» | Feil AUD-tag eller teamdomene, eller Access er ikke slått på for adressen du bruker (steg 2). |
 | «… har ikke tilgang til Flow» | Personen er sluppet inn av Access, men ikke lagt inn under **Brukere** (steg 4). |
 | Appen svarer med databasefeil («no such table») | Deploy command er ikke `npm run deploy:cf`, så migrasjonene har ikke kjørt (steg 1.2). |

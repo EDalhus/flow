@@ -7,6 +7,8 @@ export interface AuthUser {
   short_name: string;
   initials: string;
   roles: UserRole[];
+  /** true når appen kjører uten Cloudflare Access. */
+  open: boolean;
 }
 
 export type AppEnv = { Bindings: Env; Variables: { user: AuthUser } };

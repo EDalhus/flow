@@ -12,6 +12,8 @@ export interface UserRef {
 export interface Me extends UserRef {
   email: string;
   roles: UserRole[];
+  /** Appen kjører uten Cloudflare Access; brukeren velges i appen. */
+  open: boolean;
 }
 
 export interface UserView extends UserRef {

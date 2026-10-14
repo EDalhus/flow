@@ -6,7 +6,7 @@ import { AlertsPanel } from '../components/Alerts.tsx';
 import { Chat } from '../components/Chat.tsx';
 import { ArrowLeft, Check, Phone } from '../components/Icons.tsx';
 import { KaibokForm } from '../components/KaibokForm.tsx';
-import { BellButton } from '../components/Topbar.tsx';
+import { BellButton, UserBadge } from '../components/Topbar.tsx';
 import { Loading, StatusBadge } from '../components/ui.tsx';
 import { FlowMap } from '../map/FlowMap.tsx';
 import { FLAG_STYLE, addDays, dayHeading, dayShort, fr, goodsParts, osloTime, telHref, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
@@ -76,7 +76,7 @@ export function MobileApp() {
       {screen === 'list' ? (
         <>
           <header style={{ position: 'absolute', top: 14, left: 14, right: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
-            <span style={{ ...pill, width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 500 }} aria-label="Innlogget bruker" role="img">{me.data?.initials}</span>
+            <UserBadge size={48} align="left" />
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 300, letterSpacing: '-0.01em', textShadow: '0 2px 12px rgba(0,0,0,.6)' }}>Flatholmen Havn</h1>
             <BellButton open={alerts} onToggle={() => setAlerts(!alerts)} glass />
           </header>

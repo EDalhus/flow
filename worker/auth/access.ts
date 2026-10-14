@@ -5,19 +5,26 @@ import type { UserRole } from '../../shared/domain/types.ts';
 import { fail, newId } from '../lib/http.ts';
 import type { AppEnv, AuthUser } from '../types.ts';
 
-// Cloudflare Access setter Cf-Access-Jwt-Assertion på alle forespørsler som slipper gjennom.
-// Vi verifiserer signatur, utsteder og audience selv, slik at Workeren ikke kan nås forbi Access.
+// Innlogging er valgfri.
+//  - Med Cloudflare Access (ACCESS_AUD + ACCESS_TEAM_DOMAIN satt): Access setter Cf-Access-Jwt-Assertion,
+//    og vi verifiserer signatur, utsteder og audience selv.
+//  - Uten Access («åpen modus»): ingen innlogging. Brukeren velger hvem hen er i appen (X-Flow-As),
+//    ellers brukes den innebygde brukeren «Flow». Alle med adressen kan da se og endre alt.
+
+/** Innebygd bruker i åpen modus. Opprettes automatisk som admin. */
+export const OPEN_EMAIL = 'flow@flow.local';
 
 const jwksByTeam = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
-async function identify(env: Env, token: string | undefined, devUser: string | undefined): Promise<string> {
+type Who = { email: string; open: boolean };
+
+async function identify(env: Env, token: string | undefined, devUser: string | undefined, chosen: string | undefined): Promise<Who> {
   if (!env.ACCESS_AUD) {
-    // Lokal utvikling: ingen Access foran. Krever DEV_USER_EMAIL i .dev.vars.
-    // X-Dev-User lar deg bytte bruker lokalt (og i testene); virker aldri når Access er satt opp.
-    if (env.DEV_USER_EMAIL) return (devUser || env.DEV_USER_EMAIL).toLowerCase();
-    throw fail(500, 'Cloudflare Access er ikke konfigurert (ACCESS_AUD mangler).');
+    // Lokal utvikling og tester: DEV_USER_EMAIL, byttes med X-Dev-User.
+    if (env.DEV_USER_EMAIL) return { email: (devUser || env.DEV_USER_EMAIL).toLowerCase(), open: true };
+    return { email: (chosen || OPEN_EMAIL).toLowerCase(), open: true };
   }
-  if (!env.ACCESS_TEAM_DOMAIN) throw fail(500, 'Cloudflare Access er ikke konfigurert (ACCESS_TEAM_DOMAIN mangler).');
+  if (!env.ACCESS_TEAM_DOMAIN) throw fail(500, 'Cloudflare Access er delvis konfigurert: ACCESS_TEAM_DOMAIN mangler.');
   if (!token) throw fail(401, 'Ikke innlogget.');
 
   const issuer = `https://${env.ACCESS_TEAM_DOMAIN.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`;
@@ -29,7 +36,7 @@ async function identify(env: Env, token: string | undefined, devUser: string | u
   try {
     const { payload } = await jwtVerify(token, jwks, { issuer, audience: env.ACCESS_AUD });
     if (typeof payload.email !== 'string' || !payload.email) throw new Error('mangler e-post');
-    return payload.email.toLowerCase();
+    return { email: payload.email.toLowerCase(), open: false };
   } catch {
     throw fail(401, 'Ugyldig eller utløpt innlogging.');
   }
@@ -46,13 +53,13 @@ async function loadUser(db: D1Database, email: string) {
     .first<UserRow>();
 }
 
-/** Første innlogging for en e-post i ADMIN_EMAILS oppretter brukeren som admin. */
+/** Oppretter en admin: ved første innlogging for ADMIN_EMAILS, eller den innebygde «Flow»-brukeren. */
 async function provisionAdmin(db: D1Database, email: string) {
-  const local = email.split('@')[0].replace(/[._-]+/g, ' ').trim();
+  const local = email === OPEN_EMAIL ? 'flow' : email.split('@')[0].replace(/[._-]+/g, ' ').trim();
   const name = local.replace(/\b\p{L}/gu, ch => ch.toUpperCase()) || email;
   const parts = name.split(' ');
   const short = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
-  const initials = parts.map(p => p[0]).join('').slice(0, 2).toUpperCase();
+  const initials = (parts.length > 1 ? parts.map(p => p[0]).join('') : name.slice(0, 2)).slice(0, 2).toUpperCase();
   const id = newId('u');
   await db.batch([
     db.prepare('INSERT INTO users (id, email, name, short_name, initials) VALUES (?, ?, ?, ?, ?)').bind(id, email, name, short, initials),
@@ -60,9 +67,21 @@ async function provisionAdmin(db: D1Database, email: string) {
   ]);
 }
 
-export async function authenticate(env: Env, request: { header: (n: string) => string | undefined; cookie: () => string | undefined }): Promise<AuthUser> {
-  const email = await identify(env, request.header('Cf-Access-Jwt-Assertion') ?? request.cookie(), request.header('X-Dev-User'));
+export async function authenticate(env: Env, request: {
+  header: (n: string) => string | undefined; cookie: () => string | undefined; chosen?: string;
+}): Promise<AuthUser> {
+  const who = await identify(env, request.header('Cf-Access-Jwt-Assertion') ?? request.cookie(), request.header('X-Dev-User'), request.chosen);
+  let email = who.email;
   let row = await loadUser(env.DB, email);
+  // Åpen modus: ukjent eller deaktivert valgt bruker → den innebygde brukeren.
+  if (who.open && !env.DEV_USER_EMAIL && email !== OPEN_EMAIL && (!row || !row.active)) {
+    email = OPEN_EMAIL;
+    row = await loadUser(env.DB, email);
+  }
+  if (!row && who.open && email === OPEN_EMAIL) {
+    await provisionAdmin(env.DB, email);
+    row = await loadUser(env.DB, email);
+  }
   if (!row) {
     const admins = (env.ADMIN_EMAILS ?? '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     if (!admins.includes(email)) throw fail(403, `${email} har ikke tilgang til Flow. Be en administrator legge deg til.`);
@@ -74,11 +93,17 @@ export async function authenticate(env: Env, request: { header: (n: string) => s
   return {
     id: row.id, email: row.email, name: row.name, short_name: row.short_name, initials: row.initials,
     roles: (row.roles ? row.roles.split(',') : []) as UserRole[],
+    open: who.open,
   };
 }
 
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
-  c.set('user', await authenticate(c.env, { header: n => c.req.header(n), cookie: () => getCookie(c, 'CF_Authorization') }));
+  c.set('user', await authenticate(c.env, {
+    header: n => c.req.header(n),
+    cookie: () => getCookie(c, 'CF_Authorization'),
+    // Brukervalg i åpen modus; WebSocket kan ikke sette headere, så den bruker ?as=.
+    chosen: c.req.header('X-Flow-As') ?? c.req.query('as'),
+  }));
   await next();
 });
 
