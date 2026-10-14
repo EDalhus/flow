@@ -6,13 +6,13 @@ import { dayRelative, ddmm, fr, goodsParts, telHref, telShort, timeRange, typeLa
 import { useBoat, useMe, usePutCrew, useUsers } from '../lib/queries.ts';
 import { canCrew, canQuayLog } from '../lib/roles.ts';
 import { Chat } from './Chat.tsx';
-import { Check, Phone } from './Icons.tsx';
+import { Check, Close, Phone } from './Icons.tsx';
 import { BigNumber, FlagBadge, Rating, RatingBars, Segmented } from './ui.tsx';
 
 export type DetailTab = 'oversikt' | 'chat' | 'profil';
 
-export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts }: {
-  call: PortCallView; tab: DetailTab; onTab: (t: DetailTab) => void; onOpenKaibok: () => void; onOpenAlerts: () => void;
+export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClose }: {
+  call: PortCallView; tab: DetailTab; onTab: (t: DetailTab) => void; onOpenKaibok: () => void; onOpenAlerts: () => void; onClose?: () => void;
 }) {
   const boat = useBoat(call.boat.id);
   const users = useUsers();
@@ -24,8 +24,15 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts }: {
   return (
     <section aria-labelledby="sel-h" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '0 6px' }}>
-        <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)' }}>
-          {typeLabel(call.type)} · {call.quay.name} · {dayRelative(call.service_date)} {timeRange(call)}
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)' }}>
+            {typeLabel(call.type)} · {call.quay.name} · {dayRelative(call.service_date)} {timeRange(call)}
+          </span>
+          {onClose && (
+            <button type="button" className="icon-btn pill" onClick={onClose} aria-label="Lukk anløpet" title="Lukk (Esc)" style={{ width: 36, height: 36, flex: 'none', marginRight: -6 }}>
+              <Close size={14} />
+            </button>
+          )}
         </span>
         <h2 id="sel-h" style={{ margin: 0, fontSize: 30, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{call.boat.name}</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, fontSize: 13 }}>

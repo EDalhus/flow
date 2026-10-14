@@ -37,10 +37,14 @@ export function KartPage() {
   const list = calls.data?.calls ?? [];
   const selectedId = params.get('id');
   const tab = (params.get('tab') as DetailTab) ?? 'oversikt';
-  const selected = list.find(c => c.id === selectedId)
-    ?? list.find(c => c.service_date === today && c.status !== 'ferdig')
-    ?? list[0];
+  // Ingen automatisk valg: detaljpanelet vises bare når et anløp er valgt, så kartet er mest mulig fritt.
+  const selected = selectedId ? list.find(c => c.id === selectedId) : undefined;
   const select = (id: string, t?: DetailTab) => setParams(p => { p.set('id', id); if (t) p.set('tab', t); else p.delete('tab'); return p; }, { replace: true });
+  const deselect = () => setParams(p => { p.delete('id'); p.delete('tab'); return p; }, { replace: true });
+  const deselectRef = useRef(deselect);
+  deselectRef.current = deselect;
+  const alertsRef = useRef(false);
+  alertsRef.current = alertsOpen;
 
   const fence = settings.data?.geofence ?? { ...FALLBACK, radius_m: 300, label: '' };
   const quayPos = (id: string) => {
@@ -96,7 +100,12 @@ export function KartPage() {
   }, [vessels, calls.data, list, fence.lon, fence.lat]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setAlertsOpen(false);
+    // Esc lukker varsler først, deretter valgt anløp. Ikke mens kaibok-skjemaet er åpent.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      if (alertsRef.current) setAlertsOpen(false);
+      else deselectRef.current();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
@@ -183,7 +192,7 @@ export function KartPage() {
           <div key={g.date} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <h2 style={{ margin: '4px 4px 0', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>{g.title}</h2>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {g.items.map(c => <li key={c.id}><CallCard call={c} on={c.id === selected?.id} onClick={() => select(c.id)} /></li>)}
+              {g.items.map(c => <li key={c.id}><CallCard call={c} on={c.id === selected?.id} onClick={() => (c.id === selected?.id ? deselect() : select(c.id))} /></li>)}
             </ul>
           </div>
         ))}
@@ -200,11 +209,12 @@ export function KartPage() {
 
       {alertsOpen && <div className="ov kart-alerts"><AlertsPanel onClose={() => setAlertsOpen(false)} /></div>}
 
-      <aside className="ov glass scroll kart-right" aria-label="Valgt anløp">
-        {selected
-          ? <CallDetail call={selected} tab={tab} onTab={t => select(selected.id, t)} onOpenKaibok={() => setKaibok(true)} onOpenAlerts={() => setAlertsOpen(true)} />
-          : calls.isSuccess && <p className="empty">Ingen anløp i dag eller i morgen.</p>}
-      </aside>
+      {selected && (
+        <aside className="ov glass scroll kart-right" aria-label="Valgt anløp">
+          <CallDetail call={selected} tab={tab} onTab={t => select(selected.id, t)} onOpenKaibok={() => setKaibok(true)}
+            onOpenAlerts={() => setAlertsOpen(true)} onClose={deselect} />
+        </aside>
+      )}
 
       {kaibok && selected && <KaibokModal call={selected} onClose={() => setKaibok(false)} />}
     </div>
