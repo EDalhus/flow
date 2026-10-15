@@ -304,6 +304,23 @@ describe('rapporter', () => {
     expect(products.json.rows).toContainEqual(expect.objectContaining({ name: 'Hav salt', packaging: 'BB + pall', forecast_tonnes_prev: 20 }));
   });
 
+  it('summerer tonn ut og inn siste N dager mot forrige periode', async () => {
+    const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO port_calls (id, boat_id, type, quay_id, eta, etd, service_date, source, completed_at) VALUES
+        ('s1', 'b_a', 'henting', 'q_kai1', ?1, ?5, ?2, 'import', ?5),
+        ('s2', 'b_b', 'levering', 'q_kai2', ?1, ?5, ?2, 'import', ?5),
+        ('s3', 'b_a', 'henting', 'q_kai1', ?3, ?6, ?4, 'import', ?6)`)
+        .bind(`${day(2)}T08:00:00Z`, day(2), `${day(10)}T08:00:00Z`, day(10), `${day(2)}T10:00:00Z`, `${day(10)}T10:00:00Z`),
+      env.DB.prepare(`INSERT INTO port_call_goods (id, port_call_id, sku_id, quantity, direction) VALUES
+        ('sg1', 's1', 's_hav_bb', 300, 'ut'), ('sg2', 's2', 's_stein_bb', 120, 'inn'), ('sg3', 's3', 's_hav_bb', 200, 'ut')`),
+    ]);
+    const week = await api('/reports/summary?days=7');
+    expect(week.json).toMatchObject({ days: 7, out: { tonnes: 300, calls: 1 }, in: { tonnes: 120, calls: 1 }, calls: 2 });
+    expect(week.json.prev.out.tonnes).toBe(200);
+    expect((await api('/reports/summary?days=0')).status).toBe(400);
+  });
+
   it('gir punktlighet, avvik og båtsnitt', async () => {
     const res = await api('/reports/quality?weeks=8');
     expect(res.status).toBe(200);

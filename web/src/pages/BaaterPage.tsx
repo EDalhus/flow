@@ -72,8 +72,9 @@ export function BaaterPage() {
                 </span>
                 <BigNumber value={b.rating_count ? b.avg_total : null} />
                 <RatingBars variant="card" values={{ p: b.avg_punctuality, s: b.avg_cooperation, u: b.avg_equipment }} />
-                <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{b.rating_count ? `${b.rating_count} kaibøker · sist ${ddmm(b.last_log_at!)}` : 'Ingen kaibøker ennå'}</span>
-                {next && <span style={{ fontSize: 13, color: '#80EFDE' }}>Neste: {next}</span>}
+                <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>
+                  {next ? <span style={{ color: 'var(--aqua)' }}>Neste: {next}</span> : b.rating_count ? `${b.rating_count} kaibøker · sist ${ddmm(b.last_log_at!)}` : 'Ingen kaibøker ennå'}
+                </span>
               </button>
             );
           })}

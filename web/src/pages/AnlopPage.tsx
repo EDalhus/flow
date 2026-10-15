@@ -6,9 +6,9 @@ import type { PortCallCreateInput } from '../../../shared/schemas.ts';
 import { isoWeek, osloToUtc } from '../../../shared/time.ts';
 import { Close, Minus, Plus } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
-import { BoatFlagLine, Loading, QuayMark, SearchBox, Segmented, StatusBadge } from '../components/ui.tsx';
+import { CallIssues, Loading, QuayMark, SearchBox, Segmented, StatusBadge } from '../components/ui.tsx';
 import { api, errorText } from '../lib/api.ts';
-import { FLAG_STYLE, addDays, crewSummary, dayHeading, dayShort, fr, goodsShort, hmFromIso, nb, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
+import { FLAG_STYLE, addDays, dayHeading, dayShort, fr, goodsShort, hmFromIso, nb, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useBoats, useCreatePortCall, useMe, usePortCalls, useProducts, useQuays, useUsers, type Sku } from '../lib/queries.ts';
 import { canPlan } from '../lib/roles.ts';
 import './anlop.css';
@@ -55,8 +55,8 @@ export function AnlopPage() {
 
         <section className="panel-light scroll" aria-label="Anløpsliste" style={{ overflowX: 'auto', overflowY: 'hidden' }}>
           <div style={{ minWidth: 960 }}>
-          <div className="arow hide-s" style={{ fontSize: 12, color: 'var(--fg-55)', borderBottom: '1px solid rgba(var(--tint), .07)' }}>
-            <span>Tid</span><span>Båt</span><span>Type</span><span>Kai</span><span>Varer</span><span>Mannskap</span><span>Status</span>
+          <div className="arow hide-s" style={{ fontSize: 12, color: 'var(--fg-45)', paddingTop: 18, paddingBottom: 12 }}>
+            <span>Tid</span><span>Båt</span><span>Varer</span><span>Mannskap</span><span>Status</span>
           </div>
           <div className="scroll" style={{ maxHeight: 'calc(100vh - 290px)', minHeight: 200 }}>
             {calls.isPending && <Loading />}
@@ -64,7 +64,7 @@ export function AnlopPage() {
               const items = visible.filter(c => c.service_date === d);
               return (
                 <div key={d}>
-                  <div style={{ padding: '14px 18px 6px', fontSize: 13, color: 'var(--fg-62)', display: 'flex', justifyContent: 'space-between' }}>
+                  <div className="eyebrow" style={{ padding: '22px 24px 10px', display: 'flex', justifyContent: 'space-between', color: 'var(--fg-55)' }}>
                     <span>{dayHeading(d, today)}</span><span className="n">{items.length} anløp</span>
                   </div>
                   {items.map(c => <Row key={c.id} call={c} fresh={c.id === fresh} />)}
@@ -86,29 +86,27 @@ export function AnlopPage() {
 }
 
 function Row({ call: c, fresh }: { call: PortCallView; fresh: boolean }) {
-  const crew = crewSummary(c);
-  const boats = [...new Set(c.collisions.flatMap(x => x.with.map(w => w.boat_name)))];
   return (
     <Link to={`/?id=${c.id}`} className="arow arow-link" aria-label={`${c.boat.name}, ${timeRange(c)} – åpne i kartet`}
-      style={{ borderTop: '1px solid rgba(var(--tint), .05)', ...(fresh ? { background: 'rgba(128,239,222,.08)' } : c.status === 'ferdig' ? { opacity: .55 } : {}) }}>
+      style={{ borderTop: '1px solid rgba(var(--tint), .06)', ...(fresh ? { background: 'rgba(128,239,222,.1)' } : c.status === 'ferdig' ? { opacity: .5 } : {}) }}>
       <span className="n" style={{ fontSize: 15 }}>{timeRange(c)}</span>
-      <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
         <span style={{ fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
           {c.boat.name}
           {fresh && <span style={{ fontSize: 11, borderRadius: 999, padding: '1px 8px', background: '#80EFDE', color: '#1A231E' }}>Ny</span>}
         </span>
-        <BoatFlagLine boat={c.boat} />
+        <span style={{ fontSize: 13, color: 'var(--fg-55)', display: 'flex', gap: 6, alignItems: 'center' }}>
+          {typeLabel(c.type)}<span aria-hidden="true">·</span><QuayMark quay={c.quay} compact />
+        </span>
       </span>
-      <span style={{ fontSize: 14, color: 'rgba(var(--tint), .8)' }}>{typeLabel(c.type)}</span>
-      <span style={{ fontSize: 14, minWidth: 0 }}><QuayMark quay={c.quay} compact /></span>
-      <span style={{ fontSize: 14, color: 'rgba(var(--tint), .8)' }}>{goodsShort(c.goods) || '–'}</span>
-      <span style={{ display: 'flex', flexDirection: 'column', fontSize: 13, lineHeight: 1.35 }}>
-        <span style={{ color: crew.ansWarn ? 'var(--warn-fg)' : undefined }}>{crew.ansText}</span>
-        <span style={{ color: 'var(--fg-55)' }}>{crew.crewText}</span>
+      <span style={{ fontSize: 14, color: 'var(--fg-75)' }}>{goodsShort(c.goods) || '–'}</span>
+      <span style={{ fontSize: 14, color: 'var(--fg-75)' }}>
+        {c.responsible && <>{c.responsible.short_name}<span style={{ color: 'var(--fg-45)' }}> · </span></>}
+        <span style={{ color: c.responsible ? 'var(--fg-45)' : undefined }}>{c.crew.length} {c.crew.length === 1 ? 'rolle' : 'roller'}</span>
       </span>
-      <span style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
         <StatusBadge status={c.status} basis={c.status_basis} />
-        {c.collisions.length > 0 && <span style={{ fontSize: 12, color: 'var(--bad-fg)' }}>{boats.length ? `Kolliderer med ${boats.join(', ')}` : c.collisions[0].text}</span>}
+        <CallIssues call={c} />
       </span>
     </Link>
   );

@@ -35,13 +35,12 @@ export function QuayMark({ quay, compact }: { quay: Pick<QuayRef, 'name' | 'nick
   const title = quayTitle(quay);
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: compact ? 5 : 7, minWidth: 0, maxWidth: '100%' }}>
-      <span className="badge" style={{
-        flex: 'none', fontSize: compact ? 10 : 11, padding: compact ? '2px 6px' : '3px 8px', fontWeight: 500,
-        background: own ? 'rgba(var(--tint), .1)' : 'rgba(232,176,110,.18)',
-        color: own ? 'rgba(var(--tint), .78)' : '#E8B06E',
-      }}>
-        {own ? 'Vår' : 'Nabo'}
-      </span>
+      {/* Egne kaier er standard og trenger ikke merke; bare naboens kaier merkes. */}
+      {!own && (
+        <span className="badge" style={{ flex: 'none', fontSize: compact ? 10 : 11, padding: compact ? '2px 6px' : '3px 8px', fontWeight: 500, background: 'rgba(232,176,110,.18)', color: '#C98A3E' }}>
+          Nabo
+        </span>
+      )}
       <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, minWidth: 0 }}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
         {!own && quay.company && (
@@ -163,4 +162,51 @@ export function BigNumber({ value, size = 42, digits = 1 }: { value: number | nu
 
 export function Loading({ text = 'Laster …' }: { text?: string }) {
   return <p className="empty loading" role="status">{text}</p>;
+}
+
+/**
+ * Det som krever oppmerksomhet på et anløp, som små merker: kollisjon, mannskap som mangler
+ * og gult/rødt flagg. Ingenting vises når alt er i orden, så listene holder seg rolige.
+ */
+export function CallIssues({ call, showFlag = true }: { call: PortCallView; showFlag?: boolean }) {
+  const done = call.status === 'ferdig' || call.status === 'avlyst';
+  const open = call.crew.filter(s => !s.user).length;
+  const chips: { key: string; text: string; title?: string; tone: 'bad' | 'warn' }[] = [];
+  if (call.collisions.length && !done) {
+    const boats = [...new Set(call.collisions.flatMap(x => x.with.map(w => w.boat_name)))];
+    chips.push({ key: 'c', tone: 'bad', text: boats.length ? `Kolliderer med ${boats.join(', ')}` : 'Kollisjon', title: call.collisions.map(x => x.text).join(' · ') });
+  }
+  if (!done && call.crew.length && !call.responsible) chips.push({ key: 'a', tone: 'warn', text: 'Ansvarlig mangler' });
+  else if (!done && open) chips.push({ key: 'o', tone: 'warn', text: `${open} ${open === 1 ? 'rolle' : 'roller'} uten navn` });
+  if (showFlag && (call.boat.flag === 'red' || call.boat.flag === 'yellow')) {
+    chips.push({ key: 'f', tone: call.boat.flag === 'red' ? 'bad' : 'warn', text: FLAG_STYLE[call.boat.flag].label, title: call.boat.flag_reason ?? undefined });
+  }
+  if (!chips.length) return null;
+  return (
+    <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {chips.map(ch => (
+        <span key={ch.key} className="badge" title={ch.title}
+          style={{ fontSize: 12, padding: '3px 9px', '--badge-c': ch.tone === 'bad' ? '#FF6B5E' : '#F7B955', color: ch.tone === 'bad' ? 'var(--bad-fg)' : 'var(--warn-fg)', background: ch.tone === 'bad' ? 'rgba(229,72,77,.14)' : 'rgba(247,185,85,.16)' } as CSSProperties}>
+          <span className="dot" style={{ background: 'currentColor' }} />{ch.text}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Nøkkeltall på én rolig rad uten bokser, skilt med tynne linjer (som «Main Statistics»). */
+export function StatStrip({ items }: { items: { label: string; value: ReactNode; unit?: string; note?: ReactNode }[] }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px 0' }}>
+      {items.map((it, i) => (
+        <div key={it.label} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: i ? '0 32px' : '0 32px 0 0', borderLeft: i ? '1px solid var(--line)' : undefined, minWidth: 150 }}>
+          <span style={{ fontSize: 13, color: 'var(--sage)' }}>{it.label}</span>
+          <span className="n" style={{ fontSize: 38, fontWeight: 200, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
+            {it.value}{it.unit && <span style={{ fontSize: 18, color: 'var(--fg-45)' }}>{it.unit}</span>}
+          </span>
+          {it.note && <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)' }}>{it.note}</span>}
+        </div>
+      ))}
+    </div>
+  );
 }

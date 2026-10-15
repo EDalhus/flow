@@ -1,7 +1,7 @@
 .arow {
   display: grid;
-  grid-template-columns: 110px minmax(170px, 1.3fr) 90px 64px minmax(160px, 1.6fr) minmax(170px, 1.3fr) 130px;
-  align-items: center; gap: 14px; padding: 12px 18px;
+  grid-template-columns: 120px minmax(180px, 1.2fr) minmax(200px, 1.6fr) minmax(130px, .8fr) minmax(190px, 1.1fr);
+  align-items: center; gap: 20px; padding: 16px 24px;
 }
 .arow-link { color: inherit; text-decoration: none; transition: background .15s; }
 .arow-link:hover { background: rgba(var(--tint), .04); }

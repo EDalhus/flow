@@ -4,7 +4,7 @@ import type { QuayLogView } from '../../../shared/api.ts';
 import { CATEGORY_LABEL } from '../../../shared/domain/types.ts';
 import { ArrowUpRight, Camera, Star } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
-import { Loading, QuayMark, SearchBox, Segmented, Stars } from '../components/ui.tsx';
+import { Loading, QuayMark, SearchBox, Segmented, StatStrip, Stars } from '../components/ui.tsx';
 import { ddmm, fr, osloTime, serviceDate } from '../lib/format.ts';
 import { useQuayLogs } from '../lib/queries.ts';
 import './kaibok.css';
@@ -36,20 +36,11 @@ export function KaibokLogPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
-          {[
-            ['Kaibøker levert', String(stats?.count ?? '–'), ''],
-            ['Med avvik', String(stats?.with_deviation ?? '–'), stats?.deviation_share != null ? ` · ${Math.round(stats.deviation_share * 100)} %` : ''],
-            ['Snittvurdering', avg.split(',')[0], avg.includes(',') ? `,${avg.split(',')[1]} av 5` : ''],
-          ].map(([label, big, dim]) => (
-            <div key={label} className="glass" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 4, borderRadius: 22 }}>
-              <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{label}</span>
-              <span className="n" style={{ fontSize: 44, fontWeight: 200, lineHeight: 1.05, letterSpacing: '-0.02em' }}>
-                {big}<span style={{ color: 'var(--fg-45)', fontSize: 24 }}>{dim}</span>
-              </span>
-            </div>
-          ))}
-        </div>
+        <StatStrip items={[
+          { label: 'Kaibøker levert', value: String(stats?.count ?? '–') },
+          { label: 'Med avvik', value: String(stats?.with_deviation ?? '–'), note: stats?.deviation_share != null ? `${Math.round(stats.deviation_share * 100)} % av kaibøkene` : undefined },
+          { label: 'Snittvurdering', value: avg, unit: ' av 5' },
+        ]} />
 
         <section className="panel-light" aria-label="Kaibøker" style={{ overflow: 'hidden' }}>
           <div className="krow hide-s" style={{ cursor: 'default', fontSize: 12, color: 'var(--fg-55)', borderTop: 'none' }}>

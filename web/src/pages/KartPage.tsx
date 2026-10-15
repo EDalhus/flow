@@ -3,13 +3,13 @@ import { useSearchParams } from 'react-router';
 import type { PortCallView } from '../../../shared/api.ts';
 import { AlertsPanel, useAlerts } from '../components/Alerts.tsx';
 import { CallDetail, type DetailTab } from '../components/CallDetail.tsx';
-import { Anchor, Check, Minus, Plus, Target, TrendUp, Warning } from '../components/Icons.tsx';
+import { Anchor, Minus, Plus, Target, TrendUp } from '../components/Icons.tsx';
 import { KaibokModal } from '../components/KaibokForm.tsx';
 import { Sidebar, Topbar } from '../components/Topbar.tsx';
-import { FlagBadge, Loading, QuayMark, Rating, Segmented, StatusBadge } from '../components/ui.tsx';
+import { CallIssues, Loading, QuayMark, Segmented, StatusBadge } from '../components/ui.tsx';
 import { ATTRIBUTION, FlowMap, type MapHandle, type Project } from '../map/FlowMap.tsx';
-import { STATUS_STYLE, addDays, nb, crewSummary, dayHeading, goodsShort, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
-import { useAis, useMe, usePortCalls, useQuays, useSettings } from '../lib/queries.ts';
+import { STATUS_STYLE, addDays, nb, dayHeading, goodsShort, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
+import { useAis, useMe, usePortCalls, useQuays, useSettings, useSummary } from '../lib/queries.ts';
 import { AisCheck } from '../components/AisCheck.tsx';
 import { VesselLayer, aisLive } from '../map/Vessels.tsx';
 import { useNow } from '../lib/useNow.ts';
@@ -64,20 +64,7 @@ export function KartPage() {
 
   const todays = list.filter(c => c.service_date === today);
   const active = list.filter(c => c.status !== 'ferdig');
-  const counts = [
-    { n: todays.length, label: 'i dag' },
-    { n: list.filter(c => c.status === 'ved_kai').length, label: 'ved kai' },
-    { n: list.filter(c => c.status === 'paa_vei').length, label: 'på vei' },
-    { n: list.filter(c => c.service_date === tomorrow).length, label: 'i morgen' },
-  ];
   const clashCount = active.filter(c => c.collisions.length).length;
-  const tonnesToday = todays.reduce((t, c) => t + c.tonnes_in + c.tonnes_out, 0);
-  const stats = [
-    { label: 'Anløp i dag', value: String(counts[0].n), note: `${todays.filter(c => c.status !== 'ferdig').length} gjenstår` },
-    { label: 'Ved kai nå', value: String(counts[1].n), note: '' },
-    { label: 'På vei til oss', value: String(counts[2].n), note: '' },
-    { label: 'Tonn over kaia i dag', value: nb(tonnesToday), note: `${counts[3].n} anløp i morgen` },
-  ];
   const groups = [today, tomorrow].map(d => ({
     date: d,
     title: d === today ? 'I dag' : dayHeading(d, today),
@@ -190,10 +177,13 @@ export function KartPage() {
 
       <aside className="ov glass scroll kart-left" aria-label="Anløp">
         <span className="eyebrow" style={{ padding: '4px 6px 0' }}>Anløp i dag og i morgen</span>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-          <Stat icon={<span style={{ width: 22, height: 22, borderRadius: '50%', background: '#5BD68A', color: '#1A231E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={13} strokeWidth={3} /></span>}
-            label="I rute" value={active.length - clashCount} />
-          <Stat icon={<Warning />} label="Kollisjon" value={clashCount} onClick={clashCount ? () => setFilter('kollisjon') : undefined} />
+        <div style={{ display: 'flex', gap: 8, padding: '0 6px', fontSize: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 8, height: 8, background: 'var(--green)' }} />{active.length - clashCount} i rute</span>
+          {clashCount > 0 && (
+            <button type="button" onClick={() => setFilter('kollisjon')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--bad-fg)' }}>
+              <span className="dot" style={{ width: 8, height: 8, background: 'var(--red)' }} />{clashCount} {clashCount === 1 ? 'kollisjon' : 'kollisjoner'}
+            </button>
+          )}
         </div>
         <Segmented<Filter> label="Filter" value={filter} onChange={setFilter} stretch
           options={[{ value: 'alle', label: 'Alle' }, { value: 'levering', label: 'Levering' }, { value: 'henting', label: 'Henting' }, { value: 'kollisjon', label: 'Kollisjon' }]} />
@@ -209,20 +199,7 @@ export function KartPage() {
         {calls.isSuccess && !groups.length && <p className="empty" style={{ padding: 20 }}>Ingen anløp i dette filteret.</p>}
       </aside>
 
-      {!selected && (
-        <aside className="ov kart-stats" aria-label="Hovedtall">
-          <h2 style={{ margin: '0 0 4px', fontSize: 32, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.08 }}>Hovedtall<br />i dag</h2>
-          {stats.map(st => (
-            <div key={st.label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 14, color: 'var(--sage)' }}>{st.label}</span>
-              <span style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-                <span className="n" style={{ fontSize: 38, fontWeight: 200, lineHeight: 1.05, letterSpacing: '-0.02em' }}>{st.value}</span>
-                {st.note && <span className="n" style={{ fontSize: 14, color: 'var(--aqua)', display: 'flex', alignItems: 'center', gap: 4 }}><TrendUp size={14} />{st.note}</span>}
-              </span>
-            </div>
-          ))}
-        </aside>
-      )}
+      {!selected && <MainStats />}
 
       <div className="ov kart-zoom">
         <span style={{ fontSize: 15, marginRight: 6 }}>Zoom</span>
@@ -247,46 +224,68 @@ export function KartPage() {
   );
 }
 
-function Stat({ icon, label, value, onClick }: { icon: React.ReactNode; label: string; value: number; onClick?: () => void }) {
-  const body = (
-    <>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{icon}<span style={{ fontSize: 14 }}>{label}</span></div>
-      <span className="n" style={{ fontSize: 40, fontWeight: 200, lineHeight: 1 }}>{value}</span>
-    </>
-  );
-  const style: React.CSSProperties = { borderRadius: 20, background: 'rgba(var(--tint), .035)', border: '1px solid rgba(var(--tint), .06)', padding: '14px 16px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', textAlign: 'left' };
-  return onClick
-    ? <button type="button" onClick={onClick} style={{ ...style, cursor: 'pointer' }}>{body}</button>
-    : <div style={style}>{body}</div>;
-}
-
 function CallCard({ call: c, on, onClick }: { call: PortCallView; on: boolean; onClick: () => void }) {
-  const crew = crewSummary(c);
-  const boats = [...new Set(c.collisions.flatMap(x => x.with.map(w => w.boat_name)))];
   return (
-    <button type="button" className={`card${on ? ' on' : ''}${c.status === 'ferdig' ? ' done' : ''}`} onClick={onClick} aria-pressed={on}>
-      <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, width: '100%' }}>
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-          <span style={{ fontSize: 19, letterSpacing: '-0.01em' }}>{c.boat.name}</span>
-          <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            {timeRange(c)} · <QuayMark quay={c.quay} compact /> · {typeLabel(c.type)}
-          </span>
-        </span>
+    <button type="button" className={`card${on ? ' on' : ''}${c.status === 'ferdig' ? ' done' : ''}`} onClick={onClick} aria-pressed={on} style={{ gap: 8, padding: '14px 16px' }}>
+      <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, width: '100%' }}>
+        <span style={{ fontSize: 18, letterSpacing: '-0.01em', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.boat.name}</span>
         <StatusBadge status={c.status} basis={c.status_basis} />
       </span>
-      <span style={{ fontSize: 13, color: 'var(--fg-75)' }}>{goodsShort(c.goods)}</span>
-      <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 12 }}>
-        <FlagBadge flag={c.boat.flag} />
-        <Rating value={c.boat.rating_count ? c.boat.avg_total : null} />
-        <span style={{ color: crew.ansWarn ? 'var(--warn-fg)' : 'var(--fg-62)' }}>{crew.ansText}{crew.open ? ` · ${crew.open} uten navn` : ''}</span>
+      <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <span>{timeRange(c)}</span><span aria-hidden="true">·</span><QuayMark quay={c.quay} compact /><span aria-hidden="true">·</span><span>{typeLabel(c.type)}</span>
       </span>
-      {c.collisions.length > 0 && (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--bad-fg)', fontSize: 12 }}>
-          <span className="dot" style={{ background: '#E5484D' }} />
-          {boats.length ? `Kolliderer med ${boats.join(', ')}` : c.collisions[0].text}
-        </span>
-      )}
+      <span style={{ fontSize: 13, color: 'var(--fg-75)', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{goodsShort(c.goods)}</span>
+      <CallIssues call={c} />
     </button>
+  );
+}
+
+const PERIODS = [7, 30, 90, 180] as const;
+
+/** Hovedtall: tonn utlevert (og mottatt) siste 7/30/90/180 dager mot perioden før. */
+function MainStats() {
+  const [days, setDays] = useState<number>(() => {
+    try { const v = Number(localStorage.getItem('flow-periode')); return PERIODS.includes(v as 30) ? v : 30; } catch { return 30; }
+  });
+  const pick = (d: number) => { setDays(d); try { localStorage.setItem('flow-periode', String(d)); } catch { /* ignorer */ } };
+  const sum = useSummary(days);
+  const d = sum.data;
+  const change = (a: number, b: number) => {
+    if (!b) return null;
+    const p = Math.round((a / b - 1) * 100);
+    return { text: `${p > 0 ? '+' : p < 0 ? '−' : '±'}${Math.abs(p)} %`, up: p >= 0 };
+  };
+  const main = d && change(d.out.tonnes, d.prev.out.tonnes);
+  return (
+    <aside className="ov kart-stats" aria-label="Hovedtall">
+      <h2 style={{ margin: 0, fontSize: 32, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.08 }}>Hovedtall</h2>
+      <div role="group" aria-label="Periode" style={{ display: 'flex', gap: 4 }}>
+        {PERIODS.map(p => (
+          <button key={p} type="button" className="tab" aria-pressed={days === p} onClick={() => pick(p)} style={{ minHeight: 32, padding: '0 11px', fontSize: 13 }}>
+            {p} d
+          </button>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 14, color: 'var(--sage)' }}>Tonn utlevert</span>
+        <span className="n" style={{ fontSize: 52, fontWeight: 200, lineHeight: 1.02, letterSpacing: '-0.03em' }}>{d ? nb(d.out.tonnes) : '–'}</span>
+        {main && (
+          <span className="n" style={{ fontSize: 13, color: main.up ? 'var(--aqua)' : 'var(--bad-fg)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <TrendUp size={14} style={main.up ? undefined : { transform: 'scaleY(-1)' }} />{main.text} mot forrige {days} d
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: 13, color: 'var(--sage)' }}>Mottatt</span>
+          <span className="n" style={{ fontSize: 26, fontWeight: 300 }}>{d ? nb(d.in.tonnes) : '–'}<span style={{ fontSize: 14, color: 'var(--fg-55)' }}> t</span></span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: 13, color: 'var(--sage)' }}>Anløp</span>
+          <span className="n" style={{ fontSize: 26, fontWeight: 300 }}>{d ? nb(d.calls) : '–'}</span>
+        </div>
+      </div>
+    </aside>
   );
 }
 

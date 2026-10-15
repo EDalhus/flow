@@ -184,3 +184,11 @@ export function useSaveQuay() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['quays'] }),
   });
 }
+
+export type Summary = {
+  days: number; from: string; to: string;
+  out: { tonnes: number; calls: number }; in: { tonnes: number; calls: number }; calls: number;
+  prev: { from: string; to: string; out: { tonnes: number; calls: number }; in: { tonnes: number; calls: number }; calls: number };
+};
+export const useSummary = (days: number) =>
+  useQuery({ queryKey: ['summary', days], queryFn: () => api<Summary>(`/reports/summary?days=${days}`), placeholderData: keepPreviousData, staleTime: 5 * 60_000 });

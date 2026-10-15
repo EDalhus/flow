@@ -3,7 +3,7 @@ import type { ProductReportRow, WeeklyReport } from '../../../shared/api.ts';
 import { CATEGORY_LABEL } from '../../../shared/domain/types.ts';
 import { TrendUp } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
-import { Loading, Segmented } from '../components/ui.tsx';
+import { Loading, Segmented, StatStrip } from '../components/ui.tsx';
 import { arrow, nb, pct } from '../lib/format.ts';
 import { useProductReport, useProducts, useQualityReport, useWeeklyReport } from '../lib/queries.ts';
 import './rapporter.css';
@@ -111,17 +111,7 @@ function Kpis({ w, dirWord }: { w: WeeklyReport; dirWord: string }) {
       cmp: `${arrow(t.forecast_tonnes, t.forecast_tonnes_prev)}${pct(t.forecast_tonnes, t.forecast_tonnes_prev)} mot samme uker i fjor`,
     },
   ];
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: 12 }}>
-      {kpis.map(k => (
-        <div key={k.label} className="glass" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span className="sub">{k.label}</span>
-          <span className="n" style={{ fontSize: 38, fontWeight: 200, lineHeight: 1.1, letterSpacing: '-0.02em' }}>{k.big}<span style={{ color: 'var(--fg-45)', fontSize: 18 }}>{k.unit}</span></span>
-          <span className="n" style={{ fontSize: 13, color: 'var(--fg-75)' }}>{k.cmp}</span>
-        </div>
-      ))}
-    </div>
-  );
+  return <StatStrip items={kpis.map(k => ({ label: k.label, value: k.big, unit: k.unit, note: k.cmp }))} />;
 }
 
 function Outlook({ w, name, dirWord }: { w: WeeklyReport; name: string; dirWord: string }) {
@@ -134,19 +124,27 @@ function Outlook({ w, name, dirWord }: { w: WeeklyReport; name: string; dirWord:
   const title = empty ? `Ingen varer ${dirWord} for ${name}` : `${up ? 'Økende' : 'Lavere'} trykk de neste fire ukene – ${name}`;
   const text = empty
     ? `${name.charAt(0).toUpperCase() + name.slice(1)} går ikke ${dirWord} over kaia i perioden – velg «Inn + ut» eller en annen vare.`
-    : `Uke ${last + 1}–${Math.min(last + 4, w.weeks_in_year)} ventes ${nb(o.next4_tonnes)} t (${pct(o.next4_tonnes, o.next4_tonnes_prev)} mot i fjor).` +
-      (o.busiest_week ? ` Travleste uke ventes å bli uke ${o.busiest_week} med ca. ${o.busiest_calls} anløp og ${nb(o.busiest_tonnes)} t – ${versus} samme uke i fjor (${pct(o.busiest_tonnes, o.busiest_tonnes_prev)} tonn).` : '');
+    : `Uke ${last + 1}–${Math.min(last + 4, w.weeks_in_year)}: ${nb(o.next4_tonnes)} t (${pct(o.next4_tonnes, o.next4_tonnes_prev)} mot i fjor).` +
+      (o.busiest_week ? ` Travleste uke: ${o.busiest_week}, ca. ${o.busiest_calls} anløp.` : '');
+  const detail = o.busiest_week
+    ? `Uke ${o.busiest_week} ventes ${nb(o.busiest_tonnes)} t – ${versus} samme uke i fjor (${pct(o.busiest_tonnes, o.busiest_tonnes_prev)} tonn). `
+    : '';
   return (
-    <div className="panel-accent" style={{ padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+    <div className="panel-accent" style={{ padding: '18px 24px', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
       <span style={{ width: 36, height: 36, flex: 'none', borderRadius: '50%', background: 'rgba(128,239,222,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C2F7EE' }}>
         <TrendUp size={18} style={up ? undefined : { transform: 'scaleY(-1)' }} />
       </span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={{ fontSize: 26, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{title}</span>
-        <span style={{ fontSize: 15, color: 'var(--fg-85)', marginTop: 4 }}>{text}</span>
-        <span style={{ fontSize: 12, color: 'var(--fg-55)' }}>
-          Prognose = fjorårets tall for samme uke × årets trend siste 8 uker ({pct(w.trend.tonnes, 1)} mot {w.prev_year}). Tallene er eksempeldata.
-        </span>
+        <span style={{ fontSize: 22, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.2 }}>{title}</span>
+        <span style={{ fontSize: 15, color: 'var(--fg-85)' }}>{text}</span>
+        {!empty && (
+          <details style={{ fontSize: 13, color: 'var(--fg-62)', marginTop: 2 }}>
+            <summary style={{ cursor: 'pointer', width: 'fit-content' }}>Slik regnes prognosen</summary>
+            <p style={{ margin: '6px 0 0' }}>
+              {detail}Prognose = fjorårets tall for samme uke × årets trend siste 8 uker ({pct(w.trend.tonnes, 1)} mot {w.prev_year}). Tallene er eksempeldata.
+            </p>
+          </details>
+        )}
       </div>
     </div>
   );
@@ -179,7 +177,7 @@ function MainChart({ w, name, dirWord, dir, prodSelected, hover, onHover }: {
     const on = i === hw;
     const fill = fc(i)
       ? { background: `rgba(128,239,222,${on ? '.5' : '.28'})`, border: '1px dashed #80EFDE', borderBottom: 'none' }
-      : { background: on ? '#C2F7EE' : '#80EFDE' };
+      : { background: on ? '#80EFDE' : 'rgba(128,239,222,.5)' };
     return (
       <div key={i} className="wk" onMouseEnter={() => onHover(i)} style={on ? { background: 'rgba(var(--tint), .06)', borderRadius: 4 } : undefined}>
         <div style={{ width: '100%', borderRadius: '3px 3px 0 0', height: `${((v / max) * 100).toFixed(1)}%`, ...fill }} />
@@ -193,7 +191,7 @@ function MainChart({ w, name, dirWord, dir, prodSelected, hover, onHover }: {
         <div><h2 id="c-main" className="ttl" style={{ fontSize: 20 }}>Varer og anløp per uke</h2>
           <span className="sub">{name.charAt(0).toUpperCase() + name.slice(1)} · {dirWord} · hold over en uke for detaljer</span></div>
         <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'rgba(var(--tint), .7)', flexWrap: 'wrap' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 10, borderRadius: 2, background: '#80EFDE' }} />{w.year}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 10, borderRadius: 2, background: 'rgba(128,239,222,.5)' }} />{w.year}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 10, borderRadius: 2, background: 'rgba(128,239,222,.28)', border: '1px dashed #80EFDE' }} />Prognose</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 2, background: '#D6E0D9' }} />{w.prev_year}</span>
         </div>

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { reportQuery } from '../../shared/schemas.ts';
-import { isoWeek, todayOslo } from '../../shared/time.ts';
+import { addDays, isoWeek, todayOslo } from '../../shared/time.ts';
 import { buildProducts, buildWeekly, loadFacts, loadQuality } from '../db/reports.ts';
 import { fail, query } from '../lib/http.ts';
 import { loadSettings } from '../lib/settings.ts';
@@ -44,6 +44,37 @@ app.get('/quality', query(z.object({ weeks: z.coerce.number().int().min(1).max(5
   const { weeks } = c.req.valid('query');
   const settings = await loadSettings(c.env.DB);
   return c.json(await loadQuality(c.env.DB, todayOslo(), weeks, settings.punctuality_window_minutes));
+});
+
+/**
+ * Tonn og anløp siste N dager mot de N dagene før (hovedtallene på kartet).
+ * «Ut» = utlevert fra kaia (henting), «inn» = mottatt (levering). Bare ferdige anløp.
+ */
+app.get('/summary', query(z.object({ days: z.coerce.number().int().min(1).max(366).default(30) })), async c => {
+  const { days } = c.req.valid('query');
+  const today = todayOslo();
+  const from = addDays(today, -(days - 1));
+  const prevTo = addDays(from, -1);
+  const prevFrom = addDays(prevTo, -(days - 1));
+  const window = async (a: string, b: string) => {
+    const [dirs, calls] = await c.env.DB.batch([
+      c.env.DB.prepare(`
+        SELECT g.direction, sum(g.quantity * s.kg_per_unit) / 1000.0 AS tonnes, count(DISTINCT pc.id) AS calls
+        FROM port_calls pc JOIN port_call_goods g ON g.port_call_id = pc.id JOIN skus s ON s.id = g.sku_id
+        WHERE pc.completed_at IS NOT NULL AND pc.cancelled_at IS NULL AND pc.service_date BETWEEN ? AND ?
+        GROUP BY g.direction`).bind(a, b),
+      c.env.DB.prepare(`SELECT count(*) AS n FROM port_calls WHERE completed_at IS NOT NULL AND cancelled_at IS NULL AND service_date BETWEEN ? AND ?`).bind(a, b),
+    ]);
+    const by = Object.fromEntries((dirs.results as { direction: string; tonnes: number; calls: number }[]).map(r => [r.direction, r]));
+    const r1 = (n: number | undefined) => Math.round((n ?? 0) * 10) / 10;
+    return {
+      out: { tonnes: r1(by.ut?.tonnes), calls: by.ut?.calls ?? 0 },
+      in: { tonnes: r1(by.inn?.tonnes), calls: by.inn?.calls ?? 0 },
+      calls: (calls.results[0] as { n: number }).n,
+    };
+  };
+  const [current, previous] = await Promise.all([window(from, today), window(prevFrom, prevTo)]);
+  return c.json({ days, from, to: today, ...current, prev: { from: prevFrom, to: prevTo, ...previous } });
 });
 
 export default app;
