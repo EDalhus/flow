@@ -6,9 +6,9 @@ import type { PortCallCreateInput } from '../../../shared/schemas.ts';
 import { isoWeek, osloToUtc } from '../../../shared/time.ts';
 import { Close, Minus, Plus } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
-import { BoatFlagLine, Loading, SearchBox, Segmented, StatusBadge } from '../components/ui.tsx';
+import { BoatFlagLine, Loading, QuayMark, SearchBox, Segmented, StatusBadge } from '../components/ui.tsx';
 import { api, errorText } from '../lib/api.ts';
-import { FLAG_STYLE, addDays, crewSummary, dayHeading, dayShort, fr, goodsShort, hmFromIso, nb, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
+import { FLAG_STYLE, addDays, crewSummary, dayHeading, dayShort, fr, goodsShort, hmFromIso, nb, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useBoats, useCreatePortCall, useMe, usePortCalls, useProducts, useQuays, useUsers, type Sku } from '../lib/queries.ts';
 import { canPlan } from '../lib/roles.ts';
 import './anlop.css';
@@ -98,7 +98,7 @@ function Row({ call: c, fresh }: { call: PortCallView; fresh: boolean }) {
         <BoatFlagLine boat={c.boat} />
       </span>
       <span style={{ fontSize: 14, color: 'rgba(243,245,246,.8)' }}>{typeLabel(c.type)}</span>
-      <span style={{ fontSize: 14 }}>{c.quay.name}</span>
+      <span style={{ fontSize: 14, minWidth: 0 }}><QuayMark quay={c.quay} compact /></span>
       <span style={{ fontSize: 14, color: 'rgba(243,245,246,.8)' }}>{goodsShort(c.goods) || '–'}</span>
       <span style={{ display: 'flex', flexDirection: 'column', fontSize: 13, lineHeight: 1.35 }}>
         <span style={{ color: crew.ansWarn ? '#F7C873' : undefined }}>{crew.ansText}</span>
@@ -145,7 +145,10 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
   // Standardvalg når oppslagene er lastet.
   const boatList = useMemo(() => [...(boats.data ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'nb')), [boats.data]);
   const boat = boatList.find(b => b.id === boatId) ?? boatList[0];
-  const quay = quayId || quays.data?.[0]?.id || '';
+  const quayList = quays.data ?? [];
+  const ownQuays = quayList.filter(q => !q.company);
+  const partnerQuays = quayList.filter(q => q.company);
+  const quay = quayId || quayList[0]?.id || '';
   const seller = sellerId || (me.data?.roles.includes('salg') ? me.data.id : sellers[0]?.id ?? '');
   const allSkus = (products.data ?? []).flatMap(p => p.skus.map(s => ({ ...s, name: p.name })));
   const goods = lines.map(l => ({ sku: allSkus.find(s => s.id === (l.sku_id || allSkus[0]?.id)), qty: Number(l.quantity) || 0 }));
@@ -217,7 +220,19 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
           <Segmented label="Type" value={type} onChange={setType} stretch options={[{ value: 'levering', label: 'Levering' }, { value: 'henting', label: 'Henting' }]} />
         </div>
         <div className="field"><span>Kai</span>
-          <Segmented label="Kai" value={quay} onChange={setQuayId} stretch options={(quays.data ?? []).map(qy => ({ value: qy.id, label: qy.name }))} />
+          {partnerQuays.length === 0 ? (
+            <Segmented label="Kai" value={quay} onChange={setQuayId} stretch
+              options={ownQuays.map(qy => ({ value: qy.id, label: quayTitle(qy) }))} />
+          ) : (
+            <select className="inp" value={quay} onChange={e => setQuayId(e.target.value)} aria-label="Kai">
+              <optgroup label="Våre kaier">
+                {ownQuays.map(qy => <option key={qy.id} value={qy.id}>{quayTitle(qy)}</option>)}
+              </optgroup>
+              <optgroup label="Nabo – samarbeid">
+                {partnerQuays.map(qy => <option key={qy.id} value={qy.id}>{quayLabel(qy)}</option>)}
+              </optgroup>
+            </select>
+          )}
         </div>
       </div>
 

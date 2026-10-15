@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type { BoatSummary, PortCallView } from '../../../shared/api.ts';
+import type { BoatSummary, PortCallView, QuayRef } from '../../../shared/api.ts';
 import type { CallStatus, Flag } from '../../../shared/domain/types.ts';
-import { FLAG_STYLE, STATUS_STYLE, fr, ratingColor } from '../lib/format.ts';
+import { FLAG_STYLE, STATUS_STYLE, fr, isOwnQuay, quayTitle, ratingColor } from '../lib/format.ts';
 import { Flag as FlagIcon, Search, Star } from './Icons.tsx';
 
 export function StatusBadge({ status, basis, size = 'sm' }: { status: CallStatus; basis?: PortCallView['status_basis']; size?: 'sm' | 'lg' }) {
@@ -25,6 +25,29 @@ export function FlagBadge({ flag, icon = true, style }: { flag: Flag; icon?: boo
     <span className="badge" style={{ background: f.bg, color: f.c, gap: 5, padding: '3px 9px', ...style }}>
       {icon && <FlagIcon size={11} />}
       {f.label}
+    </span>
+  );
+}
+
+/** Tydelig merke: «Vår» vs «Nabo», med kallenavn som hovedtekst. */
+export function QuayMark({ quay, compact }: { quay: Pick<QuayRef, 'name' | 'nickname' | 'company'>; compact?: boolean }) {
+  const own = isOwnQuay(quay);
+  const title = quayTitle(quay);
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: compact ? 5 : 7, minWidth: 0, maxWidth: '100%' }}>
+      <span className="badge" style={{
+        flex: 'none', fontSize: compact ? 10 : 11, padding: compact ? '2px 6px' : '3px 8px', fontWeight: 500,
+        background: own ? 'rgba(255,255,255,.1)' : 'rgba(232,176,110,.18)',
+        color: own ? 'rgba(243,245,246,.78)' : '#E8B06E',
+      }}>
+        {own ? 'Vår' : 'Nabo'}
+      </span>
+      <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, minWidth: 0 }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+        {!own && quay.company && (
+          <span style={{ fontSize: compact ? 11 : 12, color: 'var(--fg-55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{quay.company}</span>
+        )}
+      </span>
     </span>
   );
 }

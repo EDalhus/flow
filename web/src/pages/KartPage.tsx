@@ -6,9 +6,9 @@ import { CallDetail, type DetailTab } from '../components/CallDetail.tsx';
 import { Anchor, Check, Clock, Minus, Plus, Target, Warning } from '../components/Icons.tsx';
 import { KaibokModal } from '../components/KaibokForm.tsx';
 import { Topbar } from '../components/Topbar.tsx';
-import { FlagBadge, Loading, Rating, Segmented, StatusBadge } from '../components/ui.tsx';
+import { FlagBadge, Loading, QuayMark, Rating, Segmented, StatusBadge } from '../components/ui.tsx';
 import { ATTRIBUTION, FlowMap, type MapHandle, type Project } from '../map/FlowMap.tsx';
-import { STATUS_STYLE, addDays, crewSummary, dayHeading, goodsShort, osloTime, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
+import { STATUS_STYLE, addDays, crewSummary, dayHeading, goodsShort, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useAis, useMe, usePortCalls, useQuays, useSettings } from '../lib/queries.ts';
 import { AisCheck } from '../components/AisCheck.tsx';
 import { VesselLayer, aisLive } from '../map/Vessels.tsx';
@@ -123,7 +123,10 @@ export function KartPage() {
         {quayPt && (
           <span style={{ position: 'absolute', left: quayPt[0], top: quayPt[1], transform: 'translate(-50%, -150%)', display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(243,245,246,.95)', color: '#0B0E11', borderRadius: 999, padding: '4px 10px 4px 6px', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
             <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#0B0E11', color: '#F3F5F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Anchor size={11} /></span>
-            Vår kai · {quays.data?.length ? `Kai ${quays.data.map(x => x.name.replace('Kai ', '')).join('–')}` : 'Flatholmen'}
+            Vår kai · {(() => {
+              const own = (quays.data ?? []).filter(x => !x.company);
+              return own.length ? own.map(x => quayTitle(x)).join(' · ') : 'Flatholmen';
+            })()}
           </span>
         )}
         <VesselLayer project={project} vessels={vessels} calls={list} selectedId={selected?.id} onSelect={id => select(id)}
@@ -249,7 +252,9 @@ function CallCard({ call: c, on, onClick }: { call: PortCallView; on: boolean; o
       <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, width: '100%' }}>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
           <span style={{ fontSize: 19, letterSpacing: '-0.01em' }}>{c.boat.name}</span>
-          <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)' }}>{timeRange(c)} · {c.quay.name} · {typeLabel(c.type)}</span>
+          <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {timeRange(c)} · <QuayMark quay={c.quay} compact /> · {typeLabel(c.type)}
+          </span>
         </span>
         <StatusBadge status={c.status} basis={c.status_basis} />
       </span>
@@ -273,15 +278,16 @@ function CallCard({ call: c, on, onClick }: { call: PortCallView; on: boolean; o
 function MapCard({ call, x, y, now, today, onChat }: { call: PortCallView; x: number; y: number; now: Date; today: string; onChat: () => void }) {
   const eta = Date.parse(call.eta);
   const mins = Math.round((eta - now.getTime()) / 60_000);
-  let sub = `Neste: Vår kai · ${call.quay.name}`;
+  const kai = quayLabel(call.quay);
+  let sub = call.quay.company ? `Neste · nabo ${quayTitle(call.quay)}` : `Neste: Vår kai · ${quayTitle(call.quay)}`;
   let big = osloTime(call.eta).slice(0, 2), dim = osloTime(call.eta).slice(2);
   let foot = call.service_date === today ? `ETA ${osloTime(call.eta)}` : `ETA ${call.service_date === addDays(today, 1) ? 'i morgen' : call.service_date.slice(8, 10) + '.' + call.service_date.slice(5, 7)}`;
   if (call.status === 'ved_kai') {
-    sub = `Ved kai · ${call.quay.name}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'Planlagt avgang';
+    sub = `Ved kai · ${kai}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'Planlagt avgang';
   } else if (call.status === 'ferdig') {
-    sub = `Ferdig · ${call.quay.name}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'Kaibok levert';
+    sub = `Ferdig · ${kai}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'Kaibok levert';
   } else if (call.status === 'kaibok_mangler') {
-    sub = `Kaibok mangler · ${call.quay.name}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'ETD passert – fyll ut kaibok';
+    sub = `Kaibok mangler · ${kai}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'ETD passert – fyll ut kaibok';
   } else if (call.service_date === today && mins > 0) {
     big = String(Math.floor(mins / 60)); dim = ` t ${String(mins % 60).padStart(2, '0')} min`; foot = `til ankomst · ETA ${osloTime(call.eta)}`;
   }
@@ -307,7 +313,8 @@ function MapCard({ call, x, y, now, today, onChat }: { call: PortCallView; x: nu
 
 /** Kaibelegg i dag: én bane per kai, kollisjoner skravert, strek for nå. */
 function Timeline({ calls, selected, onSelect, now, quays }: {
-  calls: PortCallView[]; selected?: string; onSelect: (id: string) => void; now: Date; quays: { id: string; name: string }[];
+  calls: PortCallView[]; selected?: string; onSelect: (id: string) => void; now: Date;
+  quays: { id: string; name: string; nickname: string | null; company: string | null }[];
 }) {
   const hour = (iso: string) => { const [h, m] = osloTime(iso).split(':').map(Number); return h + m / 60; };
   const t0 = Math.min(5, ...calls.map(c => Math.floor(hour(c.eta))));
@@ -342,9 +349,15 @@ function Timeline({ calls, selected, onSelect, now, quays }: {
       <div style={{ overflowX: 'auto', flex: 1 }}>
         <div style={{ minWidth: 520, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {quays.map(qy => (
-            <div key={qy.id} style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ width: 52, flex: 'none', fontSize: 13, color: 'var(--fg-62)' }}>{qy.name}</div>
-              <div style={{ position: 'relative', flex: 1, height: 38, borderRadius: 12, background: 'rgba(255,255,255,.03)' }}>
+            <div key={qy.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 118, flex: 'none', paddingRight: 4 }}>
+                <QuayMark quay={qy} compact />
+              </div>
+              <div style={{
+                position: 'relative', flex: 1, height: 38, borderRadius: 12,
+                background: isOwnQuay(qy) ? 'rgba(255,255,255,.03)' : 'rgba(232,176,110,.06)',
+                outline: isOwnQuay(qy) ? undefined : '1px solid rgba(232,176,110,.18)',
+              }}>
                 {calls.filter(c => c.quay.id === qy.id).map(c => {
                   const s = STATUS_STYLE[c.status];
                   const a = hour(c.eta), b = Math.max(a + 0.25, hour(c.etd) < a ? 24 : hour(c.etd));
@@ -363,7 +376,7 @@ function Timeline({ calls, selected, onSelect, now, quays }: {
             </div>
           ))}
           <div style={{ display: 'flex' }}>
-            <div style={{ width: 52, flex: 'none' }} />
+            <div style={{ width: 118, flex: 'none' }} />
             <div style={{ position: 'relative', flex: 1, height: 16 }}>
               {ticks.map(h => <span key={h} className="n" style={{ position: 'absolute', top: 0, transform: 'translateX(-50%)', fontSize: 11, color: 'rgba(243,245,246,.5)', left: `${pct(h)}%` }}>{String(h % 24).padStart(2, '0')}</span>)}
             </div>

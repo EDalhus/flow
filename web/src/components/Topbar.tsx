@@ -98,7 +98,7 @@ export function Topbar({ search, style, glass, alertsOpen, onAlerts }: {
     <header ref={ref} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', zIndex: 20, ...style }}>
       <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Logo /></div>
       <nav aria-label="Hovedmeny" style={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-        {[...LINKS, ...(me.data?.roles.includes('admin') ? [['/admin', 'Brukere'] as const] : [])].map(([to, label]) => (
+        {[...LINKS, ...(me.data?.roles.includes('admin') ? [['/admin', 'Admin'] as const] : [])].map(([to, label]) => (
           <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `nav${isActive ? ' active' : ''}`}>{label}</NavLink>
         ))}
       </nav>

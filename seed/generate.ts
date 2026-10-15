@@ -110,10 +110,12 @@ for (const [key, value] of Object.entries(SETTINGS)) add('settings', { key, valu
 // ---------------------------------------------------------------- kaier, agenter, båter
 
 // Omtrentlige posisjoner langs kaifronten ved adressen; justeres når AIS kobles på.
-add('quays', { id: 'q_kai1', name: 'Kai 1', sort: 1, lat: 62.47935, lon: 6.19240 });
-add('quays', { id: 'q_kai2', name: 'Kai 2', sort: 2, lat: 62.47900, lon: 6.19345 });
-const QUAYS = ['q_kai1', 'q_kai2'];
-const QUAY = { 'Kai 1': 'q_kai1', 'Kai 2': 'q_kai2' } as const;
+add('quays', { id: 'q_kai1', name: 'Kai 1', nickname: 'Ytre', company: null, sort: 1, lat: 62.47935, lon: 6.19240 });
+add('quays', { id: 'q_kai2', name: 'Kai 2', nickname: 'Indre', company: null, sort: 2, lat: 62.47900, lon: 6.19345 });
+// Eksempel på nabokai for samarbeid om kaiplass.
+add('quays', { id: 'q_nabo1', name: 'Kai A', nickname: 'Fiskebrygga', company: 'Ålesund Fiskemottak', sort: 10, lat: 62.4802, lon: 6.1911 });
+const QUAYS = ['q_kai1', 'q_kai2', 'q_nabo1'];
+const QUAY = { 'Kai 1': 'q_kai1', 'Kai 2': 'q_kai2', 'Kai A': 'q_nabo1' } as const;
 
 const AGENTS = {
   kystagenten: ['Kystagenten AS', '+47 400 10 201'],

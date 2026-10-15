@@ -1,8 +1,9 @@
 import type { GoodsView, PortCallView } from '../../../shared/api.ts';
+import { isOwnQuay, quayLabel, quayTitle } from '../../../shared/domain/quay.ts';
 import type { CallStatus, Flag } from '../../../shared/domain/types.ts';
 import { addDays, osloTime, serviceDate, todayOslo } from '../../../shared/time.ts';
 
-export { addDays, osloTime, serviceDate, todayOslo };
+export { addDays, isOwnQuay, osloTime, quayLabel, quayTitle, serviceDate, todayOslo };
 
 /** 4.6 → "4,6" */
 export const fr = (n: number | null | undefined, digits = 1) => (n == null ? '–' : n.toFixed(digits).replace('.', ','));

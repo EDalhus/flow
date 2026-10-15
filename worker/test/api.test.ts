@@ -313,6 +313,37 @@ describe('rapporter', () => {
   });
 });
 
+describe('kaier hos nabobedrifter', () => {
+  it('lar admin legge til nabokai med kallenavn og booke anløp der', async () => {
+    expect((await api('/quays', { body: { name: 'Kai A', company: 'Nabo AS' } })).status).toBe(403);
+    const created = await api('/quays', {
+      as: 'admin',
+      body: { name: 'Kai A', nickname: 'Fiskebrygga', company: 'Nabo AS', lat: 62.48, lon: 6.19 },
+    });
+    expect(created).toMatchObject({
+      status: 201,
+      json: { name: 'Kai A', nickname: 'Fiskebrygga', company: 'Nabo AS', active: true, lat: 62.48, lon: 6.19 },
+    });
+    const list = await api('/quays');
+    expect(list.json.find((q: { id: string }) => q.id === created.json.id)).toMatchObject({ nickname: 'Fiskebrygga', company: 'Nabo AS' });
+
+    const booked = await api('/port-calls', {
+      body: call('2030-04-01', '09:00', '11:00', { quay_id: created.json.id, boat_id: 'b_b' }),
+    });
+    expect(booked).toMatchObject({
+      status: 201,
+      json: { quay: { id: created.json.id, name: 'Kai A', nickname: 'Fiskebrygga', company: 'Nabo AS' } },
+    });
+
+    // Samme formelle navn hos oss og nabo er OK; kollisjon bruker kallenavn + bedrift.
+    await api('/quays', { as: 'admin', body: { name: 'Kai A', nickname: 'Ytre' } });
+    const clash = await api('/port-calls/check', {
+      body: call('2030-04-01', '10:00', '12:00', { quay_id: created.json.id, boat_id: 'b_a' }),
+    });
+    expect(clash.json.collisions[0]).toMatchObject({ kind: 'quay', text: 'Fiskebrygga · Nabo AS dobbeltbooket' });
+  });
+});
+
 async function exports_default_fetch(path: string) {
   const { exports } = await import('cloudflare:workers');
   return exports.default.fetch(new Request(`http://flow.test${path}`));

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import type { CollisionView, PortCallView } from '../../../shared/api.ts';
 import { errorText } from '../lib/api.ts';
@@ -7,6 +7,7 @@ import { useMe, useNotifications, usePatchPortCall, usePortCalls, useReadNotific
 import { canPlan } from '../lib/roles.ts';
 import { api } from '../lib/api.ts';
 import { Chevron, Close, Sparkle } from './Icons.tsx';
+import { QuayMark } from './ui.tsx';
 
 /** Kollisjoner og flagg for i dag og i morgen, pluss personlige varsler. Brukes av bjella. */
 export function useAlerts() {
@@ -122,7 +123,8 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
           return (
             <div key={id} className={red ? 'alert-red' : 'alert-yellow'} style={{ borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, ...(red ? { background: 'rgba(120,42,38,.3)' } : {}) }}>
               <AlertHead badge="!" badgeStyle={red ? { background: '#E5484D', color: '#fff' } : { background: '#F7B955', color: '#0B0E11' }}
-                title={`${red ? 'Rødt flagg' : 'Gult varsel'}: ${c.boat.name}`} sub={`${dayRelative(c.service_date)} ${osloTime(c.eta)} · ${c.quay.name}`}
+                title={`${red ? 'Rødt flagg' : 'Gult varsel'}: ${c.boat.name}`}
+                sub={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{dayRelative(c.service_date)} {osloTime(c.eta)} · <QuayMark quay={c.quay} compact /></span>}
                 open={isOpen} onClick={() => toggle(id)} />
               {isOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 30 }}>
@@ -159,7 +161,7 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
 }
 
 function AlertHead({ badge, badgeStyle, title, sub, open, onClick }: {
-  badge: string; badgeStyle: React.CSSProperties; title: string; sub: string; open: boolean; onClick: () => void;
+  badge: string; badgeStyle: React.CSSProperties; title: string; sub: ReactNode; open: boolean; onClick: () => void;
 }) {
   return (
     <button type="button" onClick={onClick} aria-expanded={open}
