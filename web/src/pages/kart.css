@@ -16,8 +16,11 @@
   top: 180px; right: 32px; width: 270px; display: flex; flex-direction: column; gap: 16px; padding: 22px 24px; border-radius: 28px;
   background: rgba(20, 27, 23, .62); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
 }
-.kart-zoom { right: 40px; bottom: 236px; display: flex; align-items: center; gap: 8px; }
-.kart.has-sel .kart-zoom { right: calc(32px + var(--col) + 24px); bottom: 290px; }
+.kart-zoom { right: 40px; bottom: 112px; display: flex; align-items: center; gap: 8px; }
+.kart.tl-open .kart-zoom { bottom: 236px; }
+.kart.has-sel .kart-zoom { right: calc(32px + var(--col) + 24px); }
+.kart.has-sel.tl-open .kart-zoom { bottom: 290px; }
+
 .kart-tl { left: calc(var(--edge) + var(--col) + 24px); right: 32px; bottom: 24px; min-height: 188px; padding: 20px 26px; display: flex; flex-direction: column; gap: 12px; }
 .kart.has-sel .kart-tl { right: calc(32px + var(--col) + 24px); }
 .kart-attr { position: absolute; right: 40px; bottom: 6px; font-size: 11px; color: var(--fg-45); z-index: 4; }
@@ -50,3 +53,6 @@
   .kart-attr { right: 12px; }
   .ov-hide { display: none !important; }
 }
+
+/* Sammenlagt kaibelegg: smal stripe nederst (må stå etter .kart-tl). */
+.kart .kart-tl.kart-tl-mini { min-height: 0; flex-direction: row; align-items: center; gap: 22px; padding: 12px 14px 12px 24px; border-radius: 999px; }

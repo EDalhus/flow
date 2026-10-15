@@ -34,6 +34,9 @@ export function KartPage() {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [kaibok, setKaibok] = useState(false);
   const [aisCheck, setAisCheck] = useState(false);
+  // Kaibelegget er lagt sammen som standard, så kartet får fokus. Valget huskes.
+  const [tlOpen, setTlOpen] = useState(() => { try { return localStorage.getItem('flow-kaibelegg') === 'open'; } catch { return false; } });
+  const toggleTl = () => setTlOpen(o => { try { localStorage.setItem('flow-kaibelegg', o ? 'closed' : 'open'); } catch { /* ignorer */ } return !o; });
   const me = useMe();
   const isAdmin = !!me.data?.roles.includes('admin');
   const mapRef = useRef<MapHandle>(null);
@@ -132,7 +135,7 @@ export function KartPage() {
   };
 
   return (
-    <div className={`kart${selected ? ' has-sel' : ''}`}>
+    <div className={`kart${selected ? ' has-sel' : ''}${tlOpen ? ' tl-open' : ''}`}>
       <Sidebar />
       <div className="kart-mapwrap" style={{ position: 'absolute', inset: 0 }}>
         {settings.isSuccess && (
@@ -208,7 +211,7 @@ export function KartPage() {
         <button type="button" className="zoom-btn solid" onClick={() => mapRef.current?.flyTo(fence.lon, fence.lat, 14)} aria-label="Sentrer på kaia"><Target size={17} /></button>
       </div>
 
-      <Timeline calls={todays} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} />
+      <Timeline calls={todays} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} open={tlOpen} onToggle={toggleTl} />
 
       {alertsOpen && <div className="ov kart-alerts"><AlertsPanel onClose={() => setAlertsOpen(false)} /></div>}
 
@@ -327,9 +330,10 @@ function MapCard({ call, x, y, now, today, onChat }: { call: PortCallView; x: nu
 }
 
 /** Kaibelegg i dag: én bane per kai, kollisjoner skravert, strek for nå. */
-function Timeline({ calls, selected, onSelect, now, quays }: {
+function Timeline({ calls, selected, onSelect, now, quays, open, onToggle }: {
   calls: PortCallView[]; selected?: string; onSelect: (id: string) => void; now: Date;
   quays: { id: string; name: string; nickname: string | null; company: string | null }[];
+  open: boolean; onToggle: () => void;
 }) {
   const hour = (iso: string) => { const [h, m] = osloTime(iso).split(':').map(Number); return h + m / 60; };
   const t0 = Math.min(5, ...calls.map(c => Math.floor(hour(c.eta))));
@@ -346,11 +350,41 @@ function Timeline({ calls, selected, onSelect, now, quays }: {
   for (let h = Math.ceil(t0 / 2) * 2; h <= t1; h += 2) ticks.push(h);
   const nowH = hour(now.toISOString());
 
+  if (!open) {
+    // Sammenlagt: én smal stripe med en minitidslinje per kai.
+    const ownQuays = quays.filter(q => isOwnQuay(q) || calls.some(c => c.quay.id === q.id));
+    return (
+      <section className="ov glass kart-tl kart-tl-mini" aria-label="Kaibelegg i dag">
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 150 }}>
+          <span style={{ fontSize: 15 }}>Kaibelegg i dag</span>
+          <span style={{ fontSize: 12, color: 'var(--fg-62)' }}>
+            {remaining} gjenstår{zones.length ? <> · <span style={{ color: 'var(--bad-fg)' }}>{zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span></> : ''}
+          </span>
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }} aria-hidden="true">
+          {ownQuays.map(qy => (
+            <div key={qy.id} style={{ position: 'relative', height: 7, borderRadius: 4, background: 'rgba(var(--tint), .08)' }}>
+              {calls.filter(c => c.quay.id === qy.id).map(c => {
+                const a = hour(c.eta), b = Math.max(a + 0.25, hour(c.etd) < a ? 24 : hour(c.etd));
+                return <span key={c.id} style={{ position: 'absolute', top: 0, bottom: 0, left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, borderRadius: 4, background: c.collisions.length ? 'var(--red-soft)' : STATUS_STYLE[c.status].c, opacity: c.status === 'ferdig' ? .4 : .85 }} />;
+              })}
+              {nowH >= t0 && nowH <= t1 && <span style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--fg)', left: `${pct(nowH)}%` }} />}
+            </div>
+          ))}
+        </div>
+        <button type="button" className="btn" onClick={onToggle} aria-expanded={false} style={{ minHeight: 36, fontSize: 13, padding: '0 14px' }}>Vis</button>
+      </section>
+    );
+  }
+
   return (
     <section className="ov panel-light kart-tl" aria-labelledby="tl-h">
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <h2 id="tl-h" style={{ margin: 0, fontSize: 26, fontWeight: 300, letterSpacing: '-0.02em' }}>Kaibelegg i dag</h2>
+          <h2 id="tl-h" style={{ margin: 0, fontSize: 26, fontWeight: 300, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 12 }}>
+            Kaibelegg i dag
+            <button type="button" className="btn" onClick={onToggle} aria-expanded={true} style={{ minHeight: 32, fontSize: 13, padding: '0 12px' }}>Skjul</button>
+          </h2>
           <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{remaining} gjenstående anløp · {zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span>
         </div>
         <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--fg-62)', flexWrap: 'wrap' }}>
