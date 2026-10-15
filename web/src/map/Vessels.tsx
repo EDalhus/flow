@@ -4,8 +4,9 @@ import { Vessel } from '../components/Icons.tsx';
 import { STATUS_STYLE, osloTime } from '../lib/format.ts';
 import type { Project } from './FlowMap.tsx';
 
-// Båter på kartet. Båter med anløp hos oss (i dag/i morgen) fremheves med navn og status;
-// andre båter fra kaiboka vises grått. Uten AIS-posisjon tegnes båter som er ved kai ved kaia.
+// Båter med anløp hos oss (i dag/i morgen) fremheves med navn og status som egne knapper.
+// Alle andre fartøy, spor og kurslinjer tegnes som kartlag (se traffic.ts).
+// Uten AIS-posisjon tegnes båter som er ved kai ved kaia.
 
 export interface VesselLayerProps {
   project: Project;
@@ -20,7 +21,7 @@ export interface VesselLayerProps {
   card?: (x: number, y: number) => ReactNode;
 }
 
-interface Placed { key: string; x: number; y: number; rot: number; name: string; call: PortCallView | null; inGeofence: boolean; track: [number, number][] }
+interface Placed { key: string; x: number; y: number; rot: number; name: string; call: PortCallView | null; inGeofence: boolean }
 
 export function VesselLayer({ project, vessels, calls, selectedId, onSelect, quayPos, today, compact, card }: VesselLayerProps) {
   const active = calls.filter(c => c.status !== 'ferdig' && c.status !== 'avlyst');
@@ -31,18 +32,17 @@ export function VesselLayer({ project, vessels, calls, selectedId, onSelect, qua
   for (const v of vessels) {
     const p = project(v.lon, v.lat);
     if (!p) continue;
-    placed.push({ key: v.mmsi, x: p[0], y: p[1], rot: v.heading ?? v.cog ?? 0, name: v.name, call: callFor(v.boat_id), inGeofence: v.in_geofence, track: v.track });
+    placed.push({ key: v.mmsi, x: p[0], y: p[1], rot: v.heading ?? v.cog ?? 0, name: v.name, call: callFor(v.boat_id), inGeofence: v.in_geofence });
   }
   // Ved kai uten AIS: tegn ved kaia.
   const withAis = new Set(vessels.map(v => v.boat_id));
   active.filter(c => c.status === 'ved_kai' && !withAis.has(c.boat.id)).forEach((c, i) => {
     const q = quayPos(c.quay.id);
     const p = project(q.lon, q.lat);
-    if (p) placed.push({ key: c.id, x: p[0] + i * 4, y: p[1] + 26 + i * 44, rot: 80, name: c.boat.name, call: c, inGeofence: true, track: [] });
+    if (p) placed.push({ key: c.id, x: p[0] + i * 4, y: p[1] + 26 + i * 44, rot: 80, name: c.boat.name, call: c, inGeofence: true });
   });
 
   const hot = placed.filter(v => v.call);
-  const gray = placed.filter(v => !v.call);
   const sel = hot.find(v => v.call!.id === selectedId);
   const size = compact ? 34 : 36;
 
@@ -54,24 +54,6 @@ export function VesselLayer({ project, vessels, calls, selectedId, onSelect, qua
 
   return (
     <>
-      <svg aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-        {hot.filter(v => v.track.length > 1).map(v => {
-          const pts = v.track.map(([lon, lat]) => project(lon, lat)).filter(Boolean) as [number, number][];
-          const on = v === sel;
-          return (
-            <polyline key={v.key} points={pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')} fill="none"
-              stroke={on ? '#80EFDE' : 'rgba(var(--tint), .3)'} strokeWidth={on ? 2.2 : 1.4} strokeDasharray={compact ? '4 5' : '5 6'} strokeLinecap="round" strokeLinejoin="round" />
-          );
-        })}
-      </svg>
-
-      {gray.map(v => (
-        <span key={v.key} title={`${v.name} – i kaiboka, ikke booket`}
-          style={{ position: 'absolute', left: v.x, top: v.y, width: 22, height: 22, transform: 'translate(-11px, -11px)', borderRadius: '50%', background: 'rgba(var(--tint), .14)', border: '1px solid rgba(var(--tint), .18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Vessel size={11} fill="rgba(var(--tint), .7)" rotate={v.rot} />
-        </span>
-      ))}
-
       {sel && (
         <span className="ring" aria-hidden="true" style={{ position: 'absolute', left: sel.x, top: sel.y, width: compact ? 110 : 132, height: compact ? 110 : 132, borderRadius: '50%', border: '1.5px dashed rgba(128,239,222,.6)', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(128,239,222,.1), rgba(128,239,222,0) 70%)' }} />
       )}

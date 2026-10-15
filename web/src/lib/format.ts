@@ -97,3 +97,7 @@ export function crewSummary(c: PortCallView) {
 
 /** ISO → "07:30" i Oslo-tid (til <input type="time">). */
 export const hmFromIso = (iso: string) => osloTime(iso);
+
+/** AIS-navn er i store bokstaver: «NORDKYN» → «Nordkyn», «MS NORD» → «MS Nord». */
+export const titleCase = (s: string) => s.trim().toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase())
+  .replace(/^(Ms|Mv|Mf|Fv)\b/, m => m.toUpperCase());

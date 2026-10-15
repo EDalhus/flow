@@ -2,6 +2,7 @@ import type { FlowEvent } from '../../shared/events.ts';
 import { insideGeofence } from '../../shared/domain/geo.ts';
 import { ROOM } from '../lib/realtime.ts';
 import { loadSettings } from '../lib/settings.ts';
+import { syncArea } from './area.ts';
 import { fetchLatest, type Fetcher } from './barentswatch.ts';
 
 // Kjøres av Cron Trigger hvert minutt. Henter siste posisjon for båtene i kaiboka (de med MMSI),
@@ -134,10 +135,13 @@ export async function syncAis(env: Env, now = new Date(), fetcher: Fetcher = fet
 /** Synk + kringkasting til åpne klienter. Brukes av cron. */
 export async function runAisSync(env: Env) {
   const r = await syncAis(env);
+  // Trafikkbildet rundt kaia. Feil her skal ikke stoppe synken av våre båter.
+  let area = 0;
+  try { area = await syncArea(env); } catch (e) { console.error('AIS-område feilet', e); }
   const events: FlowEvent[] = [
     { type: 'ais.updated' },
     ...[...r.arrived, ...r.departed].map(id => ({ type: 'port_call.changed' as const, id })),
   ];
-  if (r.ok && r.positions) await env.QUAY_ROOM.getByName(ROOM).broadcast(events);
+  if ((r.ok && r.positions) || area) await env.QUAY_ROOM.getByName(ROOM).broadcast(events);
   return r;
 }

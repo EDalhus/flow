@@ -103,6 +103,8 @@ export interface AisVesselInfo {
   longitude?: number | null;
   speedOverGround?: number | null;
   courseOverGround?: number | null;
+  trueHeading?: number | null;
+  navigationalStatus?: number | null;
   msgtime?: string | null;
 }
 
@@ -152,4 +154,55 @@ export function matchVessels(list: AisVesselInfo[], q: string, limit = 8): AisVe
     if (score) scored.push({ v, score });
   }
   return scored.sort((a, b) => b.score - a.score || (a.v.name ?? '').localeCompare(b.v.name ?? '')).slice(0, limit).map(x => x.v);
+}
+
+// ---------------------------------------------------------------- trafikkbildet rundt kaia
+
+/** Historiske spor. Samme token (scope «ais») som live-API-et. */
+export const HISTORIC_URL = 'https://historic.ais.barentswatch.no/open/v1/historic';
+
+/** Kall med token; prøver én gang til med nytt token ved 401. */
+async function authed(creds: { clientId: string; clientSecret: string }, url: string, init: RequestInit, fetcher: Fetcher, what: string): Promise<unknown> {
+  const clientId = creds.clientId.trim();
+  const clientSecret = creds.clientSecret.trim();
+  const call = async (retry: boolean): Promise<unknown> => {
+    const t = await token(clientId, clientSecret, fetcher);
+    const res = await fetcher(url, { ...init, headers: { ...init.headers, authorization: `Bearer ${t}` } });
+    if (res.status === 401 && retry) { resetTokenCache(); return call(false); }
+    if (!res.ok) throw new Error(`BarentsWatch ${what} svarte ${res.status}`);
+    return res.json();
+  };
+  return call(true);
+}
+
+/** Alle fartøy innenfor et rektangel [vest, sør, øst, nord] som har meldt seg siden `since`. */
+export async function fetchArea(
+  creds: { clientId: string; clientSecret: string },
+  box: [number, number, number, number],
+  since: Date,
+  fetcher: Fetcher = fetch,
+): Promise<AisVesselInfo[]> {
+  const [w, s, e, n] = box;
+  const data = await authed(creds, LATEST_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      modelType: 'Full',
+      since: since.toISOString(),
+      geometry: { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] },
+    }),
+  }, fetcher, 'AIS (område)');
+  if (!Array.isArray(data)) throw new Error('BarentsWatch AIS svarte uten fartøyliste');
+  return data as AisVesselInfo[];
+}
+
+/** Posisjonsrapporter siste 24 timer for ett fartøy. */
+export async function fetchTrack24h(
+  creds: { clientId: string; clientSecret: string },
+  mmsi: number,
+  fetcher: Fetcher = fetch,
+): Promise<{ latitude?: number | null; longitude?: number | null; msgtime: string }[]> {
+  const data = await authed(creds, `${HISTORIC_URL}/trackslast24hours/${mmsi}`, {}, fetcher, 'historikk');
+  if (!Array.isArray(data)) throw new Error('BarentsWatch svarte uten spor');
+  return data as { latitude?: number | null; longitude?: number | null; msgtime: string }[];
 }

@@ -1,6 +1,8 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { STALE_MIN, destination, mergeArea, metersAfter, shipCategory, thin } from '../../shared/domain/ais.ts';
 import { distanceM, insideGeofence } from '../../shared/domain/geo.ts';
+import { syncArea } from '../ais/area.ts';
 import { LATEST_URL, TOKEN_URL, resetTokenCache, type AisPosition } from '../ais/barentswatch.ts';
 import { syncAis } from '../ais/sync.ts';
 import { api } from './fixtures.ts';
@@ -112,5 +114,52 @@ describe('AIS-synk', () => {
     const padded = { ...withKeys, BW_CLIENT_ID: '  test-id\n', BW_CLIENT_SECRET: 'test-hemmelighet\n' } as Env;
     const bw = fakeBarentsWatch(() => []);
     expect((await syncAis(padded, new Date(), bw.fetcher)).ok).toBe(true);
+  });
+});
+
+describe('trafikkbildet rundt kaia', () => {
+  beforeEach(() => resetTokenCache());
+
+  it('bygger opp spor, kutter gamle punkter og fjerner fartøy som er borte', () => {
+    const t0 = new Date('2026-10-16T10:00:00Z');
+    const at = (min: number) => new Date(t0.getTime() + min * 60_000);
+    const msg = (min: number, lat: number) => ({ mmsi: 257111222, name: 'NORFRAKT ', shipType: 70, latitude: lat, longitude: 6.1, speedOverGround: 9, courseOverGround: 210, msgtime: at(min).toISOString() });
+    let area = mergeArea([], [msg(0, 62.5)], at(0));
+    area = mergeArea(area, [msg(1, 62.49)], at(1));
+    area = mergeArea(area, [msg(1, 62.49)], at(2)); // samme melding: ikke nytt punkt
+    expect(area).toHaveLength(1);
+    expect(area[0]).toMatchObject({ mmsi: '257111222', name: 'NORFRAKT', ship_type: 70, lat: 62.49, sog: 9 });
+    expect(area[0].trail).toHaveLength(2);
+    area = mergeArea(area, [msg(20, 62.4)], at(20));
+    expect(area[0].trail.map(p => p[1])).toEqual([62.4]);
+    expect(mergeArea(area, [], at(20 + STALE_MIN + 1))).toEqual([]);
+  });
+
+  it('henter området rundt geofencen og viser det i /ais', async () => {
+    let body: { geometry?: { coordinates: number[][][] }; modelType?: string } = {};
+    const fetcher = async (url: string, init?: RequestInit) => {
+      if (url === TOKEN_URL) return Response.json({ access_token: 'tok', expires_in: 3600 });
+      if (url === LATEST_URL) {
+        body = JSON.parse(init?.body as string);
+        return Response.json([{ mmsi: 257999000, name: 'NABOBÅT', shipType: 30, latitude: 62.5, longitude: 6.2, speedOverGround: 7, msgtime: new Date().toISOString() }]);
+      }
+      return new Response('ukjent', { status: 404 });
+    };
+    expect(await syncArea(withKeys, new Date(), fetcher)).toBe(1);
+    expect(body.modelType).toBe('Full');
+    const [w, s] = body.geometry!.coordinates[0][0];
+    expect(w).toBeLessThan(6.19292);
+    expect(s).toBeLessThan(62.47918);
+    const view = await api('/ais');
+    expect(view.json.area).toEqual([expect.objectContaining({ mmsi: '257999000', name: 'NABOBÅT', ship_type: 30 })]);
+  });
+
+  it('beregner punkt langs kursen og tynner ut spor', () => {
+    const [lon, lat] = destination(62.5, 6.2, 0, metersAfter(10, 6));
+    expect(lon).toBeCloseTo(6.2, 6);
+    expect(distanceM({ lat: 62.5, lon: 6.2 }, { lat, lon })).toBeCloseTo(1852, -1);
+    expect(thin([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 4)).toEqual([1, 4, 7, 10]);
+    expect(shipCategory(30)).toBe('fiske');
+    expect(shipCategory(75)).toBe('last');
   });
 });

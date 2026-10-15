@@ -252,13 +252,49 @@ export interface AisVessel {
   ais_ts: string;
   fetched_at: string;
   in_geofence: boolean;
-  /** [lon, lat] siste to timer. */
+  /** [lon, lat] siste 12 minutter. */
   track: [number, number][];
 }
 
 export interface AisView {
   status: { checked_at: string; ok: boolean; configured: boolean; message: string | null; boats: number; positions: number } | null;
   vessels: AisVessel[];
+  /** Alle fartøy i området rundt kaia, også de som ikke er i båtregisteret. */
+  area: AreaVessel[];
+}
+
+/** Fartøy i trafikkbildet rundt kaia (BarentsWatch, modelType Full). */
+export interface AreaVessel {
+  mmsi: string;
+  name: string | null;
+  callsign: string | null;
+  imo: string | null;
+  /** AIS skipstype (0–99). */
+  ship_type: number | null;
+  length: number | null;
+  width: number | null;
+  draught: number | null;
+  destination: string | null;
+  country: string | null;
+  lat: number;
+  lon: number;
+  /** Knop. */
+  sog: number | null;
+  cog: number | null;
+  heading: number | null;
+  nav_status: number | null;
+  /** Tidspunkt for siste AIS-melding. */
+  ts: string;
+  /** [lon, lat, unix-sekunder] de siste minuttene. */
+  trail: [number, number, number][];
+}
+
+/** Spor siste 24 timer for ett fartøy. */
+export interface AisTrack {
+  mmsi: string;
+  /** [lon, lat] eldste først. */
+  points: [number, number][];
+  error: string | null;
 }
 
 export interface PhotoUpload {

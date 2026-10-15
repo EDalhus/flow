@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import type { BoatDetail, ExternalVessel, SearchResult } from '../../../shared/api.ts';
 import { api, errorText } from '../lib/api.ts';
-import { FLAG_STYLE, STATUS_STYLE, addDays, dayRelative, fr, osloTime, telHref, todayOslo } from '../lib/format.ts';
+import { FLAG_STYLE, STATUS_STYLE, addDays, dayRelative, fr, osloTime, telHref, titleCase, todayOslo } from '../lib/format.ts';
 import { useMe } from '../lib/queries.ts';
 import { canBoats } from '../lib/roles.ts';
 import { ArrowLeft, Close, Search } from './Icons.tsx';
@@ -196,6 +196,3 @@ function VesselCard({ v, onBack, go }: { v: ExternalVessel; onBack: () => void; 
   );
 }
 
-/** AIS-navn er i store bokstaver: «NORDKYN» → «Nordkyn», «MS NORD» → «MS Nord». */
-const titleCase = (s: string) => s.trim().toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase())
-  .replace(/^(Ms|Mv|Mf|Fv)\b/, m => m.toUpperCase());

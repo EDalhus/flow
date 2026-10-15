@@ -1,15 +1,22 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
-import type { PortCallView } from '../../../shared/api.ts';
+import { useNavigate, useSearchParams } from 'react-router';
+import type { AisTrack, BoatDetail, PortCallView } from '../../../shared/api.ts';
+import { distanceM } from '../../../shared/domain/geo.ts';
+import { MOVING_KNOTS } from '../../../shared/domain/ais.ts';
+import { shipTypeLabel } from '../../../shared/domain/shiptype.ts';
 import { AlertsPanel } from '../components/Alerts.tsx';
 import { CallDetail, type DetailTab } from '../components/CallDetail.tsx';
-import { Anchor, Minus, Plus, Target, TrendUp } from '../components/Icons.tsx';
+import { Anchor, Close, Minus, Plus, Target, TrendUp } from '../components/Icons.tsx';
 import { KaibokModal } from '../components/KaibokForm.tsx';
 import { BoatTabs, Sidebar, Topbar } from '../components/Topbar.tsx';
 import { QuayMark } from '../components/ui.tsx';
 import { BASEMAPS, FlowMap, attribution, type Basemap, type MapHandle, type Project } from '../map/FlowMap.tsx';
-import { STATUS_STYLE, addDays, nb, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo } from '../lib/format.ts';
-import { useAis, usePortCalls, useQuays, useSettings, useSummary } from '../lib/queries.ts';
+import { CATEGORY_COLOR, CATEGORY_LABEL, ago, degMin, trafficLayers, trafficVessels, type TrafficVessel } from '../map/traffic.ts';
+import { STATUS_STYLE, addDays, fr, nb, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, titleCase, todayOslo } from '../lib/format.ts';
+import { api, errorText } from '../lib/api.ts';
+import { canBoats } from '../lib/roles.ts';
+import { useAis, useMe, usePortCalls, useQuays, useSettings, useSummary } from '../lib/queries.ts';
 import { VesselLayer } from '../map/Vessels.tsx';
 import { useNow } from '../lib/useNow.ts';
 import './kart.css';
@@ -41,7 +48,11 @@ export function KartPage() {
   const tab = (params.get('tab') as DetailTab) ?? 'oversikt';
   // Ingen automatisk valg: detaljpanelet vises bare når et anløp er valgt, så kartet er mest mulig fritt.
   const selected = selectedId ? list.find(c => c.id === selectedId) : undefined;
-  const select = (id: string, t?: DetailTab) => setParams(p => { p.set('id', id); if (t) p.set('tab', t); else p.delete('tab'); return p; }, { replace: true });
+  const [shipSel, setShipSel] = useState<string | null>(null);
+  const select = (id: string, t?: DetailTab) => {
+    setShipSel(null);
+    setParams(p => { p.set('id', id); if (t) p.set('tab', t); else p.delete('tab'); return p; }, { replace: true });
+  };
   const deselect = () => setParams(p => { p.delete('id'); p.delete('tab'); return p; }, { replace: true });
   const deselectRef = useRef(deselect);
   deselectRef.current = deselect;
@@ -59,6 +70,30 @@ export function KartPage() {
   const ais = useAis();
   const vessels = ais.data?.vessels ?? [];
 
+  // Trafikkbildet: alle fartøy i området. Båter med anløp hos oss tegnes som egne knapper.
+  const [zoomNames, setZoomNames] = useState(false);
+  const traffic = useMemo(() => trafficVessels(ais.data?.area ?? [], vessels), [ais.data, vessels]);
+  const hotMmsi = useMemo(() => {
+    const booked = new Set(list.filter(c => c.status !== 'ferdig' && c.status !== 'avlyst').map(c => c.boat.id));
+    return new Set(vessels.filter(v => booked.has(v.boat_id)).map(v => v.mmsi));
+  }, [list, vessels]);
+  const selectedMmsi = shipSel ?? (selected ? vessels.find(v => v.boat_id === selected.boat.id)?.mmsi ?? null : null);
+  const selShip = traffic.find(v => v.mmsi === selectedMmsi) ?? null;
+  const track24 = useQuery({
+    queryKey: ['ais-track', selectedMmsi], queryFn: () => api<AisTrack>(`/ais/track/${selectedMmsi}`),
+    enabled: !!selectedMmsi, staleTime: 120_000,
+  });
+  const layers = useMemo(
+    () => trafficLayers(traffic, hotMmsi, selectedMmsi, track24.data?.mmsi === selectedMmsi ? track24.data.points : null, zoomNames),
+    [traffic, hotMmsi, selectedMmsi, track24.data, zoomNames],
+  );
+  const pickShip = (mmsi: string | null) => {
+    setShipSel(mmsi);
+    if (mmsi && selected) deselect();
+  };
+  const shipRef = useRef(shipSel);
+  shipRef.current = shipSel;
+
   // Fra det globale søket: «Vis i kartet» sender posisjonen hit (også båter utenfor båtregisteret).
   const focus = params.get('lat') && params.get('lon')
     ? { lat: Number(params.get('lat')), lon: Number(params.get('lon')), name: params.get('name') ?? '', mmsi: params.get('mmsi') }
@@ -66,6 +101,7 @@ export function KartPage() {
   useEffect(() => {
     if (!focus || !mapRef.current) return;
     mapRef.current.flyTo(focus.lon, focus.lat, 12.5);
+    if (focus.mmsi && !hotMmsi.has(focus.mmsi)) setShipSel(focus.mmsi);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.lat, focus?.lon, settings.isSuccess]);
   // Første gang AIS-data finnes: vis kaia og båtene som skal til oss.
@@ -83,6 +119,7 @@ export function KartPage() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || document.querySelector('[role="dialog"][aria-modal="true"]')) return;
       if (alertsRef.current) setAlertsOpen(false);
+      else if (shipRef.current) setShipSel(null);
       else deselectRef.current();
     };
     window.addEventListener('keydown', onKey);
@@ -91,7 +128,7 @@ export function KartPage() {
 
   const overlays = (project: Project) => {
     const quayPt = project(fence.lon, fence.lat);
-    const card = (x: number, y: number) => selected && <MapCard call={selected} x={x} y={y} now={now} today={today} onChat={() => select(selected.id, 'chat')} />;
+    const card = (x: number, y: number) => selected && <MapCard call={selected} x={x} y={y} now={now} today={today} onChat={() => select(selected.id, 'chat')} approach={selShip && approach(selShip, fence)} />;
     const selectedOnMap = vessels.some(v => v.boat_id === selected?.boat.id) || (selected?.status === 'ved_kai');
     return (
       <>
@@ -106,7 +143,11 @@ export function KartPage() {
         )}
         <VesselLayer project={project} vessels={vessels} calls={list} selectedId={selected?.id} onSelect={id => select(id)}
           quayPos={quayPos} today={today} card={card} />
-        {focus && !vessels.some(v => v.mmsi === focus.mmsi) && (() => {
+        {shipSel && selShip && (() => {
+          const pt = project(selShip.lon, selShip.lat);
+          return pt && <ShipCard v={selShip} x={pt[0]} y={pt[1]} now={now.getTime()} fence={fence} trackError={track24.data?.error ?? null} onClose={() => setShipSel(null)} />;
+        })()}
+        {focus && !traffic.some(v => v.mmsi === focus.mmsi) && (() => {
           const pt = project(focus.lon, focus.lat);
           return pt && (
             <span style={{ position: 'absolute', left: pt[0], top: pt[1], transform: 'translate(-9px, -9px)', display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'none' }}>
@@ -127,7 +168,8 @@ export function KartPage() {
       <div className="kart-mapwrap" style={{ position: 'absolute', inset: 0 }}>
         {settings.isSuccess && (
           <FlowMap ref={mapRef} center={focus ? [focus.lon, focus.lat] : [fence.lon - 0.06, fence.lat + 0.004]} zoom={focus ? 12.5 : 11.4}
-            padding={{ top: 120, bottom: 160, left: 120, right: 320 }} geofence={fence} overlays={overlays} basemap={basemap} />
+            padding={{ top: 120, bottom: 160, left: 120, right: 320 }} geofence={fence} overlays={overlays} basemap={basemap}
+            traffic={layers} onShipClick={pickShip} onZoomNames={setZoomNames} />
         )}
         <span className="kart-attr ov-hide">{attribution(basemap)}</span>
       </div>
@@ -136,7 +178,7 @@ export function KartPage() {
         <Topbar glass alertsOpen={alertsOpen} onAlerts={setAlertsOpen} center={<BoatTabs />} />
       </div>
 
-      {!selected && <MainStats />}
+      {!selected && !shipSel && <MainStats />}
 
       <div className="ov kart-zoom">
         <div role="group" aria-label="Kartvisning" className="pill seg" style={{ backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.7)', marginRight: 8 }}>
@@ -149,6 +191,8 @@ export function KartPage() {
         <button type="button" className="zoom-btn" onClick={() => mapRef.current?.zoomOut()} aria-label="Zoom ut"><Minus size={16} /></button>
         <button type="button" className="zoom-btn solid" onClick={() => mapRef.current?.flyTo(fence.lon, fence.lat, 14)} aria-label="Sentrer på kaia"><Target size={17} /></button>
       </div>
+
+      <TrafficLegend />
 
       <Timeline calls={todays.filter(c => c.time_known)} untimed={todays.filter(c => !c.time_known && c.status !== 'ferdig').length} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} open={tlOpen} onToggle={toggleTl} />
 
@@ -216,7 +260,7 @@ function MainStats() {
 }
 
 /** Flytende kort ved valgt båt/kai: nedtelling til ankomst eller planlagt avgang. */
-function MapCard({ call, x, y, now, today, onChat }: { call: PortCallView; x: number; y: number; now: Date; today: string; onChat: () => void }) {
+function MapCard({ call, x, y, now, today, onChat, approach }: { call: PortCallView; x: number; y: number; now: Date; today: string; onChat: () => void; approach?: Approach | null }) {
   const eta = Date.parse(call.eta);
   const mins = Math.round((eta - now.getTime()) / 60_000);
   const kai = quayLabel(call.quay);
@@ -252,6 +296,115 @@ function MapCard({ call, x, y, now, today, onChat }: { call: PortCallView; x: nu
       </div>
       <span className="n" style={{ fontSize: 46, fontWeight: 200, letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 10 }}>{big}<span style={{ color: 'var(--fg-45)' }}>{dim}</span></span>
       <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{foot}</span>
+      {approach && call.status !== 'ved_kai' && call.status !== 'ferdig' && (
+        <span className="n" style={{ fontSize: 13, color: 'var(--aqua)', marginTop: 6 }}>AIS: {approachText(approach)}</span>
+      )}
+    </div>
+  );
+}
+
+/** Luftlinje til kaia og tid dit med farten fartøyet holder nå. */
+interface Approach { nm: number; knots: number | null; minutes: number | null }
+
+function approach(v: TrafficVessel, fence: { lat: number; lon: number }): Approach {
+  const nm = distanceM(v, fence) / 1852;
+  const moving = (v.sog ?? 0) >= MOVING_KNOTS;
+  return { nm, knots: v.sog, minutes: moving ? (nm / v.sog!) * 60 : null };
+}
+
+function approachText(a: Approach) {
+  const when = a.minutes == null ? 'ligger stille' : a.minutes < 90 ? `ca. ${Math.round(a.minutes)} min` : `ca. ${fr(a.minutes / 60)} t`;
+  return `${fr(a.nm)} nm til kaia · ${when}${a.knots != null && a.minutes != null ? ` i ${fr(a.knots)} kn` : ''}`;
+}
+
+/** Info om et fartøy i trafikkbildet, som når man klikker et skip i Kystverkets kart. */
+function ShipCard({ v, x, y, now, fence, trackError, onClose }: {
+  v: TrafficVessel; x: number; y: number; now: number; fence: { lat: number; lon: number }; trackError: string | null; onClose: () => void;
+}) {
+  const me = useMe();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const info = v.info;
+  const name = v.name ? titleCase(v.name) : `MMSI ${v.mmsi}`;
+  const type = v.cat === 'flow' ? 'Vår båt' : shipTypeLabel(info?.ship_type) ?? 'Ukjent type';
+  const a = approach(v, fence);
+  const add = async () => {
+    setBusy(true); setError(null);
+    try {
+      const b = await api<BoatDetail>('/boats', { body: { name, mmsi: v.mmsi, imo: info?.imo && /^\d{7}$/.test(info.imo) ? info.imo : null, callsign: info?.callsign ?? null } });
+      qc.invalidateQueries({ queryKey: ['boats'] });
+      qc.invalidateQueries({ queryKey: ['ais'] });
+      navigate(`/baater?id=${b.id}`);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const left = x + 34 + 300 > window.innerWidth - 24 ? x - 34 - 300 : x + 34;
+  const top = Math.min(Math.max(y - 60, 110), window.innerHeight - 420);
+  const cell = (k: string, val: string) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 1 }}>
+      <span style={{ fontSize: 13, fontWeight: 600 }}>{k}</span>
+      <span className="n" style={{ fontSize: 14, color: 'var(--fg-75)' }}>{val}</span>
+    </div>
+  );
+  return (
+    <div className="glass ov-hide" role="dialog" aria-label={`Fartøy ${name}`}
+      style={{ position: 'absolute', left, top, width: 300, padding: 16, borderRadius: 18, background: 'rgba(30,34,38,.88)', display: 'flex', flexDirection: 'column', gap: 12, zIndex: 6 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <span style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(242,245,243,.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+          <span style={{ width: 12, height: 22, background: CATEGORY_COLOR[v.cat], clipPath: 'polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%)', transform: 'rotate(30deg)' }} />
+        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 17, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+          <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>
+            {[info?.country, info?.callsign, type].filter(Boolean).join(' · ')}
+          </span>
+        </div>
+        <button type="button" className="icon-btn" onClick={onClose} aria-label="Lukk" style={{ width: 32, height: 32 }}><Close size={14} /></button>
+      </div>
+      <div style={{ display: 'flex', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', padding: '10px 0' }}>
+        {cell('Stevning', v.heading != null ? `${Math.round(v.heading)}°` : '–')}
+        {cell('Kurs', v.cog != null ? `${fr(v.cog)}°` : '–')}
+        {cell('Fart', v.sog != null ? `${fr(v.sog)} kn` : '–')}
+      </div>
+      <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 12px', fontSize: 13 }}>
+        {info?.destination && <><dt style={{ fontWeight: 600 }}>Destinasjon</dt><dd style={{ margin: 0, textAlign: 'right' }}>{info.destination}</dd></>}
+        {info?.length && <><dt style={{ fontWeight: 600 }}>Størrelse</dt><dd className="n" style={{ margin: 0, textAlign: 'right' }}>{fr(info.length, 0)} × {info.width ? fr(info.width, 0) : '–'} m{info.draught ? ` · ${fr(info.draught)} m dypg.` : ''}</dd></>}
+        <dt style={{ fontWeight: 600 }}>Posisjon</dt>
+        <dd className="n" style={{ margin: 0, textAlign: 'right' }}>{degMin(v.lat, 'N', 'S')}, {degMin(v.lon, 'Ø', 'V')}</dd>
+        <dt style={{ fontWeight: 600 }}>Oppdatert</dt>
+        <dd className="n" style={{ margin: 0, textAlign: 'right' }}>{osloTime(v.ts)} · {ago(v.ts, now)}</dd>
+      </dl>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 10px', borderRadius: 12, background: 'rgba(128,239,222,.08)' }}>
+        <span style={{ fontSize: 12, color: 'var(--fg-62)' }}>Til vår kai (luftlinje)</span>
+        <span className="n" style={{ fontSize: 14, color: 'var(--aqua)' }}>{approachText(a)}</span>
+      </div>
+      <span style={{ fontSize: 12, color: 'var(--fg-55)' }}>
+        Ringene: 6, 12, 24, 36, 48, 60 min og 3 t med farten nå. Turkis linje: sporet siste døgn{trackError ? ` (ikke tilgjengelig: ${trackError})` : ''}.
+      </span>
+      {error && <div className="error-box">{error}</div>}
+      <div style={{ display: 'flex', gap: 8 }}>
+        {v.boatId
+          ? <button type="button" className="btn" style={{ minHeight: 36, fontSize: 13 }} onClick={() => navigate(`/baater?id=${v.boatId}`)}>Åpne i båtregisteret</button>
+          : canBoats(me.data) && <button type="button" className="btn btn-w" style={{ minHeight: 36, fontSize: 13 }} disabled={busy} onClick={add}>Legg til i båtregisteret</button>}
+      </div>
+    </div>
+  );
+}
+
+/** Fargeforklaring for skipstypene. */
+export function TrafficLegend() {
+  return (
+    <div className="ov kart-legend ov-hide" aria-label="Fargeforklaring">
+      {(Object.keys(CATEGORY_LABEL) as (keyof typeof CATEGORY_LABEL)[]).filter(k => k !== 'hurtig').map(k => (
+        <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 8, height: 13, background: CATEGORY_COLOR[k], clipPath: 'polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%)' }} />{CATEGORY_LABEL[k]}
+        </span>
+      ))}
     </div>
   );
 }

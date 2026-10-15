@@ -17,7 +17,7 @@ Rapporter og administrasjon ligger nederst i menyen. `/hjullaster` er en fullskj
 
 **Klokkeslett på anløp er valgfritt.** Tidene er sjelden kjent før ca. en time før båten kommer, så et anløp kan legges inn med bare dag. Tiden settes på anløpet («Sett tid») når den er kjent. Anløp uten tid er utenfor kollisjonssjekken og kaibelegget til tiden er satt.
 
-**Kartbakgrunn:** Mørk og lys bruker Kartverkets åpne kart (CC BY 4.0). Satellitt og hybrid bruker Esri World Imagery. Esris vilkår kan kreve en ArcGIS-konto ved kommersiell bruk; flyfoto fra Norge i bilder kan brukes i stedet hvis dere har tilgang.
+**Kartbakgrunn:** Mørk og lys er flate sjøkart i Kystverket-stil (hav, land, veier og navn – uten terreng), laget av vektorfliser fra OpenFreeMap (OpenStreetMap-data, ingen nøkkel). Satellitt og hybrid bruker Esri World Imagery. Esris vilkår kan kreve en ArcGIS-konto ved kommersiell bruk; flyfoto fra Norge i bilder kan brukes i stedet hvis dere har tilgang.
 
 **MVP:** Silonivået beregnes fra registrert påfylling og pakkehastigheten (standard 10 t/t per linje). Når sensorene på siloene kobles på, erstattes det beregnede nivået med målt verdi. Bulkbil viser og teller ned; styring av traktene kan kobles på senere.
 
@@ -32,7 +32,7 @@ Alt kjører i én Cloudflare Worker:
 | Sanntid | Durable Object (`QuayRoom`) med WebSocket |
 | AIS | BarentsWatch, hentet av Cron Trigger hvert minutt |
 | Innlogging | Cloudflare Access (Zero Trust) |
-| Kart | MapLibre med Kartverkets åpne kart (© Kartverket, CC BY 4.0) |
+| Kart | MapLibre med vektorfliser fra OpenFreeMap (© OpenMapTiles, © OpenStreetMap-bidragsytere) |
 
 Koden deployes fra GitHub med Cloudflare Workers Builds. Ingenting må kjøres lokalt.
 
@@ -145,9 +145,17 @@ Eksempeldataene (`SEED_DEMO`) inneholder testbrukere på `@flow.example`. De kan
 Cron-jobben kjører hvert minutt:
 
 - **Henting:** Den henter siste posisjon for båtene i kaiboka og lagrer posisjon og spor for de siste 6 timene.
+- **Trafikkbildet:** Den henter også alle fartøy i et område på ca. 60 × 60 km rundt kaia, og bygger opp spor for de siste 12 minuttene (tabellen `ais_area`, én rad).
 - **Ved kai:** Båten er innenfor geofencen (300 m rundt Flatholmen havn 81B) med fart under 3 knop, og har et anløp med ETA innenfor ±12 timer. Anløp uten klokkeslett regnes med ETA midt på dagen.
 - **Kaibok mangler:** Båten har forlatt geofencen uten at kaiboka er levert.
 - **Uten AIS-posisjon:** Status anslås ut fra ETA og ETD, og merket viser at det er et anslag. Anløp uten klokkeslett står som planlagt til AIS melder båten.
+
+På kartet vises trafikken som i Kystverkets kart:
+
+- Skipene er farget etter type (fiske, last, tank, passasjer osv.). Våre båter er turkise, og båter med anløp hos oss har egne merker med navn og status.
+- Stiplet linje er sporet de siste 12 minuttene. Hvit linje viser hvor fartøyet er om 6 minutter med farten og kursen det holder nå.
+- Klikk på et skip for stevning, kurs, fart, destinasjon, posisjon og når det sist meldte seg. Kortet viser også luftlinje og omtrentlig tid til vår kai, og ringer for hvor langt skipet kommer på 6, 12, 24, 36, 48 og 60 minutter og 3 timer.
+- Sporet for det siste døgnet hentes fra BarentsWatch sitt historikk-API når et skip velges. Det bruker samme nøkler.
 
 AIS-status vises ikke på kartet. Hvis AIS ikke er satt opp, eller siste henting fra BarentsWatch feilet, kommer det et varsel i bjella. Admin kan åpne varselet og kjøre AIS-sjekken derfra.
 
