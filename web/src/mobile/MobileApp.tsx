@@ -7,7 +7,7 @@ import { Chat } from '../components/Chat.tsx';
 import { ArrowLeft, Check, Phone } from '../components/Icons.tsx';
 import { KaibokForm } from '../components/KaibokForm.tsx';
 import { BellButton, UserBadge } from '../components/Topbar.tsx';
-import { Loading, StatusBadge } from '../components/ui.tsx';
+import { Loading, QuayMark, StatusBadge } from '../components/ui.tsx';
 import { FlowMap } from '../map/FlowMap.tsx';
 import { FLAG_STYLE, addDays, dayHeading, dayShort, fr, goodsParts, osloTime, quayLabel, telHref, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useAis, useBoat, useMe, usePortCalls, useQuays, useSettings, useUsers } from '../lib/queries.ts';
@@ -136,7 +136,9 @@ function MobileCard({ call: c, onOpen }: { call: PortCallView; onOpen: () => voi
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%' }}>
         <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span style={{ fontSize: 21, letterSpacing: '-0.01em' }}>{c.boat.name}</span>
-          <span style={{ fontSize: 14, color: 'rgba(243,245,246,.65)' }}>{typeLabel(c.type)} · {quayLabel(c.quay)}</span>
+          <span style={{ fontSize: 14, color: 'rgba(243,245,246,.65)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {typeLabel(c.type)} · <QuayMark quay={c.quay} compact />
+          </span>
         </span>
         <span className="n" style={{ fontSize: 28, fontWeight: 200, letterSpacing: '-0.02em' }}>{osloTime(c.eta)}</span>
       </span>
@@ -176,7 +178,9 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
     <>
       <header style={{ position: 'absolute', top: 14, left: 14, right: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
         <button type="button" className="icon-btn" onClick={onBack} aria-label="Tilbake til anløpslista" style={{ ...pill, width: 48, height: 48 }}><ArrowLeft size={20} /></button>
-        <span style={{ fontSize: 18, fontWeight: 300, textShadow: '0 2px 12px rgba(0,0,0,.6)' }}>{quayLabel(c.quay)} · {typeLabel(c.type)}</span>
+        <span style={{ fontSize: 18, fontWeight: 300, textShadow: '0 2px 12px rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <QuayMark quay={c.quay} compact /> · {typeLabel(c.type)}
+        </span>
         <span style={{ width: 48 }} />
       </header>
       <div className="glass" style={{ position: 'absolute', left: 16, top: 168, width: 200, padding: '14px 16px', borderRadius: 22, background: 'rgba(40,46,44,.5)', display: 'flex', flexDirection: 'column', zIndex: 2 }}>

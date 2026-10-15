@@ -6,9 +6,9 @@ import type { PortCallCreateInput } from '../../../shared/schemas.ts';
 import { isoWeek, osloToUtc } from '../../../shared/time.ts';
 import { Close, Minus, Plus } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
-import { BoatFlagLine, Loading, SearchBox, Segmented, StatusBadge } from '../components/ui.tsx';
+import { BoatFlagLine, Loading, QuayMark, SearchBox, Segmented, StatusBadge } from '../components/ui.tsx';
 import { api, errorText } from '../lib/api.ts';
-import { FLAG_STYLE, addDays, crewSummary, dayHeading, dayShort, fr, goodsShort, hmFromIso, nb, quayLabel, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
+import { FLAG_STYLE, addDays, crewSummary, dayHeading, dayShort, fr, goodsShort, hmFromIso, nb, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useBoats, useCreatePortCall, useMe, usePortCalls, useProducts, useQuays, useUsers, type Sku } from '../lib/queries.ts';
 import { canPlan } from '../lib/roles.ts';
 import './anlop.css';
@@ -98,7 +98,7 @@ function Row({ call: c, fresh }: { call: PortCallView; fresh: boolean }) {
         <BoatFlagLine boat={c.boat} />
       </span>
       <span style={{ fontSize: 14, color: 'rgba(243,245,246,.8)' }}>{typeLabel(c.type)}</span>
-      <span style={{ fontSize: 14 }}>{quayLabel(c.quay)}</span>
+      <span style={{ fontSize: 14, minWidth: 0 }}><QuayMark quay={c.quay} compact /></span>
       <span style={{ fontSize: 14, color: 'rgba(243,245,246,.8)' }}>{goodsShort(c.goods) || '–'}</span>
       <span style={{ display: 'flex', flexDirection: 'column', fontSize: 13, lineHeight: 1.35 }}>
         <span style={{ color: crew.ansWarn ? '#F7C873' : undefined }}>{crew.ansText}</span>
@@ -221,13 +221,14 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
         </div>
         <div className="field"><span>Kai</span>
           {partnerQuays.length === 0 ? (
-            <Segmented label="Kai" value={quay} onChange={setQuayId} stretch options={ownQuays.map(qy => ({ value: qy.id, label: qy.name }))} />
+            <Segmented label="Kai" value={quay} onChange={setQuayId} stretch
+              options={ownQuays.map(qy => ({ value: qy.id, label: quayTitle(qy) }))} />
           ) : (
             <select className="inp" value={quay} onChange={e => setQuayId(e.target.value)} aria-label="Kai">
               <optgroup label="Våre kaier">
-                {ownQuays.map(qy => <option key={qy.id} value={qy.id}>{qy.name}</option>)}
+                {ownQuays.map(qy => <option key={qy.id} value={qy.id}>{quayTitle(qy)}</option>)}
               </optgroup>
-              <optgroup label="Samarbeid (nabo)">
+              <optgroup label="Nabo – samarbeid">
                 {partnerQuays.map(qy => <option key={qy.id} value={qy.id}>{quayLabel(qy)}</option>)}
               </optgroup>
             </select>

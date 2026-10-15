@@ -132,7 +132,10 @@ export const flagOverride = z.object({ flag, reason: text(500).min(3, 'Skriv en 
 export const agentCreate = z.object({ name: text(100).min(1), phone: phone.nullable().optional() });
 
 export const quayCreate = z.object({
+  /** Formelt navn, f.eks. «Kai 1». */
   name: text(80).min(1),
+  /** Kallenavn som vises i UI. Tom = bruk name. */
+  nickname: optionalText(80),
   /** Tom/null = egen kai; ellers nabobedrift vi samarbeider med. */
   company: optionalText(100),
   sort: z.int().min(0).max(10_000).optional(),

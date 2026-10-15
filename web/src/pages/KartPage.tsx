@@ -6,9 +6,9 @@ import { CallDetail, type DetailTab } from '../components/CallDetail.tsx';
 import { Anchor, Check, Clock, Minus, Plus, Target, Warning } from '../components/Icons.tsx';
 import { KaibokModal } from '../components/KaibokForm.tsx';
 import { Topbar } from '../components/Topbar.tsx';
-import { FlagBadge, Loading, Rating, Segmented, StatusBadge } from '../components/ui.tsx';
+import { FlagBadge, Loading, QuayMark, Rating, Segmented, StatusBadge } from '../components/ui.tsx';
 import { ATTRIBUTION, FlowMap, type MapHandle, type Project } from '../map/FlowMap.tsx';
-import { STATUS_STYLE, addDays, crewSummary, dayHeading, goodsShort, osloTime, quayLabel, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
+import { STATUS_STYLE, addDays, crewSummary, dayHeading, goodsShort, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useAis, useMe, usePortCalls, useQuays, useSettings } from '../lib/queries.ts';
 import { AisCheck } from '../components/AisCheck.tsx';
 import { VesselLayer, aisLive } from '../map/Vessels.tsx';
@@ -125,7 +125,7 @@ export function KartPage() {
             <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#0B0E11', color: '#F3F5F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Anchor size={11} /></span>
             Vår kai · {(() => {
               const own = (quays.data ?? []).filter(x => !x.company);
-              return own.length ? `Kai ${own.map(x => x.name.replace('Kai ', '')).join('–')}` : 'Flatholmen';
+              return own.length ? own.map(x => quayTitle(x)).join(' · ') : 'Flatholmen';
             })()}
           </span>
         )}
@@ -252,7 +252,9 @@ function CallCard({ call: c, on, onClick }: { call: PortCallView; on: boolean; o
       <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, width: '100%' }}>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
           <span style={{ fontSize: 19, letterSpacing: '-0.01em' }}>{c.boat.name}</span>
-          <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)' }}>{timeRange(c)} · {quayLabel(c.quay)} · {typeLabel(c.type)}</span>
+          <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {timeRange(c)} · <QuayMark quay={c.quay} compact /> · {typeLabel(c.type)}
+          </span>
         </span>
         <StatusBadge status={c.status} basis={c.status_basis} />
       </span>
@@ -277,7 +279,7 @@ function MapCard({ call, x, y, now, today, onChat }: { call: PortCallView; x: nu
   const eta = Date.parse(call.eta);
   const mins = Math.round((eta - now.getTime()) / 60_000);
   const kai = quayLabel(call.quay);
-  let sub = call.quay.company ? `Neste · ${kai}` : `Neste: Vår kai · ${call.quay.name}`;
+  let sub = call.quay.company ? `Neste · nabo ${quayTitle(call.quay)}` : `Neste: Vår kai · ${quayTitle(call.quay)}`;
   let big = osloTime(call.eta).slice(0, 2), dim = osloTime(call.eta).slice(2);
   let foot = call.service_date === today ? `ETA ${osloTime(call.eta)}` : `ETA ${call.service_date === addDays(today, 1) ? 'i morgen' : call.service_date.slice(8, 10) + '.' + call.service_date.slice(5, 7)}`;
   if (call.status === 'ved_kai') {
@@ -311,7 +313,8 @@ function MapCard({ call, x, y, now, today, onChat }: { call: PortCallView; x: nu
 
 /** Kaibelegg i dag: én bane per kai, kollisjoner skravert, strek for nå. */
 function Timeline({ calls, selected, onSelect, now, quays }: {
-  calls: PortCallView[]; selected?: string; onSelect: (id: string) => void; now: Date; quays: { id: string; name: string; company: string | null }[];
+  calls: PortCallView[]; selected?: string; onSelect: (id: string) => void; now: Date;
+  quays: { id: string; name: string; nickname: string | null; company: string | null }[];
 }) {
   const hour = (iso: string) => { const [h, m] = osloTime(iso).split(':').map(Number); return h + m / 60; };
   const t0 = Math.min(5, ...calls.map(c => Math.floor(hour(c.eta))));
@@ -346,11 +349,15 @@ function Timeline({ calls, selected, onSelect, now, quays }: {
       <div style={{ overflowX: 'auto', flex: 1 }}>
         <div style={{ minWidth: 520, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {quays.map(qy => (
-            <div key={qy.id} style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ width: 72, flex: 'none', fontSize: 12, color: 'var(--fg-62)', lineHeight: 1.25, paddingRight: 6 }}>
-                {qy.company ? <><span style={{ display: 'block', color: 'var(--fg-55)' }}>{qy.company}</span>{qy.name}</> : qy.name}
+            <div key={qy.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 118, flex: 'none', paddingRight: 4 }}>
+                <QuayMark quay={qy} compact />
               </div>
-              <div style={{ position: 'relative', flex: 1, height: 38, borderRadius: 12, background: 'rgba(255,255,255,.03)' }}>
+              <div style={{
+                position: 'relative', flex: 1, height: 38, borderRadius: 12,
+                background: isOwnQuay(qy) ? 'rgba(255,255,255,.03)' : 'rgba(232,176,110,.06)',
+                outline: isOwnQuay(qy) ? undefined : '1px solid rgba(232,176,110,.18)',
+              }}>
                 {calls.filter(c => c.quay.id === qy.id).map(c => {
                   const s = STATUS_STYLE[c.status];
                   const a = hour(c.eta), b = Math.max(a + 0.25, hour(c.etd) < a ? 24 : hour(c.etd));
@@ -369,7 +376,7 @@ function Timeline({ calls, selected, onSelect, now, quays }: {
             </div>
           ))}
           <div style={{ display: 'flex' }}>
-            <div style={{ width: 72, flex: 'none' }} />
+            <div style={{ width: 118, flex: 'none' }} />
             <div style={{ position: 'relative', flex: 1, height: 16 }}>
               {ticks.map(h => <span key={h} className="n" style={{ position: 'absolute', top: 0, transform: 'translateX(-50%)', fontSize: 11, color: 'rgba(243,245,246,.5)', left: `${pct(h)}%` }}>{String(h % 24).padStart(2, '0')}</span>)}
             </div>

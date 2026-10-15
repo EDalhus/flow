@@ -4,9 +4,9 @@ import type { Quay, UserView } from '../../../shared/api.ts';
 import { CREW_ROLES, CREW_ROLE_LABEL, USER_ROLES, type CrewRole, type UserRole } from '../../../shared/domain/types.ts';
 import { Plus } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
-import { Loading, Segmented } from '../components/ui.tsx';
+import { Loading, QuayMark, Segmented } from '../components/ui.tsx';
 import { errorText } from '../lib/api.ts';
-import { quayLabel } from '../lib/format.ts';
+import { quayTitle } from '../lib/format.ts';
 import { useAllQuays, useAllUsers, useMe, useSaveQuay, useSaveUser } from '../lib/queries.ts';
 
 const ROLE_LABEL: Record<UserRole, string> = { salg: 'Salg', produksjon: 'Produksjon', kaiarbeider: 'Kaiarbeider', admin: 'Admin' };
@@ -117,15 +117,15 @@ function QuayRow({ quay, onClick }: { quay: Quay; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
       style={{ width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', padding: '12px 18px', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,.05)', opacity: quay.active ? 1 : .5 }}>
-      <span style={{ display: 'flex', flexDirection: 'column' }}>
-        <span>{quayLabel(quay)}</span>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+        <QuayMark quay={quay} />
         <span className="muted" style={{ fontSize: 13 }}>
-          {quay.company ? 'Nabobedrift' : 'Egen kai'}
+          {quay.name}{quay.nickname ? ` · kallenavn «${quay.nickname}»` : ''}
           {quay.lat != null && quay.lon != null ? ` · ${quay.lat.toFixed(4)}, ${quay.lon.toFixed(4)}` : ''}
           {quay.active ? '' : ' · deaktivert'}
         </span>
       </span>
-      <span className="muted" style={{ fontSize: 13 }}>#{quay.sort}</span>
+      <span className="muted" style={{ fontSize: 13, flex: 'none' }}>#{quay.sort}</span>
     </button>
   );
 }
@@ -134,18 +134,20 @@ function QuayForm({ quay, onDone }: { quay?: Quay; onDone: () => void }) {
   const save = useSaveQuay();
   const [f, setF] = useState({
     name: quay?.name ?? '',
+    nickname: quay?.nickname ?? '',
     company: quay?.company ?? '',
     sort: quay?.sort ?? '',
     lat: quay?.lat != null ? String(quay.lat) : '',
     lon: quay?.lon != null ? String(quay.lon) : '',
     active: quay?.active ?? true,
   });
-  const partner = f.company.trim().length > 0;
+  const preview = { name: f.name.trim() || 'Kai', nickname: f.nickname.trim() || null, company: f.company.trim() || null };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const body = {
       name: f.name.trim(),
+      nickname: f.nickname.trim() || null,
       company: f.company.trim() || null,
       sort: f.sort === '' ? undefined : Number(f.sort),
       lat: f.lat === '' ? null : Number(f.lat),
@@ -157,15 +159,18 @@ function QuayForm({ quay, onDone }: { quay?: Quay; onDone: () => void }) {
 
   return (
     <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <h2 style={{ margin: 0, fontSize: 24, fontWeight: 300 }}>{quay ? quayLabel(quay) : 'Ny kai'}</h2>
+      <h2 style={{ margin: 0, fontSize: 24, fontWeight: 300 }}>{quay ? quayTitle(quay) : 'Ny kai'}</h2>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-62)' }}>
-        La bedrift stå tom for egne kaier. Fyll inn nabobedrift når dere samarbeider om kaiplass.
+        Formelt navn er Kai 1 / Kai 2. Kallenavnet er det som vises overalt i appen. La bedrift stå tom for egne kaier.
       </p>
-      <label className="field"><span>Navn på kai</span>
+      <label className="field"><span>Formelt navn</span>
         <input className="inp" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} required placeholder="Kai 1" />
       </label>
+      <label className="field"><span>Kallenavn (vises i UI)</span>
+        <input className="inp" value={f.nickname} onChange={e => setF({ ...f, nickname: e.target.value })} placeholder="F.eks. Ytre, Indre" />
+      </label>
       <label className="field"><span>Bedrift (tom = vår egen)</span>
-        <input className="inp" value={f.company} onChange={e => setF({ ...f, company: e.target.value })} placeholder="F.eks. Nabo AS" />
+        <input className="inp" value={f.company} onChange={e => setF({ ...f, company: e.target.value })} placeholder="F.eks. Ålesund Fiskemottak" />
       </label>
       <label className="field"><span>Sortering</span>
         <input className="inp n" type="number" min={0} value={f.sort} onChange={e => setF({ ...f, sort: e.target.value })} placeholder="Automatisk" />
@@ -178,11 +183,10 @@ function QuayForm({ quay, onDone }: { quay?: Quay; onDone: () => void }) {
           <input className="inp n" value={f.lon} onChange={e => setF({ ...f, lon: e.target.value })} placeholder="6.193" inputMode="decimal" />
         </label>
       </div>
-      {partner && (
-        <span style={{ fontSize: 12, color: 'var(--fg-55)' }}>
-          Vises som «{f.name.trim() || 'Kai'} · {f.company.trim()}» i anløp og på kartet.
-        </span>
-      )}
+      <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={{ fontSize: 12, color: 'var(--fg-55)' }}>Slik det vises</span>
+        <QuayMark quay={preview} />
+      </div>
       {quay && (
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, cursor: 'pointer' }}>
           <input type="checkbox" checked={f.active} onChange={e => setF({ ...f, active: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#F3F5F6' }} />

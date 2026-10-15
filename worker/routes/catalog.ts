@@ -82,9 +82,9 @@ app.patch('/users/:id', requireRole(...CAN.admin), body(userPatch), async c => {
 
 // ---------------------------------------------------------------- kaier, produkter, agenter
 
-type QuayRow = { id: string; name: string; company: string | null; sort: number; lat: number | null; lon: number | null; active: number };
+type QuayRow = { id: string; name: string; nickname: string | null; company: string | null; sort: number; lat: number | null; lon: number | null; active: number };
 const toQuay = (r: QuayRow): Quay => ({ ...r, active: !!r.active });
-const QUAY_SELECT = 'SELECT id, name, company, sort, lat, lon, active FROM quays';
+const QUAY_SELECT = 'SELECT id, name, nickname, company, sort, lat, lon, active FROM quays';
 
 app.get('/quays', async c => {
   const all = c.req.query('all') === '1';
@@ -100,8 +100,8 @@ app.post('/quays', requireRole(...CAN.admin), body(quayCreate), async c => {
   const id = newId('q');
   const sort = q.sort ?? ((await db.prepare('SELECT coalesce(max(sort), 0) + 1 AS n FROM quays').first<{ n: number }>())?.n ?? 1);
   try {
-    await db.prepare('INSERT INTO quays (id, name, company, sort, lat, lon) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind(id, q.name, q.company ?? null, sort, q.lat ?? null, q.lon ?? null).run();
+    await db.prepare('INSERT INTO quays (id, name, nickname, company, sort, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, q.name, q.nickname ?? null, q.company ?? null, sort, q.lat ?? null, q.lon ?? null).run();
   } catch (e) {
     if (isConstraintError(e, 'UNIQUE')) throw fail(409, 'Det finnes allerede en kai med dette navnet hos den bedriften.');
     throw e;
@@ -115,6 +115,7 @@ app.patch('/quays/:id', requireRole(...CAN.admin), body(quayPatch), async c => {
   const id = c.req.param('id');
   const cols = Object.entries({
     name: input.name,
+    nickname: input.nickname,
     company: input.company,
     sort: input.sort,
     lat: input.lat,

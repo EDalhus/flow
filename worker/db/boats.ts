@@ -96,7 +96,7 @@ export async function loadBoats(db: D1Database, settings: Settings, id?: string,
 }
 
 type LogRow = {
-  id: string; port_call_id: string; boat_id: string; boat_name: string; quay_id: string; quay_name: string; quay_company: string | null;
+  id: string; port_call_id: string; boat_id: string; boat_name: string; quay_id: string; quay_name: string; quay_nickname: string | null; quay_company: string | null;
   service_date: string; type: CallType; eta: string; etd: string;
   resp_id: string | null; resp_name: string | null; resp_short: string | null; resp_initials: string | null;
   had_deviation: number; cats: string | null; description: string | null;
@@ -124,7 +124,7 @@ export async function loadQuayLogs(db: D1Database, f: LogFilter): Promise<QuayLo
 
   const { results } = await db
     .prepare(`
-      SELECT ql.id, ql.port_call_id, b.id AS boat_id, b.name AS boat_name, q.id AS quay_id, q.name AS quay_name, q.company AS quay_company,
+      SELECT ql.id, ql.port_call_id, b.id AS boat_id, b.name AS boat_name, q.id AS quay_id, q.name AS quay_name, q.nickname AS quay_nickname, q.company AS quay_company,
              pc.service_date, pc.type, pc.eta, pc.etd,
              r.id AS resp_id, r.name AS resp_name, r.short_name AS resp_short, r.initials AS resp_initials,
              ql.had_deviation, (SELECT group_concat(category) FROM quay_log_categories c WHERE c.quay_log_id = ql.id) AS cats,
@@ -151,7 +151,7 @@ export async function loadQuayLogs(db: D1Database, f: LogFilter): Promise<QuayLo
 
   return results.map(l => ({
     id: l.id, port_call_id: l.port_call_id, boat: { id: l.boat_id, name: l.boat_name },
-    quay: { id: l.quay_id, name: l.quay_name, company: l.quay_company },
+    quay: { id: l.quay_id, name: l.quay_name, nickname: l.quay_nickname, company: l.quay_company },
     service_date: l.service_date, type: l.type, eta: l.eta, etd: l.etd,
     responsible: ref(l.resp_id, l.resp_name, l.resp_short, l.resp_initials),
     crew: JSON.parse(l.crew ?? '[]') as UserRef[],

@@ -2,12 +2,12 @@ import { useState } from 'react';
 import type { CollisionView, PortCallView, UserView } from '../../../shared/api.ts';
 import { CREW_ROLE_LABEL, type CrewRole } from '../../../shared/domain/types.ts';
 import { errorText } from '../lib/api.ts';
-import { dayRelative, ddmm, fr, goodsParts, quayLabel, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
+import { dayRelative, ddmm, fr, goodsParts, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
 import { useBoat, useMe, usePutCrew, useUsers } from '../lib/queries.ts';
 import { canCrew, canQuayLog } from '../lib/roles.ts';
 import { Chat } from './Chat.tsx';
 import { Check, Close, Phone } from './Icons.tsx';
-import { BigNumber, FlagBadge, Rating, RatingBars, Segmented } from './ui.tsx';
+import { BigNumber, FlagBadge, QuayMark, Rating, RatingBars, Segmented } from './ui.tsx';
 
 export type DetailTab = 'oversikt' | 'chat' | 'profil';
 
@@ -25,8 +25,8 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
     <section aria-labelledby="sel-h" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '0 6px' }}>
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)' }}>
-            {typeLabel(call.type)} · {quayLabel(call.quay)} · {dayRelative(call.service_date)} {timeRange(call)}
+          <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {typeLabel(call.type)} · <QuayMark quay={call.quay} compact /> · {dayRelative(call.service_date)} {timeRange(call)}
           </span>
           {onClose && (
             <button type="button" className="icon-btn pill" onClick={onClose} aria-label="Lukk anløpet" title="Lukk (Esc)" style={{ width: 36, height: 36, flex: 'none', marginRight: -6 }}>

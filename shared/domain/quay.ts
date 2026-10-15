@@ -1,4 +1,21 @@
-/** Visningsnavn: «Kai 1» eller «Kai 1 · Nabo AS». */
-export function quayLabel(q: { name: string; company?: string | null }): string {
-  return q.company ? `${q.name} · ${q.company}` : q.name;
+export type QuayRef = {
+  name: string;
+  nickname?: string | null;
+  company?: string | null;
+};
+
+/** Visningsnavn: kallenavn hvis satt, ellers formelt navn (Kai 1). */
+export function quayTitle(q: QuayRef): string {
+  const nick = q.nickname?.trim();
+  return nick || q.name;
+}
+
+/** Kort tekst for lister og kollisjoner: «Ytre» eller «Ytre · Nabo AS». */
+export function quayLabel(q: QuayRef): string {
+  const title = quayTitle(q);
+  return q.company ? `${title} · ${q.company}` : title;
+}
+
+export function isOwnQuay(q: { company?: string | null }): boolean {
+  return !q.company;
 }
