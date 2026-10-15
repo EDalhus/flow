@@ -2,9 +2,10 @@ import { useState } from 'react';
 import type { CollisionView, PortCallView, UserView } from '../../../shared/api.ts';
 import { CREW_ROLE_LABEL, type CrewRole } from '../../../shared/domain/types.ts';
 import { errorText } from '../lib/api.ts';
-import { dayRelative, ddmm, fr, goodsParts, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
-import { useBoat, useMe, usePutCrew, useUsers } from '../lib/queries.ts';
-import { canCrew, canQuayLog } from '../lib/roles.ts';
+import { dayRelative, ddmm, fr, goodsParts, hmFromIso, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
+import { osloToUtc } from '../../../shared/time.ts';
+import { useBoat, useMe, usePatchPortCall, usePutCrew, useUsers } from '../lib/queries.ts';
+import { canCrew, canPlan, canQuayLog } from '../lib/roles.ts';
 import { Chat } from './Chat.tsx';
 import { Check, Close, Phone } from './Icons.tsx';
 import { BigNumber, FlagBadge, QuayMark, Rating, RatingBars, Segmented } from './ui.tsx';
@@ -47,6 +48,7 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
 
       {tab === 'oversikt' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {canPlan(me.data) && call.status !== 'ferdig' && call.status !== 'avlyst' && !call.has_quay_log && <TimeEditor call={call} />}
           {call.collisions.length > 0 && <ClashButton collisions={call.collisions} onClick={onOpenAlerts} />}
           <CrewEditor call={call} users={users.data ?? []} />
 
@@ -206,6 +208,48 @@ function CrewEditor({ call, users }: { call: PortCallView; users: UserView[] }) 
         <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .55)' }}>Navn og ansvarlig settes av produksjonen.</span>
       )}
       {error && <div className="error-box" role="alert">{error}</div>}
+    </div>
+  );
+}
+
+/** Klokkeslett settes når det blir kjent (ofte ca. en time før båten kommer), og kan fjernes igjen. */
+function TimeEditor({ call }: { call: PortCallView }) {
+  const patch = usePatchPortCall();
+  const [open, setOpen] = useState(false);
+  const [eta, setEta] = useState(call.time_known ? hmFromIso(call.eta) : '');
+  const [etd, setEtd] = useState(call.time_known ? hmFromIso(call.etd) : '');
+  const ok = /^\d{2}:\d{2}$/.test(eta) && /^\d{2}:\d{2}$/.test(etd) && etd > eta;
+  const save = () => ok && patch.mutate(
+    { id: call.id, version: call.version, eta: osloToUtc(call.service_date, eta), etd: osloToUtc(call.service_date, etd), time_known: true },
+    { onSuccess: () => setOpen(false) },
+  );
+  const clear = () => patch.mutate({ id: call.id, version: call.version, time_known: false }, { onSuccess: () => setOpen(false) });
+
+  if (!open) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 16, background: 'rgba(var(--tint), .05)' }}>
+        <span style={{ fontSize: 14 }}>
+          <span className="sub">Klokkeslett </span>
+          <span className="n">{call.time_known ? timeRange(call) : 'ikke satt'}</span>
+        </span>
+        <button type="button" className="btn" onClick={() => setOpen(true)} style={{ minHeight: 34, fontSize: 13 }}>
+          {call.time_known ? 'Endre' : 'Sett tid'}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 16, background: 'rgba(var(--tint), .05)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <label className="field"><span>ETA</span><input className="inp n" type="time" value={eta} onChange={e => setEta(e.target.value)} autoFocus /></label>
+        <label className="field"><span>ETD</span><input className="inp n" type="time" value={etd} onChange={e => setEtd(e.target.value)} /></label>
+      </div>
+      {patch.isError && <div className="error-box">{errorText(patch.error)}</div>}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="btn btn-w" disabled={!ok || patch.isPending} onClick={save} style={{ minHeight: 38 }}>Lagre</button>
+        <button type="button" className="btn" onClick={() => setOpen(false)} style={{ minHeight: 38 }}>Avbryt</button>
+        {call.time_known && <button type="button" className="btn" disabled={patch.isPending} onClick={clear} style={{ minHeight: 38, marginLeft: 'auto' }}>Fjern tid</button>}
+      </div>
     </div>
   );
 }

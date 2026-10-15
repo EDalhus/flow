@@ -33,6 +33,8 @@ const portCallFields = {
   quay_id: id,
   eta: dateTime,
   etd: dateTime,
+  /** false = klokkeslett ikke kjent ennå; eta/etd brukes da bare for datoen. */
+  time_known: z.boolean().optional(),
   seller_id: id.nullable().optional(),
   boat_crane: z.boolean().optional(),
   notes: optionalText(2000),

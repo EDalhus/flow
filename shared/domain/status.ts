@@ -7,6 +7,8 @@ import type { CallStatus } from './types.ts';
 export interface StatusInput {
   eta: string;
   etd: string;
+  /** false = bare dagen er kjent; da brukes ikke klokka til å anta at båten ligger ved kai. */
+  time_known?: boolean;
   arrived_at: string | null;
   departed_at: string | null;
   completed_at: string | null;
@@ -52,7 +54,7 @@ export function deriveStatus(c: StatusInput, now: Date, opts: StatusOptions): St
   }
 
   // Ingen AIS: anta at båten ligger ved kai mellom ETA og ETD.
-  if (t >= eta) return { status: 'ved_kai', basis: 'tid' };
+  if (t >= eta && c.time_known !== false) return { status: 'ved_kai', basis: 'tid' };
   return { status: 'planlagt', basis: 'plan' };
 }
 

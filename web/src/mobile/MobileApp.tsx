@@ -131,7 +131,7 @@ function MobileCard({ call: c, onOpen }: { call: PortCallView; onOpen: () => voi
   const f = FLAG_STYLE[c.boat.flag];
   const boats = [...new Set(c.collisions.flatMap(x => x.with.map(w => w.boat_name)))];
   return (
-    <button type="button" className="card" onClick={onOpen} aria-label={`${c.boat.name}, ${typeLabel(c.type)} ${quayLabel(c.quay)}, ETA ${osloTime(c.eta)}`}
+    <button type="button" className="card" onClick={onOpen} aria-label={`${c.boat.name}, ${typeLabel(c.type)} ${quayLabel(c.quay)}, ${c.time_known ? `ETA ${osloTime(c.eta)}` : 'tid ikke satt'}`}
       style={{ borderRadius: 24, gap: 10, background: 'rgba(var(--tint), .05)', border: '1px solid rgba(var(--tint), .07)', ...(c.status === 'ferdig' ? { opacity: .6 } : {}) }}>
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%' }}>
         <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -140,7 +140,7 @@ function MobileCard({ call: c, onOpen }: { call: PortCallView; onOpen: () => voi
             {typeLabel(c.type)} · <QuayMark quay={c.quay} compact />
           </span>
         </span>
-        <span className="n" style={{ fontSize: 28, fontWeight: 200, letterSpacing: '-0.02em' }}>{osloTime(c.eta)}</span>
+        <span className="n" style={{ fontSize: c.time_known ? 28 : 15, fontWeight: 200, letterSpacing: '-0.02em' }}>{c.time_known ? osloTime(c.eta) : 'Tid ikke satt'}</span>
       </span>
       <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
         <StatusBadge status={c.status} basis={c.status_basis} size="lg" />
@@ -159,7 +159,9 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
   const me = useMe();
   const f = FLAG_STYLE[c.boat.flag];
   const mins = Math.round((Date.parse(c.eta) - now.getTime()) / 60_000);
-  const card = c.status === 'ved_kai'
+  const card = !c.time_known && c.status !== 'ferdig' && c.status !== 'kaibok_mangler'
+    ? { title: c.status === 'ved_kai' ? 'Ved kai' : 'Dag', sub: 'Klokkeslett ikke satt', big: dayShort(c.service_date), dim: '' }
+    : c.status === 'ved_kai'
     ? { title: 'Ved kai', sub: 'Planlagt avgang', big: osloTime(c.etd).slice(0, 2), dim: osloTime(c.etd).slice(2) }
     : c.status === 'ferdig' ? { title: 'Ferdig', sub: 'Kaibok levert', big: osloTime(c.etd).slice(0, 2), dim: osloTime(c.etd).slice(2) }
     : c.status === 'kaibok_mangler' ? { title: 'Kaibok mangler', sub: 'ETD passert', big: osloTime(c.etd).slice(0, 2), dim: osloTime(c.etd).slice(2) }

@@ -11,7 +11,7 @@ import { addDays, osloTime, serviceDate } from '../../shared/time.ts';
 import { loadCapacity, loadSettings } from '../lib/settings.ts';
 
 type CallRow = {
-  id: string; type: CallType; eta: string; etd: string; service_date: string; boat_crane: number; notes: string | null;
+  id: string; type: CallType; eta: string; etd: string; time_known: number; service_date: string; boat_crane: number; notes: string | null;
   version: number; arrived_at: string | null; departed_at: string | null; completed_at: string | null; cancelled_at: string | null;
   boat_id: string; boat_name: string; flag_auto: Flag; flag_auto_reason: string | null; flag_override: Flag | null;
   flag_override_reason: string | null; avg_total: number | null; rating_count: number;
@@ -49,7 +49,7 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
   const w = where(filter);
   const [calls, goods, crew] = await db.batch([
     db.prepare(`
-      SELECT pc.id, pc.type, pc.eta, pc.etd, pc.service_date, pc.boat_crane, pc.notes, pc.version,
+      SELECT pc.id, pc.type, pc.eta, pc.etd, pc.time_known, pc.service_date, pc.boat_crane, pc.notes, pc.version,
              pc.arrived_at, pc.departed_at, pc.completed_at, pc.cancelled_at,
              b.id AS boat_id, b.name AS boat_name, b.flag_auto, b.flag_auto_reason, b.flag_override, b.flag_override_reason,
              b.avg_total, b.rating_count,
@@ -93,6 +93,7 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
     const st = deriveStatus(
       {
         ...r,
+        time_known: !!r.time_known,
         completed_at: r.completed_at ?? (r.has_log ? r.etd : null),
         ais: r.ais_fetched_at ? { fetched_at: r.ais_fetched_at, sog: r.ais_sog, in_geofence: !!r.ais_in_geofence } : null,
       },
@@ -101,7 +102,7 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
     );
     const flag = effectiveFlag(r);
     return {
-      id: r.id, type: r.type, eta: r.eta, etd: r.etd, service_date: r.service_date, boat_crane: !!r.boat_crane,
+      id: r.id, type: r.type, eta: r.eta, etd: r.etd, time_known: !!r.time_known, service_date: r.service_date, boat_crane: !!r.boat_crane,
       notes: r.notes, version: r.version,
       boat: {
         id: r.boat_id, name: r.boat_name, flag, flag_reason: r.flag_override ? r.flag_override_reason : r.flag_auto_reason,
@@ -132,7 +133,7 @@ export interface CollisionContext {
   capacityFor: CapacityFor;
   quays: { id: string; name: string; nickname: string | null; company: string | null }[];
   users: Map<string, string>;
-  /** Aktive anløp i perioden (pluss en dag på hver side, for anløp over midnatt). */
+  /** Aktive anløp med kjent tid i perioden (pluss en dag på hver side, for anløp over midnatt). */
   active: CollisionCall[];
 }
 
@@ -149,7 +150,7 @@ export async function collisionContext(db: D1Database, from: string, to: string,
   return {
     settings, capacityFor, calls, quays: quays.results,
     users: new Map(users.results.map(u => [u.id, u.short_name])),
-    active: calls.filter(c => isActive(c.status)).map(toCollisionCall),
+    active: calls.filter(c => isActive(c.status) && c.time_known).map(toCollisionCall),
   };
 }
 

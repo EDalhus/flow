@@ -3,7 +3,7 @@ import { collisionsFor, findCollisions, type CollisionCall } from '../../shared/
 import { resolveResponsible } from '../../shared/domain/responsible.ts';
 import { CREW_ROLE_LABEL, type CallType, type CrewRole } from '../../shared/domain/types.ts';
 import { crewPut, portCallCancel, portCallCreate, portCallPatch, rangeQuery, type PortCallCreate } from '../../shared/schemas.ts';
-import { osloTime, serviceDate } from '../../shared/time.ts';
+import { osloTime, serviceDate, wholeDay } from '../../shared/time.ts';
 import { CAN, hasRole, requireRole } from '../auth/access.ts';
 import { attachCollisions, collisionContext, loadCall, viewCollision } from '../db/portCalls.ts';
 import { body, fail, newId, nowIso, query } from '../lib/http.ts';
@@ -79,7 +79,7 @@ async function runGuarded(db: D1Database, statements: D1PreparedStatement[]) {
 }
 
 type CurrentCall = {
-  id: string; boat_id: string; type: CallType; quay_id: string; eta: string; etd: string; service_date: string; seller_id: string | null;
+  id: string; boat_id: string; type: CallType; quay_id: string; eta: string; etd: string; time_known: number; service_date: string; seller_id: string | null;
   boat_crane: number; notes: string | null; responsible_user_id: string | null; version: number;
   completed_at: string | null; cancelled_at: string | null; has_log: number; boat_name: string;
 };
@@ -119,6 +119,8 @@ app.get('/:id', async c => {
 app.post('/check', requireRole(...CAN.plan), body(portCallCreate), async c => {
   const input = c.req.valid('json');
   const editId = c.req.query('id');
+  // Uten klokkeslett kan anløpet ikke kollidere; det sjekkes når tiden settes.
+  if (input.time_known === false) return c.json({ collisions: [] });
   const ctx = await collisionContext(c.env.DB, serviceDate(input.eta), serviceDate(input.etd));
   if (!ctx.quays.some(q => q.id === input.quay_id)) throw fail(400, 'Ukjent kai.', { field: 'quay_id' });
   const boat = await c.env.DB.prepare('SELECT name FROM boats WHERE id = ?').bind(input.boat_id).first<{ name: string }>();
@@ -148,10 +150,12 @@ app.post('/', requireRole(...CAN.plan), body(portCallCreate), async c => {
   if (!resp.ok) throw fail(400, resp.error, { field: 'responsible_user_id' });
 
   const id = newId('pc');
+  const known = input.time_known !== false;
+  const times = known ? { eta: input.eta, etd: input.etd } : wholeDay(serviceDate(input.eta));
   await db.batch([
-    db.prepare(`INSERT INTO port_calls (id, boat_id, type, quay_id, eta, etd, service_date, seller_id, created_by, boat_crane, responsible_user_id, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, input.boat_id, input.type, input.quay_id, input.eta, input.etd, serviceDate(input.eta), seller, user.id,
+    db.prepare(`INSERT INTO port_calls (id, boat_id, type, quay_id, eta, etd, time_known, service_date, seller_id, created_by, boat_crane, responsible_user_id, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, input.boat_id, input.type, input.quay_id, times.eta, times.etd, known ? 1 : 0, serviceDate(input.eta), seller, user.id,
         input.boat_crane ? 1 : 0, resp.responsible, input.notes ?? null),
     ...goodsStatements(db, id, input.type, input.goods),
     ...crewStatements(db, id, input.crew),
@@ -176,7 +180,10 @@ app.patch('/:id', requireRole(...CAN.plan), body(portCallPatch), async c => {
     seller_id: input.seller_id !== undefined ? input.seller_id : cur.seller_id,
     boat_crane: input.boat_crane !== undefined ? input.boat_crane : !!cur.boat_crane,
     notes: input.notes !== undefined ? input.notes : cur.notes,
+    // Nye tider uten at time_known er oppgitt betyr at tiden nå er kjent.
+    time_known: input.time_known ?? (input.eta || input.etd ? true : !!cur.time_known),
   };
+  if (!next.time_known) Object.assign(next, wholeDay(serviceDate(next.eta)));
   if (Date.parse(next.etd) <= Date.parse(next.eta)) throw fail(400, 'ETD må være etter ETA.', { field: 'etd' });
   await validateRefs(db, {
     boat_id: input.boat_id, quay_id: input.quay_id, seller_id: input.seller_id ?? undefined, goods: input.goods,
@@ -186,9 +193,9 @@ app.patch('/:id', requireRole(...CAN.plan), body(portCallPatch), async c => {
   const flipDirection = input.type && input.type !== cur.type && !input.goods;
   await runGuarded(db, [
     guardedAudit(db, user, cur.id, input.version, 'update', input),
-    db.prepare(`UPDATE port_calls SET boat_id = ?, type = ?, quay_id = ?, eta = ?, etd = ?, service_date = ?, seller_id = ?,
+    db.prepare(`UPDATE port_calls SET boat_id = ?, type = ?, quay_id = ?, eta = ?, etd = ?, time_known = ?, service_date = ?, seller_id = ?,
                   boat_crane = ?, notes = ?, version = version + 1, updated_at = ? WHERE id = ?`)
-      .bind(next.boat_id, next.type, next.quay_id, next.eta, next.etd, serviceDate(next.eta), next.seller_id,
+      .bind(next.boat_id, next.type, next.quay_id, next.eta, next.etd, next.time_known ? 1 : 0, serviceDate(next.eta), next.seller_id,
         next.boat_crane ? 1 : 0, next.notes, nowIso(), cur.id),
     ...(input.goods
       ? [db.prepare('DELETE FROM port_call_goods WHERE port_call_id = ?').bind(cur.id), ...goodsStatements(db, cur.id, next.type, input.goods)]

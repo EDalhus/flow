@@ -85,6 +85,8 @@ export interface PortCallView {
   eta: string;
   etd: string;
   service_date: string;
+  /** false = bare dagen er kjent; eta/etd er da 00:00–23:59. */
+  time_known: boolean;
   boat_crane: boolean;
   notes: string | null;
   version: number;
@@ -169,7 +171,7 @@ export interface BoatView extends BoatSummary {
   flag_override_reason: string | null;
   flag_override_by: UserRef | null;
   flag_override_at: string | null;
-  next_call: { id: string; eta: string; etd: string; quay_name: string; status: CallStatus } | null;
+  next_call: { id: string; eta: string; etd: string; time_known: boolean; quay_name: string; status: CallStatus } | null;
 }
 
 export interface BoatDetail extends BoatView {

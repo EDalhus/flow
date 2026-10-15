@@ -4,12 +4,16 @@ Internt logistikksystem for kaia på Flatholmen i Ålesund. Menyen har fire hove
 
 | Seksjon | Innhold |
 |---|---|
-| **Båter** | Kart med AIS, anløp, kaibok og båtregister (underfaner øverst) |
+| **Båter** | Kart med AIS, anløp, kaibok og båtregister (underfaner øverst). Kartet kan vises som mørkt, lyst, satellitt eller hybrid; valget huskes per nettleser. |
 | **Biler** | Kundebiler som henter pall og BB, sortert på forventet dag (ikke klokkeslett). Markeres «Hentet» når de har vært her. |
 | **Bulkbil** | Egne biler som henter salt i bulk. Sjåføren bestiller kvalitet (havsalt, steinsalt, blandet salt, veisalt) i opptil fire steg, f.eks. 16 t blandet på henger og så 12 t havsalt på bil, med pause (min:sek) mellom stegene. |
 | **Produksjon** | To pakkelinjer med 30 t silo hver. Viser hva som pakkes, beregnet nivå i siloen og når hjullasteren skal fylle eller stoppe før kvalitetsbytte. |
 
 Rapporter og administrasjon ligger nederst i menyen. `/hjullaster` er en fullskjermvisning for nettbrettet i hjullasteren: behov i traktene for bulkbilene, begge siloene og store knapper for å registrere påfylling.
+
+**Klokkeslett på anløp er valgfritt.** Tidene er sjelden kjent før ca. en time før båten kommer, så et anløp kan legges inn med bare dag. Tiden settes på anløpet («Sett tid») når den er kjent. Anløp uten tid er utenfor kollisjonssjekken og kaibelegget til tiden er satt.
+
+**Kartbakgrunn:** Mørk og lys bruker Kartverkets åpne kart (CC BY 4.0). Satellitt og hybrid bruker Esri World Imagery. Esris vilkår kan kreve en ArcGIS-konto ved kommersiell bruk; flyfoto fra Norge i bilder kan brukes i stedet hvis dere har tilgang.
 
 **MVP:** Silonivået beregnes fra registrert påfylling og pakkehastigheten (standard 10 t/t per linje). Når sensorene på siloene kobles på, erstattes det beregnede nivået med målt verdi. Bulkbil viser og teller ned; styring av traktene kan kobles på senere.
 
@@ -137,11 +141,11 @@ Eksempeldataene (`SEED_DEMO`) inneholder testbrukere på `@flow.example`. De kan
 Cron-jobben kjører hvert minutt:
 
 - **Henting:** Den henter siste posisjon for båtene i kaiboka og lagrer posisjon og spor for de siste 6 timene.
-- **Ved kai:** Båten er innenfor geofencen (300 m rundt Flatholmen havn 81B) med fart under 3 knop, og har et anløp med ETA innenfor ±12 timer.
+- **Ved kai:** Båten er innenfor geofencen (300 m rundt Flatholmen havn 81B) med fart under 3 knop, og har et anløp med ETA innenfor ±12 timer. Anløp uten klokkeslett regnes med ETA midt på dagen.
 - **Kaibok mangler:** Båten har forlatt geofencen uten at kaiboka er levert.
-- **Uten AIS-posisjon:** Status anslås ut fra ETA og ETD, og merket viser at det er et anslag.
+- **Uten AIS-posisjon:** Status anslås ut fra ETA og ETD, og merket viser at det er et anslag. Anløp uten klokkeslett står som planlagt til AIS melder båten.
 
-Pillen øverst på kartet viser «AIS live» når det har kommet data de siste 5 minuttene. Ellers viser den hva som mangler, for eksempel nøkler, MMSI eller en feil fra BarentsWatch.
+AIS-status vises ikke på kartet. Hvis AIS ikke er satt opp, eller siste henting fra BarentsWatch feilet, kommer det et varsel i bjella. Admin kan åpne varselet og kjøre AIS-sjekken derfra.
 
 BarentsWatch sine data utelater fiskefartøy under 15 m og fritidsbåter under 45 m, og dekker norsk økonomisk sone.
 

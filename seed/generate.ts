@@ -186,17 +186,19 @@ type Call = {
   departed?: boolean;
   completedAt?: string | null;
   source: 'app' | 'import';
+  /** Klokkeslett ikke kjent ennå: lagres som hele dagen. */
+  untimed?: boolean;
 };
 
 function addCall(c: Call) {
-  const eta = at(c.date, c.start), etd = at(c.date, c.end);
+  const eta = at(c.date, c.untimed ? 0 : c.start), etd = at(c.date, c.untimed ? 23 * 60 + 59 : c.end);
   const slots = c.crew ?? [];
   // Regel: én rolle → den personen er automatisk ansvarlig.
   const responsible = slots.length === 1 ? (slots[0][1] ?? null) : (c.responsible ?? null);
   const arrived = c.arrivedDelay == null ? null : plusMin(eta, c.arrivedDelay);
   const departed = c.departed && arrived ? plusMin(etd, Math.max(0, c.arrivedDelay ?? 0) + int(-10, 20)) : null;
   add('port_calls', {
-    id: c.id, boat_id: B(c.boat), type: c.type, quay_id: c.quay, eta, etd, service_date: c.date,
+    id: c.id, boat_id: B(c.boat), type: c.type, quay_id: c.quay, eta, etd, time_known: c.untimed ? 0 : 1, service_date: c.date,
     seller_id: c.seller ? U(c.seller) : null, created_by: U(c.source === 'import' ? 'mari' : pick(['mari', 'kari', 'henrik'])),
     boat_crane: c.crane ? 1 : 0, responsible_user_id: responsible ? U(responsible) : null,
     arrived_at: arrived, departed_at: departed, completed_at: c.completedAt ?? null, source: c.source,
@@ -416,6 +418,8 @@ for (const p of PLANNED) {
     id: callId, boat: p.boat, type: p.type, quay: QUAY[p.kai], date: addDays(TODAY, p.day), start: toMin(p.start), end: toMin(p.end),
     seller: p.seller, crane: p.crane, responsible: p.ans ?? null, crew: p.crew, goods: p.goods,
     arrivedDelay: p.arrived ?? null, departed: false, completedAt: null, source: 'app',
+    // Tidene er sjelden kjent mer enn et døgn frem.
+    untimed: p.day >= 2,
   });
 }
 

@@ -76,8 +76,9 @@ export async function syncAis(env: Env, now = new Date(), fetcher: Fetcher = fet
   const fetchedAt = now.toISOString();
 
   // Anløp som kan påvirkes: ikke avlyst, ETA fra 24 t siden til 12 t frem.
+  // Uten kjent klokkeslett regnes midt på dagen som ETA ved matching.
   const { results: calls } = await db
-    .prepare(`SELECT id, boat_id, eta, arrived_at, departed_at FROM port_calls
+    .prepare(`SELECT id, boat_id, CASE WHEN time_known = 1 THEN eta ELSE strftime('%Y-%m-%dT%H:%M:%fZ', eta, '+12 hours') END AS eta, arrived_at, departed_at FROM port_calls
               WHERE source = 'app' AND cancelled_at IS NULL AND eta BETWEEN ? AND ?
                 AND boat_id IN (SELECT value FROM json_each(?))`)
     .bind(new Date(now.getTime() - 24 * 3_600_000).toISOString(), new Date(now.getTime() + 12 * 3_600_000).toISOString(), JSON.stringify(boats.map(b => b.id)))

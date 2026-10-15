@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router';
 import type { CollisionView, PortCallView } from '../../../shared/api.ts';
 import { errorText } from '../lib/api.ts';
 import { FLAG_STYLE, addDays, dayRelative, fr, osloTime, todayOslo } from '../lib/format.ts';
-import { useMe, useNotifications, usePatchPortCall, usePortCalls, useReadNotifications } from '../lib/queries.ts';
+import { useAis, useMe, useNotifications, usePatchPortCall, usePortCalls, useReadNotifications } from '../lib/queries.ts';
+import { AisCheck } from './AisCheck.tsx';
 import { canPlan } from '../lib/roles.ts';
 import { api } from '../lib/api.ts';
 import { Chevron, Close, Sparkle } from './Icons.tsx';
@@ -17,13 +18,19 @@ export function useAlerts() {
   const list = calls.data?.calls ?? [];
   const flagged = list.filter(c => c.status !== 'ferdig' && (c.boat.flag === 'red' || c.boat.flag === 'yellow'));
   const collisions = calls.data?.collisions ?? [];
+  // AIS vises bare når noe er galt: ikke satt opp, eller siste henting feilet.
+  const ais = useAis().data?.status;
+  const aisProblem = ais && (!ais.configured || !ais.ok)
+    ? (ais.configured ? ais.message ?? 'Siste henting fra BarentsWatch feilet.' : 'AIS er ikke satt opp (BarentsWatch-nøkler mangler).')
+    : null;
   return {
+    aisProblem,
     calls: list,
     collisions,
     flagged,
     notifications: notes.data?.items ?? [],
     unread: notes.data?.unread ?? 0,
-    count: collisions.length + flagged.length + (notes.data?.unread ?? 0),
+    count: collisions.length + flagged.length + (notes.data?.unread ?? 0) + (aisProblem ? 1 : 0),
   };
 }
 
@@ -42,6 +49,7 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
   const read = useReadNotifications();
   const [open, setOpen] = useState<string | null>(a.collisions.length ? 'c0' : null);
   const [error, setError] = useState<string | null>(null);
+  const [aisCheck, setAisCheck] = useState(false);
   const byId = useMemo(() => new Map(a.calls.map(c => [c.id, c])), [a.calls]);
   const planner = canPlan(me.data);
 
@@ -124,7 +132,7 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
             <div key={id} className={red ? 'alert-red' : 'alert-yellow'} style={{ borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, ...(red ? { background: 'rgba(120,42,38,.3)' } : {}) }}>
               <AlertHead badge="!" badgeStyle={red ? { background: '#E5484D', color: '#fff' } : { background: '#F7B955', color: '#1A231E' }}
                 title={`${red ? 'Rødt flagg' : 'Gult varsel'}: ${c.boat.name}`}
-                sub={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{dayRelative(c.service_date)} {osloTime(c.eta)} · <QuayMark quay={c.quay} compact /></span>}
+                sub={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{dayRelative(c.service_date)}{c.time_known ? ` ${osloTime(c.eta)}` : ''} · <QuayMark quay={c.quay} compact /></span>}
                 open={isOpen} onClick={() => toggle(id)} />
               {isOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 30 }}>
@@ -135,6 +143,14 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
             </div>
           );
         })}
+
+        {a.aisProblem && (
+          <div className="alert-yellow" style={{ borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <AlertHead badge="!" badgeStyle={{ background: '#F7B955', color: '#1A231E' }} title="Problem med AIS" sub={a.aisProblem}
+              open={aisCheck} onClick={() => me.data?.roles.includes('admin') && setAisCheck(!aisCheck)} />
+            {aisCheck && <AisCheck onClose={() => setAisCheck(false)} />}
+          </div>
+        )}
 
         {a.notifications.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 6px 0' }}>

@@ -75,7 +75,9 @@ export const goodsParts = (g: GoodsView): [string, string] => [
   g.unit === 'pall' ? `${g.product_name} · 25 kg × ${g.bags_per_unit} · ${g.pallet_type === 'srs' ? 'SRS-pall' : 'Europall'}` : g.product_name,
 ];
 
-export const timeRange = (c: Pick<PortCallView, 'eta' | 'etd'>) => `${osloTime(c.eta)}–${osloTime(c.etd)}`;
+/** "07:30–11:00", eller "Tid ikke satt" når bare dagen er kjent. */
+export const timeRange = (c: Pick<PortCallView, 'eta' | 'etd'> & { time_known?: boolean }) =>
+  c.time_known === false ? 'Tid ikke satt' : `${osloTime(c.eta)}–${osloTime(c.etd)}`;
 export const typeLabel = (t: string) => (t === 'levering' ? 'Levering' : 'Henting');
 
 export const telHref = (phone: string) => `tel:${phone.replace(/\s/g, '')}`;

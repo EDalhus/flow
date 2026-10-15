@@ -53,28 +53,27 @@ export function AnlopPage() {
           </div>
         </div>
 
-        <section className="panel-light scroll" aria-label="Anløpsliste" style={{ overflowX: 'auto', overflowY: 'hidden' }}>
-          <div style={{ minWidth: 960 }}>
-          <div className="arow hide-s" style={{ fontSize: 12, color: 'var(--fg-45)', paddingTop: 18, paddingBottom: 12 }}>
-            <span>Tid</span><span>Båt</span><span>Varer</span><span>Mannskap</span><span>Status</span>
-          </div>
-          <div className="scroll" style={{ maxHeight: 'calc(100vh - 290px)', minHeight: 200 }}>
-            {calls.isPending && <Loading />}
-            {days.map(d => {
-              const items = visible.filter(c => c.service_date === d);
-              return (
-                <div key={d}>
-                  <div className="eyebrow" style={{ padding: '22px 24px 10px', display: 'flex', justifyContent: 'space-between', color: 'var(--fg-55)' }}>
-                    <span>{dayHeading(d, today)}</span><span className="n">{items.length} anløp</span>
-                  </div>
-                  {items.map(c => <Row key={c.id} call={c} fresh={c.id === fresh} />)}
+        {calls.isPending && <Loading />}
+        {/* Én boks per dag, som på Biler. Anløp uten klokkeslett står sist i dagen. */}
+        {days.map(d => {
+          const items = visible.filter(c => c.service_date === d)
+            .sort((x, y) => Number(!x.time_known) - Number(!y.time_known) || x.eta.localeCompare(y.eta));
+          const tonnes = items.reduce((t, c) => t + c.tonnes_in + c.tonnes_out, 0);
+          return (
+            <section key={d} aria-label={dayHeading(d, today)} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                <span className="eyebrow">{dayHeading(d, today)}</span>
+                <span className="muted n" style={{ fontSize: 13 }}>{items.length} anløp · {fr(tonnes)} t</span>
+              </div>
+              <div className="panel-light" style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+                <div style={{ minWidth: 900 }}>
+                  {items.map((c, i) => <Row key={c.id} call={c} fresh={c.id === fresh} first={i === 0} />)}
                 </div>
-              );
-            })}
-            {calls.isSuccess && !days.length && <p className="empty">Ingen anløp matcher søket.</p>}
-          </div>
-          </div>
-        </section>
+              </div>
+            </section>
+          );
+        })}
+        {calls.isSuccess && !days.length && <p className="empty">Ingen anløp matcher søket.</p>}
       </div>
 
       {showNew && (
@@ -85,11 +84,11 @@ export function AnlopPage() {
   );
 }
 
-function Row({ call: c, fresh }: { call: PortCallView; fresh: boolean }) {
+function Row({ call: c, fresh, first }: { call: PortCallView; fresh: boolean; first: boolean }) {
   return (
     <Link to={`/?id=${c.id}`} className="arow arow-link" aria-label={`${c.boat.name}, ${timeRange(c)} – åpne i kartet`}
-      style={{ borderTop: '1px solid rgba(var(--tint), .06)', ...(fresh ? { background: 'rgba(128,239,222,.1)' } : c.status === 'ferdig' ? { opacity: .5 } : {}) }}>
-      <span className="n" style={{ fontSize: 15 }}>{timeRange(c)}</span>
+      style={{ borderTop: first ? 'none' : '1px solid rgba(var(--tint), .06)', ...(fresh ? { background: 'rgba(128,239,222,.1)' } : c.status === 'ferdig' ? { opacity: .5 } : {}) }}>
+      <span className="n" style={c.time_known ? { fontSize: 15 } : { fontSize: 13, color: 'var(--fg-45)' }}>{timeRange(c)}</span>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
         <span style={{ fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
           {c.boat.name}
@@ -133,6 +132,8 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
   const [type, setType] = useState<'levering' | 'henting'>('levering');
   const [quayId, setQuayId] = useState('');
   const [date, setDate] = useState(today);
+  // Klokkeslett er sjelden kjent ved planlegging – som regel først ca. en time før båten kommer.
+  const [timeKnown, setTimeKnown] = useState(false);
   const [eta, setEta] = useState('12:00');
   const [etd, setEtd] = useState('15:00');
   const [lines, setLines] = useState<Line[]>([{ sku_id: '', quantity: '200' }]);
@@ -153,14 +154,14 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
   const allSkus = (products.data ?? []).flatMap(p => p.skus.map(s => ({ ...s, name: p.name })));
   const goods = lines.map(l => ({ sku: allSkus.find(s => s.id === (l.sku_id || allSkus[0]?.id)), qty: Number(l.quantity) || 0 }));
 
-  const etaIso = osloToUtc(date, eta || '00:00');
-  const etdIso = osloToUtc(date, etd || '00:00');
-  const timesOk = /^\d{2}:\d{2}$/.test(eta) && /^\d{2}:\d{2}$/.test(etd) && etdIso > etaIso;
+  const etaIso = timeKnown ? osloToUtc(date, eta || '00:00') : osloToUtc(date, 0);
+  const etdIso = timeKnown ? osloToUtc(date, etd || '00:00') : osloToUtc(date, 23 * 60 + 59);
+  const timesOk = !timeKnown || (/^\d{2}:\d{2}$/.test(eta) && /^\d{2}:\d{2}$/.test(etd) && etdIso > etaIso);
   const crew = CREW_ROLES.flatMap(r => Array.from({ length: roles[r] }, () => ({ crew_role: r })));
   const total = crew.length;
 
   const draft: PortCallCreateInput | null = boat && quay && timesOk ? {
-    boat_id: boat.id, type, quay_id: quay, eta: etaIso, etd: etdIso, boat_crane: crane, seller_id: seller || null,
+    boat_id: boat.id, type, quay_id: quay, eta: etaIso, etd: etdIso, time_known: timeKnown, boat_crane: crane, seller_id: seller || null,
     goods: goods.filter(g => g.sku && g.qty > 0).map(g => ({ sku_id: g.sku!.id, quantity: g.qty })),
     crew: crew.map(s => ({ ...s, user_id: null })),
   } : null;
@@ -180,7 +181,7 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
 
   const applySuggestion = (s: CollisionView['suggestions'][number]) => {
     if (s.kind === 'move_quay') setQuayId(s.quay_id);
-    else { setEta(hmFromIso(s.eta)); setEtd(hmFromIso(s.etd)); }
+    else { setTimeKnown(true); setEta(hmFromIso(s.eta)); setEtd(hmFromIso(s.etd)); }
   };
 
   const tonnes = goods.reduce((sum, g) => sum + (g.sku ? (g.qty * g.sku.kg_per_unit) / 1000 : 0), 0);
@@ -236,15 +237,25 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <label className="field"><span>Dag</span>
           <select className="inp" value={date} onChange={e => setDate(e.target.value)}>
             {dates.map(d => <option key={d} value={d}>{dayShort(d)}</option>)}
           </select>
         </label>
-        <label className="field"><span>ETA</span><input className="inp n" type="time" value={eta} onChange={e => setEta(e.target.value)} /></label>
-        <label className="field"><span>ETD</span><input className="inp n" type="time" value={etd} onChange={e => setEtd(e.target.value)} /></label>
+        <div className="field"><span>Klokkeslett</span>
+          <Segmented label="Klokkeslett" value={timeKnown ? 'ja' : 'nei'} onChange={v => setTimeKnown(v === 'ja')} stretch
+            options={[{ value: 'nei', label: 'Ikke kjent' }, { value: 'ja', label: 'Kjent' }]} />
+        </div>
       </div>
+      {timeKnown ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <label className="field"><span>ETA</span><input className="inp n" type="time" value={eta} onChange={e => setEta(e.target.value)} /></label>
+          <label className="field"><span>ETD</span><input className="inp n" type="time" value={etd} onChange={e => setEtd(e.target.value)} /></label>
+        </div>
+      ) : (
+        <span className="sub" style={{ marginTop: -6 }}>Tiden kan settes på anløpet når den er kjent. Kollisjoner sjekkes da.</span>
+      )}
 
       <div className="field"><span>Varer</span>
         {lines.map((l, i) => {

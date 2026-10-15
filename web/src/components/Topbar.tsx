@@ -39,14 +39,15 @@ export function Sidebar() {
 }
 
 /** Underfaner for Båter-seksjonen (kart, anløp, kaibok og båtregister samlet). */
-export function BoatTabs() {
+export function BoatTabs({ wide }: { wide?: boolean }) {
   const { pathname } = useLocation();
   if (!BOAT_PATHS.includes(pathname)) return null;
   const tabs = [['/', 'Kart'], ['/anlop', 'Anløp'], ['/kaibok', 'Kaibok'], ['/baater', 'Båtregister']] as const;
   return (
-    <nav aria-label="Båter" className="pill seg" style={{ display: 'inline-flex', backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.6)' }}>
+    // wide: like bred som anløpspanelet på kartet (--col), med fanene jevnt fordelt.
+    <nav aria-label="Båter" className="pill seg" style={{ display: 'inline-flex', backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.6)', ...(wide ? { width: 'var(--col)', maxWidth: '100%' } : {}) }}>
       {tabs.map(([to, label]) => (
-        <NavLink key={to} to={to} end className="tab" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}
+        <NavLink key={to} to={to} end className="tab" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', ...(wide ? { flex: 1 } : {}) }}
           aria-current={pathname === to ? 'page' : undefined} {...(pathname === to ? { 'aria-pressed': true } : {})}>
           {label}
         </NavLink>

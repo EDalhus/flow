@@ -35,6 +35,9 @@ export function osloToUtc(date: string, time: string | number): string {
 }
 
 /** ISO UTC → lokal Oslo-dato ("2026-10-14"). */
+/** Anløp uten kjent klokkeslett lagres som hele dagen. */
+export const wholeDay = (date: string) => ({ eta: osloToUtc(date, 0), etd: osloToUtc(date, 23 * 60 + 59) });
+
 export function serviceDate(iso: string | Date): string {
   return osloParts(typeof iso === 'string' ? new Date(iso) : iso).date;
 }

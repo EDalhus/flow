@@ -1,11 +1,24 @@
-import { LngLatBounds, Map as MlMap } from 'maplibre-gl';
+import { LngLatBounds, Map as MlMap, type LayerSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
 
-// Bakgrunnskart: Kartverkets åpne WMTS-cache (topograatone), CC BY 4.0.
-// Gråtonekartet er lyst; vi inverterer lysstyrken (brightness-min > max) for mørkt tema som i designet.
+// Bakgrunnskart som brukeren velger selv:
+//   mørk/lys  – Kartverkets åpne WMTS-cache (topograatone), CC BY 4.0. Mørk inverterer lysstyrken.
+//   satellitt – Esri World Imagery. Hybrid legger Esris stedsnavn og grenser oppå.
 export const KARTVERKET_TILES = 'https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png';
-export const ATTRIBUTION = 'Kart © Kartverket (CC BY 4.0)';
+const ESRI_IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const ESRI_LABELS = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
+
+export type Basemap = 'mork' | 'lys' | 'satellitt' | 'hybrid';
+export const BASEMAPS: { value: Basemap; label: string }[] = [
+  { value: 'mork', label: 'Mørk' }, { value: 'lys', label: 'Lys' }, { value: 'satellitt', label: 'Satellitt' }, { value: 'hybrid', label: 'Hybrid' },
+];
+export const attribution = (b: Basemap) =>
+  b === 'mork' || b === 'lys' ? 'Kart © Kartverket (CC BY 4.0)' : 'Bilder © Esri, Maxar, Earthstar Geographics';
+const LAYERS: Record<Basemap, string[]> = {
+  mork: ['kartverket-mork'], lys: ['kartverket-lys'], satellitt: ['esri-bilder'], hybrid: ['esri-bilder', 'esri-navn'],
+};
+const ALL_LAYERS = [...new Set(Object.values(LAYERS).flat())];
 
 export interface MapHandle {
   zoomIn(): void;
@@ -26,6 +39,7 @@ interface Props {
   /** HTML-overlegg (kai, båter, kort) plassert med project(). Tegnes på nytt når kartet flyttes. */
   overlays?: (project: Project) => ReactNode;
   interactive?: boolean;
+  basemap?: Basemap;
 }
 
 function circle(lon: number, lat: number, radiusM: number, steps = 64) {
@@ -39,7 +53,7 @@ function circle(lon: number, lat: number, radiusM: number, steps = 64) {
   return { type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [coords] } };
 }
 
-export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, zoom = 11.6, padding, geofence, overlays, interactive = true }, ref) {
+export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, zoom = 11.6, padding, geofence, overlays, interactive = true, basemap = 'mork' }, ref) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
   const [, setFrame] = useState(0);
@@ -59,15 +73,20 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
       style: {
         version: 8,
         sources: {
-          kartverket: { type: 'raster', tiles: [KARTVERKET_TILES], tileSize: 256, maxzoom: 18, attribution: ATTRIBUTION },
+          kartverket: { type: 'raster', tiles: [KARTVERKET_TILES], tileSize: 256, maxzoom: 18 },
+          esri: { type: 'raster', tiles: [ESRI_IMAGERY], tileSize: 256, maxzoom: 19 },
+          esriNavn: { type: 'raster', tiles: [ESRI_LABELS], tileSize: 256, maxzoom: 19 },
         },
         layers: [
-          { id: 'hav', type: 'background', paint: { 'background-color': '#1B2A23' } },
+          { id: 'hav', type: 'background', paint: { 'background-color': basemap === 'lys' ? '#DCE3DF' : '#1B2A23' } },
           {
-            id: 'kartverket', type: 'raster', source: 'kartverket',
+            id: 'kartverket-mork', type: 'raster', source: 'kartverket',
             paint: { 'raster-brightness-min': 0.55, 'raster-brightness-max': 0.02, 'raster-saturation': -1, 'raster-contrast': -0.1, 'raster-opacity': 0.7 },
           },
-        ],
+          { id: 'kartverket-lys', type: 'raster', source: 'kartverket', paint: { 'raster-saturation': -0.4, 'raster-opacity': 0.95 } },
+          { id: 'esri-bilder', type: 'raster', source: 'esri', paint: { 'raster-saturation': -0.1 } },
+          { id: 'esri-navn', type: 'raster', source: 'esriNavn' },
+        ].map(l => (l.id === 'hav' || LAYERS[basemap].includes(l.id) ? l : { ...l, layout: { visibility: 'none' } })) as LayerSpecification[],
       },
     });
     if (padding) m.setPadding(padding);
@@ -88,6 +107,17 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
     // Kartet opprettes én gang; senere endringer styres via handle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Bytt bakgrunnskart uten å bygge kartet på nytt: bare synligheten endres.
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    const apply = () => {
+      for (const id of ALL_LAYERS) m.setLayoutProperty(id, 'visibility', LAYERS[basemap].includes(id) ? 'visible' : 'none');
+      m.setPaintProperty('hav', 'background-color', basemap === 'lys' ? '#DCE3DF' : '#1B2A23');
+    };
+    if (m.isStyleLoaded()) apply(); else m.once('load', apply);
+  }, [basemap]);
 
   useImperativeHandle(ref, () => ({
     zoomIn: () => map.current?.zoomIn(),

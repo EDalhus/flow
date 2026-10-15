@@ -45,6 +45,8 @@ describe('status', () => {
   it('faller tilbake til klokka uten AIS', () => {
     expect(deriveStatus(base, at('07:00'), opts)).toEqual({ status: 'planlagt', basis: 'plan' });
     expect(deriveStatus(base, at('08:30'), opts)).toEqual({ status: 'ved_kai', basis: 'tid' });
+    // Uten kjent klokkeslett antas ikke at båten ligger ved kai.
+    expect(deriveStatus({ ...base, time_known: false }, at('08:30'), opts)).toEqual({ status: 'planlagt', basis: 'plan' });
     expect(deriveStatus(base, at('11:30'), opts)).toEqual({ status: 'ved_kai', basis: 'tid' });
     expect(deriveStatus(base, at('12:00'), opts)).toEqual({ status: 'kaibok_mangler', basis: 'tid' });
   });

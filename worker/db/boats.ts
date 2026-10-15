@@ -44,7 +44,7 @@ type BoatRow = {
   flag_override_at: string | null; ob_id: string | null; ob_name: string | null; ob_short: string | null; ob_initials: string | null;
   rating_count: number; avg_punctuality: number | null; avg_cooperation: number | null; avg_equipment: number | null;
   avg_total: number | null; last_log_at: string | null;
-  next_id: string | null; next_eta: string | null; next_etd: string | null; next_quay: string | null;
+  next_id: string | null; next_eta: string | null; next_etd: string | null; next_known: number | null; next_quay: string | null;
 };
 
 export async function loadBoats(db: D1Database, settings: Settings, id?: string, now = new Date()): Promise<BoatView[]> {
@@ -55,7 +55,7 @@ export async function loadBoats(db: D1Database, settings: Settings, id?: string,
              b.flag_auto, b.flag_auto_reason, b.flag_override, b.flag_override_reason, b.flag_override_at,
              ob.id AS ob_id, ob.name AS ob_name, ob.short_name AS ob_short, ob.initials AS ob_initials,
              b.rating_count, b.avg_punctuality, b.avg_cooperation, b.avg_equipment, b.avg_total, b.last_log_at,
-             n.id AS next_id, n.eta AS next_eta, n.etd AS next_etd, nq.name AS next_quay
+             n.id AS next_id, n.eta AS next_eta, n.etd AS next_etd, n.time_known AS next_known, nq.name AS next_quay
       FROM boats b
       LEFT JOIN agents ag ON ag.id = b.agent_id
       LEFT JOIN users ob ON ob.id = b.flag_override_by
@@ -84,9 +84,9 @@ export async function loadBoats(db: D1Database, settings: Settings, id?: string,
       avg_equipment: b.avg_equipment, avg_total: b.avg_total, last_log_at: b.last_log_at,
       next_call: b.next_id
         ? {
-            id: b.next_id, eta: b.next_eta!, etd: b.next_etd!, quay_name: b.next_quay ?? '',
+            id: b.next_id, eta: b.next_eta!, etd: b.next_etd!, time_known: b.next_known !== 0, quay_name: b.next_quay ?? '',
             status: deriveStatus(
-              { eta: b.next_eta!, etd: b.next_etd!, arrived_at: null, departed_at: null, completed_at: null, cancelled_at: null },
+              { eta: b.next_eta!, etd: b.next_etd!, time_known: b.next_known !== 0, arrived_at: null, departed_at: null, completed_at: null, cancelled_at: null },
               now, { missingAfterMinutes: settings.quay_log_missing_after_minutes },
             ).status,
           }

@@ -16,7 +16,7 @@ type Filter = 'alle' | 'red' | 'yellow' | 'green';
 const nextText = (b: BoatView) => {
   const n = b.next_call;
   if (!n) return null;
-  return `${dayRelative(serviceDate(n.eta))} ${osloTime(n.eta)} · ${n.quay_name}${n.status === 'ved_kai' ? ' (ved kai nå)' : ''}`;
+  return `${dayRelative(serviceDate(n.eta))}${n.time_known ? ` ${osloTime(n.eta)}` : ''} · ${n.quay_name}${n.status === 'ved_kai' ? ' (ved kai nå)' : ''}`;
 };
 
 export function BaaterPage() {

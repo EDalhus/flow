@@ -96,6 +96,25 @@ describe('anløp', () => {
     expect(list.json.calls.every((c: { collisions: unknown[] }) => c.collisions.length === 1)).toBe(true);
   });
 
+  it('godtar anløp uten klokkeslett: hele dagen, ingen kollisjon før tiden settes', async () => {
+    const day = '2030-03-12';
+    const timed = await api('/port-calls', { body: call(day, '09:00', '12:00') });
+    const untimed = await api('/port-calls', { body: call(day, '00:00', '00:30', { boat_id: 'b_b', time_known: false }) });
+    expect(untimed.status).toBe(201);
+    expect(untimed.json).toMatchObject({ time_known: false, service_date: day, eta: at(day, '00:00'), etd: at(day, '23:59'), collisions: [] });
+    expect((await api('/port-calls/check', { body: call(day, '00:00', '00:30', { boat_id: 'b_b', time_known: false }) })).json.collisions).toEqual([]);
+
+    // Når tiden settes, blir den kjent og kollisjonen med det andre anløpet meldes.
+    const set = await api(`/port-calls/${untimed.json.id}`, { method: 'PATCH', body: { version: untimed.json.version, eta: at(day, '10:00'), etd: at(day, '11:00') } });
+    expect(set.status).toBe(200);
+    expect(set.json).toMatchObject({ time_known: true, eta: at(day, '10:00') });
+    expect(set.json.collisions[0]).toMatchObject({ kind: 'quay', with: [{ id: timed.json.id }] });
+
+    // Tiden kan fjernes igjen.
+    const cleared = await api(`/port-calls/${untimed.json.id}`, { method: 'PATCH', body: { version: set.json.version, time_known: false } });
+    expect(cleared.json).toMatchObject({ time_known: false, eta: at(day, '00:00'), collisions: [] });
+  });
+
   it('melder samme person på to anløp og for mange på samme rolle', async () => {
     const day = '2030-03-06';
     const trucks = (n: number, first?: string) => Array.from({ length: n }, (_, i) => ({ crew_role: 'truck', user_id: i === 0 ? first ?? null : null }));

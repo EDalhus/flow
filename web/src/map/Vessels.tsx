@@ -49,7 +49,7 @@ export function VesselLayer({ project, vessels, calls, selectedId, onSelect, qua
   const tag = (v: Placed) => {
     if (v.inGeofence) return 'ved kai';
     const c = v.call!;
-    return c.service_date === today ? osloTime(c.eta) : 'i morgen';
+    return c.service_date === today ? (c.time_known ? osloTime(c.eta) : 'i dag') : 'i morgen';
   };
 
   return (
@@ -82,7 +82,7 @@ export function VesselLayer({ project, vessels, calls, selectedId, onSelect, qua
         const s = STATUS_STYLE[c.status];
         return (
           <button key={v.key} type="button" onClick={() => onSelect(c.id)}
-            aria-label={`${c.boat.name}, ${v.inGeofence ? 'ved vår kai' : `ETA ${osloTime(c.eta)}`}, ${s.label}`}
+            aria-label={`${c.boat.name}, ${v.inGeofence ? 'ved vår kai' : (c.time_known ? `ETA ${osloTime(c.eta)}` : 'tid ikke satt')}, ${s.label}`}
             style={{ position: 'absolute', left: v.x, top: v.y, zIndex: on ? 4 : 3, padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transform: `translate(-${size / 2}px, -${size / 2}px)`, minWidth: 44, minHeight: 44 }}>
             <span style={{ position: 'relative', width: size, height: size, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)',
               ...(on ? { background: '#80EFDE', boxShadow: '0 0 0 8px rgba(128,239,222,.2)', width: size + 14, height: size + 14 } : { background: 'rgba(51,64,56,.85)', border: '1px solid rgba(var(--tint), .25)' }) }}>

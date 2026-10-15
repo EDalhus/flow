@@ -1,24 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { PortCallView } from '../../../shared/api.ts';
-import { AlertsPanel, useAlerts } from '../components/Alerts.tsx';
+import { AlertsPanel } from '../components/Alerts.tsx';
 import { CallDetail, type DetailTab } from '../components/CallDetail.tsx';
 import { Anchor, Minus, Plus, Target, TrendUp } from '../components/Icons.tsx';
 import { KaibokModal } from '../components/KaibokForm.tsx';
-import { Sidebar, Topbar } from '../components/Topbar.tsx';
+import { BoatTabs, Sidebar, Topbar } from '../components/Topbar.tsx';
 import { CallIssues, Loading, QuayMark, Segmented, StatusBadge } from '../components/ui.tsx';
-import { ATTRIBUTION, FlowMap, type MapHandle, type Project } from '../map/FlowMap.tsx';
+import { BASEMAPS, FlowMap, attribution, type Basemap, type MapHandle, type Project } from '../map/FlowMap.tsx';
 import { STATUS_STYLE, addDays, nb, dayHeading, goodsShort, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
-import { useAis, useMe, usePortCalls, useQuays, useSettings, useSummary } from '../lib/queries.ts';
-import { AisCheck } from '../components/AisCheck.tsx';
-import { VesselLayer, aisLive } from '../map/Vessels.tsx';
+import { useAis, usePortCalls, useQuays, useSettings, useSummary } from '../lib/queries.ts';
+import { VesselLayer } from '../map/Vessels.tsx';
 import { useNow } from '../lib/useNow.ts';
 import './kart.css';
 
 type Filter = 'alle' | 'levering' | 'henting' | 'kollisjon';
 const FALLBACK = { lat: 62.47918, lon: 6.19292 };
-const MONTHS = ['jan', 'feb', 'mar', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'des'];
-const WEEKDAYS = ['Søndag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag'];
 
 export function KartPage() {
   const now = useNow();
@@ -27,19 +24,20 @@ export function KartPage() {
   const calls = usePortCalls(today, tomorrow);
   const quays = useQuays();
   const settings = useSettings();
-  const alerts = useAlerts();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<Filter>('alle');
   const [q, setQ] = useState('');
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [kaibok, setKaibok] = useState(false);
-  const [aisCheck, setAisCheck] = useState(false);
   // Kaibelegget er lagt sammen som standard, så kartet får fokus. Valget huskes.
   const [tlOpen, setTlOpen] = useState(() => { try { return localStorage.getItem('flow-kaibelegg') === 'open'; } catch { return false; } });
   const toggleTl = () => setTlOpen(o => { try { localStorage.setItem('flow-kaibelegg', o ? 'closed' : 'open'); } catch { /* ignorer */ } return !o; });
-  const me = useMe();
-  const isAdmin = !!me.data?.roles.includes('admin');
   const mapRef = useRef<MapHandle>(null);
+  // Bakgrunnskart velges av hver bruker og huskes i nettleseren.
+  const [basemap, setBasemap] = useState<Basemap>(() => {
+    try { const v = localStorage.getItem('flow-kartstil'); return BASEMAPS.some(b => b.value === v) ? v as Basemap : 'mork'; } catch { return 'mork'; }
+  });
+  const pickBasemap = (b: Basemap) => { setBasemap(b); try { localStorage.setItem('flow-kartstil', b); } catch { /* ignorer */ } };
 
   const list = calls.data?.calls ?? [];
   const selectedId = params.get('id');
@@ -74,22 +72,8 @@ export function KartPage() {
     items: list.filter(c => c.service_date === d && pass(c)),
   })).filter(g => g.items.length);
 
-  const flagCount = alerts.flagged.length;
-  const alertSummary = [
-    alerts.collisions.length && `${alerts.collisions.length} ${alerts.collisions.length === 1 ? 'kollisjon' : 'kollisjoner'}`,
-    flagCount && `${flagCount} flagg`,
-  ].filter(Boolean).join(' · ');
-
   const ais = useAis();
-  const live = aisLive(ais.data?.status, now);
   const vessels = ais.data?.vessels ?? [];
-  const atQuay = list.filter(c => c.status === 'ved_kai' && c.service_date === today);
-  const onTheWay = list.filter(c => c.status === 'paa_vei').length;
-  const aisText = live
-    ? `AIS live · ${vessels.length} fartøy · ${onTheWay} på vei til oss`
-    : ais.data?.status?.configured === false ? `AIS ikke tilkoblet${isAdmin ? ' – klikk for å sjekke' : ''}`
-    : ais.data?.status?.message ?? `AIS venter på data · ${atQuay.length} ved kai`;
-
   // Første gang AIS-data finnes: vis kaia og båtene som skal til oss.
   const fitted = useRef(false);
   useEffect(() => {
@@ -140,13 +124,13 @@ export function KartPage() {
       <div className="kart-mapwrap" style={{ position: 'absolute', inset: 0 }}>
         {settings.isSuccess && (
           <FlowMap ref={mapRef} center={[fence.lon - 0.06, fence.lat + 0.004]} zoom={11.4}
-            padding={{ top: 120, bottom: 236, left: 520, right: 320 }} geofence={fence} overlays={overlays} />
+            padding={{ top: 120, bottom: 236, left: 520, right: 320 }} geofence={fence} overlays={overlays} basemap={basemap} />
         )}
-        <span className="kart-attr ov-hide">{ATTRIBUTION}</span>
+        <span className="kart-attr ov-hide">{attribution(basemap)}</span>
       </div>
 
       <div className="ov kart-top">
-        <Topbar glass alertsOpen={alertsOpen} onAlerts={setAlertsOpen}
+        <Topbar glass alertsOpen={alertsOpen} onAlerts={setAlertsOpen} center={<BoatTabs wide />}
           search={
             <label className="pill ov-hide" style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 46, padding: '0 16px', width: 280, backdropFilter: 'blur(16px)' }}>
               <span className="sr">Søk</span>
@@ -154,28 +138,6 @@ export function KartPage() {
                 style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: 14, outlineOffset: 6 }} />
             </label>
           } />
-      </div>
-
-      <div className="ov kart-title">
-        <h1 style={{ margin: 0, fontSize: 76, fontWeight: 300, letterSpacing: '-0.04em', lineHeight: 1, textShadow: '0 2px 30px rgba(0,0,0,.45)' }}>Flatholmen</h1>
-        <div style={{ display: 'flex', gap: 10, pointerEvents: 'auto', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-          <button type="button" onClick={isAdmin ? () => setAisCheck(!aisCheck) : undefined} aria-expanded={isAdmin ? aisCheck : undefined}
-            title={`${aisText}${ais.data?.status?.checked_at ? ` (sjekket ${osloTime(ais.data.status.checked_at)})` : ''}${isAdmin ? ' – klikk for å sjekke' : ''}`}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 36, padding: '0 6px', background: 'none', border: 'none', cursor: isAdmin ? 'pointer' : 'default', color: 'var(--fg)' }}>
-            <span className={live ? 'dot ping' : 'dot'} style={{ width: 8, height: 8, background: live ? 'var(--aqua)' : 'var(--sage)' }} />
-            <span className="eyebrow" style={{ color: 'var(--fg)' }}>{live ? 'AIS live' : ais.data?.status?.configured === false ? 'AIS ikke tilkoblet' : 'AIS venter'}</span>
-            <span className="n" style={{ fontSize: 15, color: 'var(--sage)' }}>
-              {WEEKDAYS[new Date(`${today}T12:00:00Z`).getUTCDay()].slice(0, 3)} {Number(today.slice(8))}. {MONTHS[Number(today.slice(5, 7)) - 1]} · {osloTime(now)}
-            </span>
-          </button>
-          {alertSummary && (
-            <button type="button" className="pill" onClick={() => setAlertsOpen(!alertsOpen)} aria-expanded={alertsOpen}
-              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 36, padding: '0 14px', backdropFilter: 'blur(16px)', background: 'rgba(120,42,38,.55)', borderColor: 'rgba(255,107,94,.25)', fontSize: 13 }}>
-              <span className="dot" style={{ width: 7, height: 7, background: '#E5484D' }} />{alertSummary}
-            </button>
-          )}
-        </div>
-        {aisCheck && <div style={{ pointerEvents: 'auto', textAlign: 'left' }}><AisCheck onClose={() => setAisCheck(false)} /></div>}
       </div>
 
       <aside className="ov glass scroll kart-left" aria-label="Anløp">
@@ -205,13 +167,18 @@ export function KartPage() {
       {!selected && <MainStats />}
 
       <div className="ov kart-zoom">
-        <span style={{ fontSize: 15, marginRight: 6 }}>Zoom</span>
+        <div role="group" aria-label="Kartvisning" className="pill seg" style={{ backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.7)', marginRight: 8 }}>
+          {BASEMAPS.map(b => (
+            <button key={b.value} type="button" className="tab" aria-pressed={basemap === b.value} onClick={() => pickBasemap(b.value)}
+              style={{ minHeight: 32, padding: '0 12px', fontSize: 13 }}>{b.label}</button>
+          ))}
+        </div>
         <button type="button" className="zoom-btn" onClick={() => mapRef.current?.zoomIn()} aria-label="Zoom inn"><Plus size={16} /></button>
         <button type="button" className="zoom-btn" onClick={() => mapRef.current?.zoomOut()} aria-label="Zoom ut"><Minus size={16} /></button>
         <button type="button" className="zoom-btn solid" onClick={() => mapRef.current?.flyTo(fence.lon, fence.lat, 14)} aria-label="Sentrer på kaia"><Target size={17} /></button>
       </div>
 
-      <Timeline calls={todays} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} open={tlOpen} onToggle={toggleTl} />
+      <Timeline calls={todays.filter(c => c.time_known)} untimed={todays.filter(c => !c.time_known && c.status !== 'ferdig').length} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} open={tlOpen} onToggle={toggleTl} />
 
       {alertsOpen && <div className="ov kart-alerts"><AlertsPanel onClose={() => setAlertsOpen(false)} /></div>}
 
@@ -300,12 +267,16 @@ function MapCard({ call, x, y, now, today, onChat }: { call: PortCallView; x: nu
   let sub = call.quay.company ? `Neste · nabo ${quayTitle(call.quay)}` : `Neste: Vår kai · ${quayTitle(call.quay)}`;
   let big = osloTime(call.eta).slice(0, 2), dim = osloTime(call.eta).slice(2);
   let foot = call.service_date === today ? `ETA ${osloTime(call.eta)}` : `ETA ${call.service_date === addDays(today, 1) ? 'i morgen' : call.service_date.slice(8, 10) + '.' + call.service_date.slice(5, 7)}`;
-  if (call.status === 'ved_kai') {
+  if (call.status === 'ved_kai' && !call.time_known) {
+    sub = `Ved kai · ${kai}`; big = 'Ved'; dim = ' kai'; foot = 'Avgang ikke satt';
+  } else if (call.status === 'ved_kai') {
     sub = `Ved kai · ${kai}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'Planlagt avgang';
   } else if (call.status === 'ferdig') {
     sub = `Ferdig · ${kai}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'Kaibok levert';
   } else if (call.status === 'kaibok_mangler') {
     sub = `Kaibok mangler · ${kai}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'ETD passert – fyll ut kaibok';
+  } else if (!call.time_known) {
+    big = '––'; dim = ':––'; foot = `${call.service_date === today ? 'I dag' : call.service_date === addDays(today, 1) ? 'I morgen' : call.service_date.slice(8, 10) + '.' + call.service_date.slice(5, 7)} · klokkeslett ikke satt`;
   } else if (call.service_date === today && mins > 0) {
     big = String(Math.floor(mins / 60)); dim = ` t ${String(mins % 60).padStart(2, '0')} min`; foot = `til ankomst · ETA ${osloTime(call.eta)}`;
   }
@@ -330,8 +301,8 @@ function MapCard({ call, x, y, now, today, onChat }: { call: PortCallView; x: nu
 }
 
 /** Kaibelegg i dag: én bane per kai, kollisjoner skravert, strek for nå. */
-function Timeline({ calls, selected, onSelect, now, quays, open, onToggle }: {
-  calls: PortCallView[]; selected?: string; onSelect: (id: string) => void; now: Date;
+function Timeline({ calls, untimed, selected, onSelect, now, quays, open, onToggle }: {
+  calls: PortCallView[]; untimed: number; selected?: string; onSelect: (id: string) => void; now: Date;
   quays: { id: string; name: string; nickname: string | null; company: string | null }[];
   open: boolean; onToggle: () => void;
 }) {
@@ -358,7 +329,7 @@ function Timeline({ calls, selected, onSelect, now, quays, open, onToggle }: {
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 150 }}>
           <span style={{ fontSize: 15 }}>Kaibelegg i dag</span>
           <span style={{ fontSize: 12, color: 'var(--fg-62)' }}>
-            {remaining} gjenstår{zones.length ? <> · <span style={{ color: 'var(--bad-fg)' }}>{zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span></> : ''}
+            {remaining} gjenstår{untimed ? ` · ${untimed} uten tid` : ''}{zones.length ? <> · <span style={{ color: 'var(--bad-fg)' }}>{zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span></> : ''}
           </span>
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }} aria-hidden="true">
@@ -385,7 +356,7 @@ function Timeline({ calls, selected, onSelect, now, quays, open, onToggle }: {
             Kaibelegg i dag
             <button type="button" className="btn" onClick={onToggle} aria-expanded={true} style={{ minHeight: 32, fontSize: 13, padding: '0 12px' }}>Skjul</button>
           </h2>
-          <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{remaining} gjenstående anløp · {zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span>
+          <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{remaining} gjenstående anløp{untimed ? ` · ${untimed} uten tid` : ''} · {zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span>
         </div>
         <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--fg-62)', flexWrap: 'wrap' }}>
           {(['ved_kai', 'paa_vei'] as const).map(s => (
