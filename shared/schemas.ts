@@ -171,3 +171,48 @@ export const reportQuery = z.object({
 });
 
 export const settingsPut = z.record(z.string(), z.unknown());
+
+// ---------------------------------------------------------------- biler (pall/BB hentes av kundebiler)
+
+export const truckOrderCreate = z.object({
+  customer: text(120).min(1, 'Skriv inn kunde.'),
+  carrier: optionalText(120),
+  reg_no: optionalText(16),
+  reference: optionalText(60),
+  expected_date: date,
+  notes: optionalText(1000),
+  goods: z.array(z.object({ sku_id: id, quantity: z.int().min(1).max(100_000) })).min(1, 'Legg til minst én vare.').max(20),
+});
+export const truckOrderPatch = truckOrderCreate.partial();
+export type TruckOrderCreateInput = z.input<typeof truckOrderCreate>;
+
+// ---------------------------------------------------------------- bulkbil (egne biler, salt i bulk)
+
+export const bulkStep = z.object({
+  quality_id: id,
+  tonnes: z.number().gt(0, 'Tonn må være over 0.').max(60),
+  target: z.enum(['bil', 'henger']).nullable().optional().transform(v => v ?? null),
+  pause_after_sec: z.int().min(0).max(1800).default(0),
+});
+export const bulkOrderCreate = z.object({
+  truck: text(60).min(1, 'Skriv inn bil.'),
+  destination: optionalText(120),
+  expected_at: dateTime.nullable().optional(),
+  notes: optionalText(500),
+  steps: z.array(bulkStep).min(1, 'Legg til minst ett steg.').max(4),
+});
+export type BulkOrderCreateInput = z.input<typeof bulkOrderCreate>;
+
+// ---------------------------------------------------------------- produksjon (pakkelinjer og siloer)
+
+export const productionOrderCreate = z.object({
+  line_id: id,
+  product_id: id,
+  tonnes: z.number().gt(0).max(2000),
+  notes: optionalText(500),
+});
+export const siloFill = z.object({ line_id: id, tonnes: z.number().gt(0).max(60) });
+export const packingLinePatch = z.object({
+  rate_tph: z.number().gt(0).max(200).optional(),
+  silo_capacity_t: z.number().gt(0).max(500).optional(),
+});

@@ -4,4 +4,7 @@ export type FlowEvent =
   | { type: 'message.created'; port_call_id: string; message_id: string }
   | { type: 'boat.changed'; id: string }
   | { type: 'notification'; user_id: string }
-  | { type: 'ais.updated' };
+  | { type: 'ais.updated' }
+  | { type: 'trucks.changed' }
+  | { type: 'bulk.changed' }
+  | { type: 'production.changed' };

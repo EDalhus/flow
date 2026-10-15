@@ -1,6 +1,17 @@
 # Flow
 
-Internt logistikksystem for kaia på Flatholmen i Ålesund: planlegging av anløp, mannskap, kaibok, båtprofiler og rapporter, med kart og AIS.
+Internt logistikksystem for kaia på Flatholmen i Ålesund. Menyen har fire hovedseksjoner:
+
+| Seksjon | Innhold |
+|---|---|
+| **Båter** | Kart med AIS, anløp, kaibok og båtregister (underfaner øverst) |
+| **Biler** | Kundebiler som henter pall og BB, sortert på forventet dag (ikke klokkeslett). Markeres «Hentet» når de har vært her. |
+| **Bulkbil** | Egne biler som henter salt i bulk. Sjåføren bestiller kvalitet (havsalt, steinsalt, blandet salt, veisalt) i opptil fire steg, f.eks. 16 t blandet på henger og så 12 t havsalt på bil, med pause (min:sek) mellom stegene. |
+| **Produksjon** | To pakkelinjer med 30 t silo hver. Viser hva som pakkes, beregnet nivå i siloen og når hjullasteren skal fylle eller stoppe før kvalitetsbytte. |
+
+Rapporter og administrasjon ligger nederst i menyen. `/hjullaster` er en fullskjermvisning for nettbrettet i hjullasteren: behov i traktene for bulkbilene, begge siloene og store knapper for å registrere påfylling.
+
+**MVP:** Silonivået beregnes fra registrert påfylling og pakkehastigheten (standard 10 t/t per linje). Når sensorene på siloene kobles på, erstattes det beregnede nivået med målt verdi. Bulkbil viser og teller ned; styring av traktene kan kobles på senere.
 
 Alt kjører i én Cloudflare Worker:
 
@@ -192,3 +203,5 @@ Logger finnes under **Workers & Pages → flow → Observability/Logs**, og bygg
 - Skjerm for innstillinger: geofence, flaggterskler og buffer. API-et finnes (`PUT /api/settings`, admin).
 - Varsler på e-post eller push i tillegg til bjella.
 - Import av ekte historikk til rapportene, slik at de oppdiktede tallene erstattes.
+- Silosensorer i stedet for beregnet nivå, og styring av traktene for bulkbil.
+- Skjerm for å endre pakkehastighet og silostørrelse per linje. API-et finnes (`PATCH /api/production/lines/:id`).

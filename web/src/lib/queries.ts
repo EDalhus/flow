@@ -1,10 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  AisView, BoatDetail, BoatView, CollisionView, Me, MessageView, NotificationView, PortCallView, ProductReport,
-  QualityReport, Quay, QuayLogView, UserView, WeeklyReport,
+  AisView, BoatDetail, BoatView, BulkOrderView, BulkQuality, CollisionView, Me, MessageView, NotificationView, PackingLineView,
+  PortCallView, ProductReport, QualityReport, Quay, QuayLogView, TruckOrderView, UserView, WeeklyReport,
 } from '../../../shared/api.ts';
 import type { Settings } from '../../../shared/domain/types.ts';
-import type { CrewPut, PortCallCreateInput, PortCallPatchInput, QuayLogCreateInput } from '../../../shared/schemas.ts';
+import type { BulkOrderCreateInput, CrewPut, PortCallCreateInput, PortCallPatchInput, QuayLogCreateInput, TruckOrderCreateInput } from '../../../shared/schemas.ts';
 import { api } from './api.ts';
 
 export type { Quay };
@@ -192,3 +192,45 @@ export type Summary = {
 };
 export const useSummary = (days: number) =>
   useQuery({ queryKey: ['summary', days], queryFn: () => api<Summary>(`/reports/summary?days=${days}`), placeholderData: keepPreviousData, staleTime: 5 * 60_000 });
+
+// ---------------------------------------------------------------- biler, bulk, produksjon
+
+export const useTruckOrders = () =>
+  useQuery({ queryKey: ['trucks'], queryFn: () => api<TruckOrderView[]>('/trucks'), refetchInterval: 5 * 60_000 });
+
+function useTruckMutation<V>(fn: (v: V) => Promise<TruckOrderView>) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: fn, onSettled: () => qc.invalidateQueries({ queryKey: ['trucks'] }) });
+}
+export const useCreateTruckOrder = () => useTruckMutation((body: TruckOrderCreateInput) => api<TruckOrderView>('/trucks', { body }));
+export const usePickupTruck = () =>
+  useTruckMutation(({ id, undo }: { id: string; undo?: boolean }) => api<TruckOrderView>(`/trucks/${id}/pickup`, { body: { undo } }));
+export const useCancelTruck = () => useTruckMutation((id: string) => api<TruckOrderView>(`/trucks/${id}/cancel`, { body: {} }));
+
+export const useBulkQualities = () => useQuery({ queryKey: ['bulk-qualities'], queryFn: () => api<BulkQuality[]>('/bulk/qualities'), ...STATIC });
+export const useBulkOrders = () =>
+  useQuery({ queryKey: ['bulk'], queryFn: () => api<BulkOrderView[]>('/bulk/orders'), refetchInterval: 30_000 });
+
+function useBulkMutation<V>(fn: (v: V) => Promise<BulkOrderView>) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: fn, onSettled: () => qc.invalidateQueries({ queryKey: ['bulk'] }) });
+}
+export const useCreateBulkOrder = () => useBulkMutation((body: BulkOrderCreateInput) => api<BulkOrderView>('/bulk/orders', { body }));
+/** Start, neste steg eller avlys. */
+export const useBulkAction = () =>
+  useBulkMutation(({ id, action }: { id: string; action: 'start' | 'next' | 'cancel' }) => api<BulkOrderView>(`/bulk/orders/${id}/${action}`, { body: {} }));
+
+export const useProduction = () =>
+  // Silonivået er beregnet fra klokka, så visningen tegnes på nytt uansett; data hentes sjeldnere.
+  useQuery({ queryKey: ['production'], queryFn: () => api<PackingLineView[]>('/production'), refetchInterval: 60_000 });
+
+function useProductionMutation<V>(fn: (v: V) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: fn, onSettled: () => qc.invalidateQueries({ queryKey: ['production'] }) });
+}
+export const useCreateProductionOrder = () =>
+  useProductionMutation((body: { line_id: string; product_id: string; tonnes: number; notes?: string | null }) => api('/production/orders', { body }));
+export const useProductionAction = () =>
+  useProductionMutation(({ id, action }: { id: string; action: 'start' | 'finish' | 'cancel' }) => api(`/production/orders/${id}/${action}`, { body: {} }));
+export const useSiloFill = () =>
+  useProductionMutation((body: { line_id: string; tonnes: number }) => api('/production/fills', { body }));

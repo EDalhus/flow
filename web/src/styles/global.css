@@ -170,7 +170,7 @@ input::placeholder, textarea::placeholder { color: rgba(var(--tint), .45); }
 }
 .tab:hover { color: var(--fg); }
 /* Aktivt valg i segmenter: lys pille med mørk tekst (som 3D/2D-velgeren i referansen). */
-.tab[aria-pressed='true'], .tab[aria-selected='true'] { background: var(--fg); color: var(--ink); }
+.tab[aria-pressed='true'], .tab[aria-selected='true'], .tab[aria-current='page'] { background: var(--fg); color: var(--ink); }
 
 .card {
   color: inherit; text-align: left; cursor: pointer; width: 100%; border-radius: 22px; padding: 16px;

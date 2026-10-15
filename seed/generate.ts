@@ -449,9 +449,77 @@ for (const [key, author, time, body] of CHAT) {
   }
 }
 
+// ---------------------------------------------------------------- biler, bulkbil og produksjon
+
+// Kundebiler som henter pall/BB – forventet dag, ikke klokkeslett.
+const TRUCKS: [number, string, string | null, string | null, [string, 'BB' | 'pall', 'europall' | 'srs' | null, number][], boolean][] = [
+  [-1, 'Brødrene Sperre', 'Tide Transport', 'SU 41 220', [['Hav salt', 'pall', 'europall', 22]], false],
+  [0, 'Nergård Sjømat', 'Bring Cargo', 'ZT 88 103', [['Hav salt', 'BB', null, 24]], true],
+  [0, 'Ålesund Fiskeindustri', 'Eget kjøretøy', null, [['Fint Rafinert salt', 'pall', 'europall', 10], ['Nitrite', 'pall', 'srs', 4]], false],
+  [0, 'Vartdal Fisk', 'Tide Transport', null, [['Stein salt', 'BB', null, 26]], false],
+  [1, 'Fjordlaks', 'PostNord', 'EL 12 908', [['Sukker salt 1:2', 'pall', 'europall', 18]], false],
+  [1, 'Myklebust Sjømat', null, null, [['Blandet salt', 'BB', null, 28]], false],
+  [2, 'Hessa Seafood', 'Bring Cargo', null, [['Hav salt', 'pall', 'srs', 20], ['Hav salt', 'BB', null, 6]], false],
+  [4, 'Nergård Sjømat', 'Bring Cargo', null, [['Hav salt', 'BB', null, 24]], false],
+  [7, 'Brødrene Sperre', 'Tide Transport', null, [['Marsel Hav salt', 'BB', null, 26]], false],
+];
+for (const [offset, customer, carrier, reg, goods, picked] of TRUCKS) {
+  const tid = id('to');
+  const date = addDays(TODAY, offset);
+  add('truck_orders', {
+    id: tid, customer, carrier, reg_no: reg, reference: String(int(40100, 40999)), expected_date: date, notes: null, created_by: U('kari'),
+    picked_up_at: picked ? at(TODAY, 8 * 60 + 40) : null, picked_up_by: picked ? U('ola') : null, cancelled_at: null,
+    created_at: at(addDays(TODAY, Math.min(offset, 0) - 3), 10 * 60),
+  });
+  goods.forEach(([p, unit, pallet, qty], i) => add('truck_order_goods', { id: id('tg'), order_id: tid, sku_id: S(p, unit, pallet).id, quantity: qty, sort: i }));
+}
+
+// Bulkbil: én ferdig i dag, én som venter og én bestilling for i ettermiddag.
+const BULK: [string, string | null, string, 'bestilt' | 'ferdig', number, [string, number, 'bil' | 'henger' | null, number][]][] = [
+  ['Bil 1 · SU 20 110', 'Vartdal Fisk', 'per', 'ferdig', 6 * 60 + 30, [['blandet', 16, 'henger', 120], ['havsalt', 12, 'bil', 0]]],
+  ['Bil 2 · SU 20 144', 'Fjordlaks', 'lars', 'bestilt', 9 * 60 + 15, [['veisalt', 18, 'henger', 90], ['steinsalt', 14, 'bil', 0]]],
+  ['Bil 1 · SU 20 110', 'Hessa Seafood', 'per', 'bestilt', 9 * 60 + 40, [['havsalt', 28, null, 0]]],
+];
+for (const [truck, dest, driver, status, minute, steps] of BULK) {
+  const bid = id('bo');
+  const created = at(TODAY, minute);
+  const done = status === 'ferdig';
+  add('bulk_orders', {
+    id: bid, truck, destination: dest, driver_id: U(driver), status, expected_at: null, notes: null, version: 1, created_at: created,
+    started_at: done ? plusMin(created, 10) : null, finished_at: done ? plusMin(created, 40) : null,
+  });
+  steps.forEach(([q, t, target, pause], i) => add('bulk_order_steps', {
+    id: id('bs'), order_id: bid, seq: i + 1, quality_id: q, tonnes: t, target, pause_after_sec: i === steps.length - 1 ? 0 : pause,
+    started_at: done ? plusMin(created, 10 + i * 15) : null, finished_at: done ? plusMin(created, 20 + i * 15) : null,
+  }));
+}
+
+// Produksjon: linje 1 pakker Hav salt, linje 2 Stein salt; neste ordre er et kvalitetsbytte.
+const PROD: [string, string, number, 'ferdig' | 'pakker' | 'planlagt', number | null, number[]][] = [
+  ['linje1', 'Hav salt', 40, 'ferdig', 6 * 60, []],
+  ['linje1', 'Hav salt', 120, 'pakker', 10 * 60, [30, 20]],
+  ['linje1', 'Blandet salt', 60, 'planlagt', null, []],
+  ['linje2', 'Stein salt', 50, 'pakker', 11 * 60, [30]],
+  ['linje2', 'Fint Rafinert salt', 30, 'planlagt', null, []],
+  ['linje2', 'Stein salt', 40, 'planlagt', null, []],
+];
+PROD.forEach(([line, product, tonnes, status, start, fills], i) => {
+  const pid = id('po');
+  const started = start == null ? null : at(TODAY, start);
+  add('production_orders', {
+    id: pid, line_id: line, product_id: P(product), tonnes, status, sort: i + 1, notes: null, created_by: U('mari'),
+    created_at: at(addDays(TODAY, -1), 14 * 60), started_at: started, finished_at: status === 'ferdig' && started ? plusMin(started, (tonnes / 10) * 60) : null,
+  });
+  fills.forEach((t, n) => add('silo_fills', {
+    id: id('sf'), line_id: line, production_order_id: pid, product_id: P(product), tonnes: t, filled_by: U('jonas'), filled_at: plusMin(started!, n * 90 - 10),
+  }));
+});
+
 // ---------------------------------------------------------------- skriv SQL
 
 const CLEAR = [
+  // Kvaliteter (bulk_qualities) og pakkelinjer (packing_lines) er faste rader fra migrasjonen og beholdes.
+  'bulk_order_steps', 'bulk_orders', 'silo_fills', 'production_orders', 'truck_order_goods', 'truck_orders',
   'audit_log', 'ais_track', 'ais_positions', 'quay_log_photos', 'quay_log_categories', 'quay_logs', 'notifications',
   'message_mentions', 'messages', 'crew_slots', 'port_call_goods', 'port_calls', 'quays', 'skus', 'products', 'boats',
   'agents', 'settings', 'shifts', 'crew_skills', 'user_roles', 'users',

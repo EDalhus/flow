@@ -39,6 +39,15 @@ export function useRealtime(): Connection {
           qc.invalidateQueries({ queryKey: ['ais'] });
           qc.invalidateQueries({ queryKey: ['port-calls'] });
           break;
+        case 'trucks.changed':
+          qc.invalidateQueries({ queryKey: ['trucks'] });
+          break;
+        case 'bulk.changed':
+          qc.invalidateQueries({ queryKey: ['bulk'] });
+          break;
+        case 'production.changed':
+          qc.invalidateQueries({ queryKey: ['production'] });
+          break;
         case 'notification':
           qc.invalidateQueries({ queryKey: ['notifications'] });
           break;

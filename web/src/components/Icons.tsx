@@ -44,6 +44,11 @@ export const Book = (p: P) => <Stroke {...p}><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3
 export const PieChart = (p: P) => <Stroke {...p}><path d="M21 12A9 9 0 1 1 12 3v9z" /><path d="M15 3.5A9 9 0 0 1 20.5 9H15z" /></Stroke>;
 export const Users = (p: P) => <Stroke {...p}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.5a6.5 6.5 0 0 1 3.5 5.5" /></Stroke>;
 
+export const Truck = (p: P) => <Stroke {...p}><path d="M2 6h11v10H2z" /><path d="M13 9h4.5l3.5 3.5V16h-8" /><circle cx="6.5" cy="17.5" r="2" /><circle cx="17" cy="17.5" r="2" /></Stroke>;
+export const BulkTruck = (p: P) => <Stroke {...p}><path d="M2 8l2 8h10l2-8z" /><path d="M16 11h3l3 3v2h-6" /><circle cx="6.5" cy="18" r="2" /><circle cx="18" cy="18" r="2" /><path d="M6 8l2-4h4l2 4" /></Stroke>;
+export const Factory = (p: P) => <Stroke {...p}><path d="M2 21V10l6 4V10l6 4V5h4l2 16z" /><path d="M6 17h2M11 17h2M16 17h2" /></Stroke>;
+export const Gauge = (p: P) => <Stroke {...p}><path d="M4 18a8 8 0 1 1 16 0" /><path d="m12 18 4-6" /></Stroke>;
+
 export const Camera = (p: P) => (
   <Stroke {...p}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></Stroke>
 );

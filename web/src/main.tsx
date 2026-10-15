@@ -14,6 +14,10 @@ const AnlopPage = lazy(() => import('./pages/AnlopPage.tsx').then(m => ({ defaul
 const BaaterPage = lazy(() => import('./pages/BaaterPage.tsx').then(m => ({ default: m.BaaterPage })));
 const KaibokLogPage = lazy(() => import('./pages/KaibokLogPage.tsx').then(m => ({ default: m.KaibokLogPage })));
 const AdminPage = lazy(() => import('./pages/AdminPage.tsx').then(m => ({ default: m.AdminPage })));
+const BilerPage = lazy(() => import('./pages/BilerPage.tsx').then(m => ({ default: m.BilerPage })));
+const BulkPage = lazy(() => import('./pages/BulkPage.tsx').then(m => ({ default: m.BulkPage })));
+const ProduksjonPage = lazy(() => import('./pages/ProduksjonPage.tsx').then(m => ({ default: m.ProduksjonPage })));
+const HjullasterPage = lazy(() => import('./pages/HjullasterPage.tsx').then(m => ({ default: m.HjullasterPage })));
 const RapporterPage = lazy(() => import('./pages/RapporterPage.tsx').then(m => ({ default: m.RapporterPage })));
 
 const queryClient = new QueryClient({
@@ -57,6 +61,10 @@ function App() {
       <Route path="/anlop" element={<AnlopPage />} />
       <Route path="/baater" element={<BaaterPage />} />
       <Route path="/kaibok" element={<KaibokLogPage />} />
+      <Route path="/biler" element={<BilerPage />} />
+      <Route path="/bulk" element={<BulkPage />} />
+      <Route path="/produksjon" element={<ProduksjonPage />} />
+      <Route path="/hjullaster" element={<HjullasterPage />} />
       <Route path="/rapporter" element={<RapporterPage />} />
       <Route path="/admin" element={<AdminPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />

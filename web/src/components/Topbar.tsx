@@ -1,34 +1,56 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { NavLink } from 'react-router';
+import { Link, NavLink, useLocation } from 'react-router';
 import { chooseUser } from '../lib/api.ts';
 import { useMe, useUsers } from '../lib/queries.ts';
 import { AlertsPanel, useAlerts } from './Alerts.tsx';
-import { Bell, Book, CalendarList, Chevron, Globe, Logo, PieChart, Ship, Users } from './Icons.tsx';
+import { Bell, BulkTruck, Chevron, Factory, Logo, PieChart, Ship, Truck, Users } from './Icons.tsx';
 
-const LINKS = [
-  { to: '/', label: 'Kart', icon: Globe },
-  { to: '/anlop', label: 'Anløp', icon: CalendarList },
-  { to: '/baater', label: 'Båter', icon: Ship },
-  { to: '/kaibok', label: 'Kaibok', icon: Book },
-  { to: '/rapporter', label: 'Rapporter', icon: PieChart },
+// Fire hovedseksjoner, med rapporter og admin nederst.
+const BOAT_PATHS = ['/', '/anlop', '/kaibok', '/baater'];
+const SECTIONS = [
+  { to: '/', label: 'Båter', icon: Ship, paths: BOAT_PATHS },
+  { to: '/biler', label: 'Biler', icon: Truck, paths: ['/biler'] },
+  { to: '/bulk', label: 'Bulkbil', icon: BulkTruck, paths: ['/bulk'] },
+  { to: '/produksjon', label: 'Produksjon', icon: Factory, paths: ['/produksjon'] },
 ] as const;
 
-/** Smal ikonmeny til venstre (som i referansen). Tekst vises som hint ved hover/fokus. */
+/** Smal ikonmeny til venstre. Tekst vises som hint ved hover/fokus. */
 export function Sidebar() {
   const me = useMe();
-  const links = [...LINKS, ...(me.data?.roles.includes('admin') ? [{ to: '/admin', label: 'Admin', icon: Users }] : [])];
+  const { pathname } = useLocation();
+  const item = (to: string, label: string, Icon: typeof Ship, active: boolean) => (
+    <Link key={to} to={to} aria-label={label} aria-current={active ? 'page' : undefined} className={`side-link${active ? ' active' : ''}`}>
+      <Icon size={21} />
+      <span className="side-tip" aria-hidden="true">{label}</span>
+    </Link>
+  );
   return (
     <nav className="sidebar" aria-label="Hovedmeny">
-      <NavLink to="/" aria-label="Flow – til kartet" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'auto' }}>
+      <Link to="/" aria-label="Flow – til kartet" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'auto' }}>
         <Logo size={34} />
-      </NavLink>
-      {links.map(({ to, label, icon: Icon }) => (
-        <NavLink key={to} to={to} end={to === '/'} aria-label={label} className={({ isActive }) => `side-link${isActive ? ' active' : ''}`}>
-          <Icon size={21} />
-          <span className="side-tip" aria-hidden="true">{label}</span>
+      </Link>
+      {SECTIONS.map(s => item(s.to, s.label, s.icon, (s.paths as readonly string[]).includes(pathname)))}
+      <span aria-hidden="true" style={{ width: 28, height: 1, background: 'var(--line)', margin: '8px 0' }} />
+      {item('/rapporter', 'Rapporter', PieChart, pathname === '/rapporter')}
+      {me.data?.roles.includes('admin') && item('/admin', 'Admin', Users, pathname === '/admin')}
+      <span style={{ marginTop: 'auto' }} />
+    </nav>
+  );
+}
+
+/** Underfaner for Båter-seksjonen (kart, anløp, kaibok og båtregister samlet). */
+export function BoatTabs() {
+  const { pathname } = useLocation();
+  if (!BOAT_PATHS.includes(pathname)) return null;
+  const tabs = [['/', 'Kart'], ['/anlop', 'Anløp'], ['/kaibok', 'Kaibok'], ['/baater', 'Båtregister']] as const;
+  return (
+    <nav aria-label="Båter" className="pill seg" style={{ display: 'inline-flex', backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.6)' }}>
+      {tabs.map(([to, label]) => (
+        <NavLink key={to} to={to} end className="tab" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}
+          aria-current={pathname === to ? 'page' : undefined} {...(pathname === to ? { 'aria-pressed': true } : {})}>
+          {label}
         </NavLink>
       ))}
-      <span style={{ marginTop: 'auto' }} />
     </nav>
   );
 }
@@ -149,7 +171,7 @@ export function Topbar({ search, center, style, glass, alertsOpen, onAlerts }: {
 
   return (
     <header style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', zIndex: 20, ...style }}>
-      <div style={{ flex: 1, minWidth: 0 }}>{center}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>{center ?? <BoatTabs />}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         {search}
         <UserPill />

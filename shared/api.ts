@@ -264,3 +264,67 @@ export interface PhotoUpload {
   url: string;
   thumb_url: string | null;
 }
+
+// ---------------------------------------------------------------- biler, bulk, produksjon
+
+export interface TruckOrderView {
+  id: string;
+  customer: string;
+  carrier: string | null;
+  reg_no: string | null;
+  reference: string | null;
+  expected_date: string;
+  notes: string | null;
+  goods: { id: string; sku_id: string; product_name: string; unit: 'BB' | 'pall'; quantity: number; tonnes: number; label: string }[];
+  tonnes: number;
+  picked_up_at: string | null;
+  picked_up_by: UserRef | null;
+  cancelled_at: string | null;
+  created_at: string;
+}
+
+export interface BulkQuality { id: string; name: string; color: string }
+
+export interface BulkOrderView {
+  id: string;
+  truck: string;
+  destination: string | null;
+  driver: UserRef | null;
+  status: 'bestilt' | 'lastes' | 'ferdig' | 'avlyst';
+  expected_at: string | null;
+  notes: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  total_tonnes: number;
+  steps: {
+    id: string; seq: number; quality_id: string; quality_name: string; color: string; tonnes: number;
+    target: 'bil' | 'henger' | null; pause_after_sec: number; started_at: string | null; finished_at: string | null;
+  }[];
+}
+
+export interface ProductionOrderView {
+  id: string;
+  line_id: string;
+  product_id: string;
+  product_name: string;
+  tonnes: number;
+  status: 'planlagt' | 'pakker' | 'ferdig' | 'avlyst';
+  sort: number;
+  notes: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface PackingLineView {
+  id: string;
+  name: string;
+  silo_capacity_t: number;
+  rate_tph: number;
+  active_order: ProductionOrderView | null;
+  queue: ProductionOrderView[];
+  done_today: ProductionOrderView[];
+  filled_for_order: number;
+  last_fill: { tonnes: number; filled_at: string; by: string | null } | null;
+}
