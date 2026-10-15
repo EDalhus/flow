@@ -15,7 +15,8 @@
 .kart.has-sel .kart-zoom { right: calc(32px + var(--col) + 24px); }
 .kart.has-sel.tl-open .kart-zoom { bottom: 290px; }
 
-.kart-tl { left: var(--edge); right: 32px; bottom: 24px; min-height: 188px; padding: 20px 26px; display: flex; flex-direction: column; gap: 12px; }
+.kart-tl { left: var(--edge); right: 32px; bottom: 24px; padding: 12px 14px 12px 24px; display: flex; flex-direction: column; gap: 14px; }
+.kart .kart-tl.kart-tl-open { border-radius: 28px; padding-top: 18px; background: rgba(20, 27, 23, .82); }
 .kart.has-sel .kart-tl { right: calc(32px + var(--col) + 24px); }
 .kart-attr { position: absolute; right: 40px; bottom: 6px; font-size: 11px; color: var(--fg-45); z-index: 4; }
 .kart-alerts { top: 84px; right: 32px; z-index: 30 !important; }
@@ -46,13 +47,14 @@
   .ov-hide { display: none !important; }
 }
 
-/* Sammenlagt kaibelegg: smal stripe nederst (må stå etter .kart-tl). */
-.kart .kart-tl.kart-tl-mini { min-height: 0; flex-direction: row; align-items: center; gap: 22px; padding: 12px 14px 12px 24px; border-radius: 999px; }
+/* Sammenlagt kaiplan: smal stripe nederst (må stå etter .kart-tl). */
+.kart .kart-tl.kart-tl-mini { border-radius: 999px; }
 
-/* Fargeforklaring for skipstypene, over kaibelegget til høyre. */
+/* Båter på kartet: fargeforklaring og valg for andre båter, nede til venstre over kaiplanen. */
 .kart-legend {
-  position: absolute; right: 40px; bottom: 162px; display: flex; gap: 12px; white-space: nowrap;
-  font-size: 11.5px; color: var(--fg-75); padding: 7px 12px; border-radius: 14px; background: rgba(20, 24, 28, .62); backdrop-filter: blur(12px);
+  position: absolute; left: var(--edge); bottom: 100px; max-width: 460px; display: flex; flex-direction: column; gap: 8px;
+  font-size: 11.5px; color: var(--fg-75); padding: 10px 12px; border-radius: 16px; background: rgba(20, 24, 28, .66); backdrop-filter: blur(12px);
 }
-.has-sel .kart-legend { display: none; }
-.tl-open .kart-legend { bottom: 286px; }
+.legend-btn { min-height: 28px !important; padding: 0 11px !important; font-size: 12px !important; }
+.tl-open .kart-legend { bottom: 300px; }
+.ship-name { font-size: 12.5px; font-weight: 700; color: #F2F5F3; text-shadow: 0 0 3px #07122A, 0 0 3px #07122A, 0 0 2px #07122A; white-space: nowrap; }

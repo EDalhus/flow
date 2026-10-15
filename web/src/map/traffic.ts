@@ -7,13 +7,14 @@ import { fr } from '../lib/format.ts';
 // hvit linje for hvor de er om 6 minutter, og for valgt fartøy ringer for 6 min–3 t og spor siste døgn.
 
 /** Farger som i Kystverkets kart. «flow» er båter i vårt båtregister. */
-export const CATEGORY_COLOR: Record<ShipCategory | 'flow', string> = {
+export type MapCategory = ShipCategory | 'flow' | 'gra';
+export const CATEGORY_COLOR: Record<MapCategory, string> = {
   fiske: '#F5A623', last: '#6BBF59', tank: '#E5484D', passasjer: '#4A90E2', hurtig: '#F2D24B',
-  slep: '#40C4C4', spesial: '#F2D24B', fritid: '#C77DD8', annet: '#9AA3A0', flow: '#80EFDE',
+  slep: '#40C4C4', spesial: '#F2D24B', fritid: '#C77DD8', annet: '#9AA3A0', flow: '#80EFDE', gra: '#7D858A',
 };
-export const CATEGORY_LABEL: Record<ShipCategory | 'flow', string> = {
+export const CATEGORY_LABEL: Record<MapCategory, string> = {
   flow: 'Våre båter', fiske: 'Fiske', last: 'Last', tank: 'Tank', passasjer: 'Passasjer', hurtig: 'Hurtigbåt',
-  slep: 'Slep', spesial: 'Los/redning', fritid: 'Fritid', annet: 'Annet',
+  slep: 'Slep', spesial: 'Los/redning', fritid: 'Fritid', annet: 'Annet', gra: 'Andre båter',
 };
 
 /** Ett fartøy slik kartet trenger det, fra områdelisten eller fra båtregisteret. */
@@ -60,30 +61,43 @@ export interface TrafficLayers {
   predict: Fc<LineString>;
   rings: Fc<LineString>;
   track: Fc<LineString>;
+  route: Fc<LineString>;
 }
 
-/** `hidden`: fartøy som tegnes som egne knapper (anløp hos oss) og ikke skal ha skipssymbol her. */
-export function trafficLayers(vessels: TrafficVessel[], hidden: Set<string>, selected: string | null, track24: [number, number][] | null, zoomNames: boolean): TrafficLayers {
-  const ships: Fc<Point> = { type: 'FeatureCollection', features: [] };
-  const trails: Fc<LineString> = { type: 'FeatureCollection', features: [] };
-  const predict: Fc<LineString> = { type: 'FeatureCollection', features: [] };
-  const rings: Fc<LineString> = { type: 'FeatureCollection', features: [] };
-  const track: Fc<LineString> = { type: 'FeatureCollection', features: [] };
+export interface TrafficOptions {
+  /** MMSI → anløp hos oss (i dag/i morgen). Klikk på disse åpner anløpet. */
+  hot: Map<string, string>;
+  selected: string | null;
+  track24: [number, number][] | null;
+  /** Seilingsruten fra valgt fartøy til kaia. */
+  route: [number, number][] | null;
+  zoomNames: boolean;
+  /** Vis fartøy som ikke er i båtregisteret. */
+  showOthers: boolean;
+  /** Farg andre fartøy etter type; ellers grå. */
+  colorOthers: boolean;
+}
+
+export function trafficLayers(vessels: TrafficVessel[], o: TrafficOptions): TrafficLayers {
+  const fc = <G extends Point | LineString>(): Fc<G> => ({ type: 'FeatureCollection', features: [] });
+  const ships = fc<Point>(), trails = fc<LineString>(), predict = fc<LineString>(), rings = fc<LineString>(), track = fc<LineString>(), route = fc<LineString>();
 
   for (const v of vessels) {
+    const ours = v.cat === 'flow';
+    const sel = v.mmsi === o.selected;
+    if (!ours && !o.showOthers && !sel) continue;
+    const cat: MapCategory = ours || o.colorOthers ? v.cat : 'gra';
     const bearing = moveBearing(v);
     const go = moving(v) && bearing != null;
-    if (!hidden.has(v.mmsi)) {
-      ships.features.push({
-        type: 'Feature', geometry: { type: 'Point', coordinates: [v.lon, v.lat] },
-        properties: {
-          mmsi: v.mmsi, icon: `${v.heading != null || go ? 'ship' : 'dot'}-${v.cat}`, rot: v.heading ?? bearing ?? 0,
-          label: v.cat === 'flow' || zoomNames || v.mmsi === selected ? v.name ?? '' : '', sel: v.mmsi === selected, flow: v.cat === 'flow',
-        },
-      });
-    }
+    ships.features.push({
+      type: 'Feature', geometry: { type: 'Point', coordinates: [v.lon, v.lat] },
+      properties: {
+        mmsi: v.mmsi, call: o.hot.get(v.mmsi) ?? '', icon: `${v.heading != null || go ? 'ship' : 'dot'}-${cat}`, rot: v.heading ?? bearing ?? 0,
+        label: ours || o.zoomNames || sel ? (v.name ?? '') : '', bold: ours || sel, sel, ours,
+      },
+    });
     if (v.trail.length > 1) {
-      trails.features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [...v.trail, [v.lon, v.lat]] }, properties: { color: CATEGORY_COLOR[v.cat] } });
+      trails.features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [...v.trail, [v.lon, v.lat]] }, properties: { color: CATEGORY_COLOR[cat] } });
     }
     if (go) {
       predict.features.push({
@@ -91,7 +105,7 @@ export function trafficLayers(vessels: TrafficVessel[], hidden: Set<string>, sel
         geometry: { type: 'LineString', coordinates: [[v.lon, v.lat], destination(v.lat, v.lon, bearing, metersAfter(v.sog!, 6))] },
       });
     }
-    if (v.mmsi === selected && moving(v)) {
+    if (sel && moving(v)) {
       for (const min of RANGE_MINUTES) {
         const r = metersAfter(v.sog!, min);
         const coords: [number, number][] = [];
@@ -101,8 +115,9 @@ export function trafficLayers(vessels: TrafficVessel[], hidden: Set<string>, sel
       }
     }
   }
-  if (track24 && track24.length > 1) track.features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: track24 }, properties: {} });
-  return { ships, trails, predict, rings, track };
+  if (o.track24 && o.track24.length > 1) track.features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: o.track24 }, properties: {} });
+  if (o.route && o.route.length > 1) route.features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: o.route }, properties: {} });
+  return { ships, trails, predict, rings, track, route };
 }
 
 // ---------------------------------------------------------------- symboler

@@ -8,9 +8,9 @@ import { KaibokModal } from '../components/KaibokForm.tsx';
 import { BoatTabs, Sidebar, Topbar } from '../components/Topbar.tsx';
 import { QuayMark } from '../components/ui.tsx';
 import { BASEMAPS, FlowMap, attribution, type MapHandle, type Project } from '../map/FlowMap.tsx';
-import { ShipCard, TrafficLegend, approach, approachText, type Approach } from '../map/ShipCard.tsx';
+import { ShipCard, TrafficLegend, approachLabel, approachText } from '../map/ShipCard.tsx';
 import { useBasemap, useTraffic } from '../map/useTraffic.ts';
-import { STATUS_STYLE, addDays, nb, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo } from '../lib/format.ts';
+import { STATUS_STYLE, addDays, nb, isOwnQuay, osloTime, quayTitle, timeRange, todayOslo } from '../lib/format.ts';
 import { usePortCalls, useQuays, useSettings, useSummary } from '../lib/queries.ts';
 import { VesselLayer } from '../map/Vessels.tsx';
 import { useNow } from '../lib/useNow.ts';
@@ -28,7 +28,7 @@ export function KartPage() {
   const [params, setParams] = useSearchParams();
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [kaibok, setKaibok] = useState(false);
-  // Kaibelegget er lagt sammen som standard, så kartet får fokus. Valget huskes.
+  // Kaiplanen er lagt sammen som standard, så kartet får fokus. Valget huskes.
   const [tlOpen, setTlOpen] = useState(() => { try { return localStorage.getItem('flow-kaibelegg') === 'open'; } catch { return false; } });
   const toggleTl = () => setTlOpen(o => { try { localStorage.setItem('flow-kaibelegg', o ? 'closed' : 'open'); } catch { /* ignorer */ } return !o; });
   const mapRef = useRef<MapHandle>(null);
@@ -39,7 +39,9 @@ export function KartPage() {
   const tab = (params.get('tab') as DetailTab) ?? 'oversikt';
   // Ingen automatisk valg: detaljpanelet vises bare når et anløp er valgt, så kartet er mest mulig fritt.
   const selected = selectedId ? list.find(c => c.id === selectedId) : undefined;
-  const { vessels, traffic, hotMmsi, shipSel, setShipSel, selShip, layers, setZoomNames, trackError } = useTraffic(list, selected?.boat.id ?? null);
+  const fence = settings.data?.geofence ?? { ...FALLBACK, radius_m: 300, label: '' };
+  const t = useTraffic(list, selected?.boat.id ?? null, fence);
+  const { vessels, traffic, hot, shipSel, setShipSel, selShip, layers, setZoomNames, trackError } = t;
   const select = (id: string, t?: DetailTab) => {
     setShipSel(null);
     setParams(p => { p.set('id', id); if (t) p.set('tab', t); else p.delete('tab'); return p; }, { replace: true });
@@ -50,7 +52,6 @@ export function KartPage() {
   const alertsRef = useRef(false);
   alertsRef.current = alertsOpen;
 
-  const fence = settings.data?.geofence ?? { ...FALLBACK, radius_m: 300, label: '' };
   const quayPos = (id: string) => {
     const qy = quays.data?.find(x => x.id === id);
     return qy?.lat != null && qy.lon != null ? { lat: qy.lat, lon: qy.lon } : fence;
@@ -58,7 +59,9 @@ export function KartPage() {
 
   const todays = list.filter(c => c.service_date === today);
 
-  const pickShip = (mmsi: string | null) => {
+  // Båt med anløp hos oss: åpne anløpet i sidepanelet. Andre båter: skipskortet.
+  const pickShip = (mmsi: string | null, callId?: string) => {
+    if (callId) { select(callId); return; }
     setShipSel(mmsi);
     if (mmsi && selected) deselect();
   };
@@ -72,7 +75,7 @@ export function KartPage() {
   useEffect(() => {
     if (!focus || !mapRef.current) return;
     mapRef.current.flyTo(focus.lon, focus.lat, 12.5);
-    if (focus.mmsi && !hotMmsi.has(focus.mmsi)) setShipSel(focus.mmsi);
+    if (focus.mmsi && !hot.has(focus.mmsi)) setShipSel(focus.mmsi);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.lat, focus?.lon, settings.isSuccess]);
   // Første gang AIS-data finnes: vis kaia og båtene som skal til oss.
@@ -99,8 +102,6 @@ export function KartPage() {
 
   const overlays = (project: Project) => {
     const quayPt = project(fence.lon, fence.lat);
-    const card = (x: number, y: number) => selected && <MapCard call={selected} x={x} y={y} now={now} today={today} onChat={() => select(selected.id, 'chat')} approach={selShip && approach(selShip, fence)} />;
-    const selectedOnMap = vessels.some(v => v.boat_id === selected?.boat.id) || (selected?.status === 'ved_kai');
     return (
       <>
         {quayPt && (
@@ -112,11 +113,10 @@ export function KartPage() {
             })()}
           </span>
         )}
-        <VesselLayer project={project} vessels={vessels} calls={list} selectedId={selected?.id} onSelect={id => select(id)}
-          quayPos={quayPos} today={today} card={card} />
+        <VesselLayer project={project} vessels={vessels} calls={list} selectedId={selected?.id} onSelect={id => select(id)} quayPos={quayPos} />
         {shipSel && selShip && (() => {
           const pt = project(selShip.lon, selShip.lat);
-          return pt && <ShipCard v={selShip} x={pt[0]} y={pt[1]} now={now.getTime()} fence={fence} trackError={trackError} onClose={() => setShipSel(null)} />;
+          return pt && <ShipCard v={selShip} x={pt[0]} y={pt[1]} now={now.getTime()} approach={t.approach} trackError={trackError} onClose={() => setShipSel(null)} />;
         })()}
         {focus && !traffic.some(v => v.mmsi === focus.mmsi) && (() => {
           const pt = project(focus.lon, focus.lat);
@@ -127,8 +127,6 @@ export function KartPage() {
             </span>
           );
         })()}
-        {/* Valgt båt uten posisjon: kortet festes ved kaia. */}
-        {selected && !selectedOnMap && quayPt && card(quayPt[0], quayPt[1])}
       </>
     );
   };
@@ -163,7 +161,7 @@ export function KartPage() {
         <button type="button" className="zoom-btn solid" onClick={() => mapRef.current?.flyTo(fence.lon, fence.lat, 14)} aria-label="Sentrer på kaia"><Target size={17} /></button>
       </div>
 
-      <TrafficLegend />
+      <TrafficLegend showOthers={t.showOthers} setShowOthers={t.setShowOthers} colorOthers={t.colorOthers} setColorOthers={t.setColorOthers} />
 
       <Timeline calls={todays.filter(c => c.time_known)} untimed={todays.filter(c => !c.time_known && c.status !== 'ferdig').length} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} open={tlOpen} onToggle={toggleTl} />
 
@@ -172,7 +170,13 @@ export function KartPage() {
       {selected && (
         <aside className="ov glass scroll kart-right" aria-label="Valgt anløp">
           <CallDetail call={selected} tab={tab} onTab={t => select(selected.id, t)} onOpenKaibok={() => setKaibok(true)}
-            onOpenAlerts={() => setAlertsOpen(true)} onClose={deselect} />
+            onOpenAlerts={() => setAlertsOpen(true)} onClose={deselect}
+            extra={selShip && t.approach && selected.status !== 'ved_kai' && selected.status !== 'ferdig' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 12px', borderRadius: 14, background: 'rgba(128,239,222,.08)' }}>
+                <span style={{ fontSize: 12, color: 'var(--fg-62)' }}>AIS · {approachLabel(t.approach)}</span>
+                <span className="n" style={{ fontSize: 14, color: 'var(--aqua)' }}>{approachText(t.approach)}</span>
+              </div>
+            )} />
         </aside>
       )}
 
@@ -230,51 +234,10 @@ function MainStats() {
   );
 }
 
-/** Flytende kort ved valgt båt/kai: nedtelling til ankomst eller planlagt avgang. */
-function MapCard({ call, x, y, now, today, onChat, approach }: { call: PortCallView; x: number; y: number; now: Date; today: string; onChat: () => void; approach?: Approach | null }) {
-  const eta = Date.parse(call.eta);
-  const mins = Math.round((eta - now.getTime()) / 60_000);
-  const kai = quayLabel(call.quay);
-  let sub = call.quay.company ? `Neste · nabo ${quayTitle(call.quay)}` : `Neste: Vår kai · ${quayTitle(call.quay)}`;
-  let big = osloTime(call.eta).slice(0, 2), dim = osloTime(call.eta).slice(2);
-  let foot = call.service_date === today ? `ETA ${osloTime(call.eta)}` : `ETA ${call.service_date === addDays(today, 1) ? 'i morgen' : call.service_date.slice(8, 10) + '.' + call.service_date.slice(5, 7)}`;
-  if (call.status === 'ved_kai' && !call.time_known) {
-    sub = `Ved kai · ${kai}`; big = 'Ved'; dim = ' kai'; foot = 'Avgang ikke satt';
-  } else if (call.status === 'ved_kai') {
-    sub = `Ved kai · ${kai}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'Planlagt avgang';
-  } else if (call.status === 'ferdig') {
-    sub = `Ferdig · ${kai}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'Kaibok levert';
-  } else if (call.status === 'kaibok_mangler') {
-    sub = `Kaibok mangler · ${kai}`; big = osloTime(call.etd).slice(0, 2); dim = osloTime(call.etd).slice(2); foot = 'ETD passert – fyll ut kaibok';
-  } else if (!call.time_known) {
-    big = '––'; dim = ':––'; foot = `${call.service_date === today ? 'I dag' : call.service_date === addDays(today, 1) ? 'I morgen' : call.service_date.slice(8, 10) + '.' + call.service_date.slice(5, 7)} · klokkeslett ikke satt`;
-  } else if (call.service_date === today && mins > 0) {
-    big = String(Math.floor(mins / 60)); dim = ` t ${String(mins % 60).padStart(2, '0')} min`; foot = `til ankomst · ETA ${osloTime(call.eta)}`;
-  }
-  // Kortet legges til høyre for punktet, eller til venstre hvis det ikke får plass.
-  const left = x + 52 + 248 > window.innerWidth - 420 ? x - 52 - 248 : x + 52;
-  const top = Math.min(Math.max(y + 44, 230), window.innerHeight - 240 - 170);
-  return (
-    <div className="glass ov-hide" style={{ position: 'absolute', left, top, width: 248, padding: '18px 18px 16px', borderRadius: 22, background: 'rgba(51,64,56,.5)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: 16 }}>{call.boat.name}</span>
-          <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{sub}</span>
-        </div>
-        <button type="button" className="icon-btn" onClick={onChat} aria-label="Åpne chat for anløpet" style={{ width: 36, height: 36, background: 'var(--aqua)', color: 'var(--ink)' }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7" /><path d="M8 7h9v9" /></svg>
-        </button>
-      </div>
-      <span className="n" style={{ fontSize: 46, fontWeight: 200, letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 10 }}>{big}<span style={{ color: 'var(--fg-45)' }}>{dim}</span></span>
-      <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{foot}</span>
-      {approach && call.status !== 'ved_kai' && call.status !== 'ferdig' && (
-        <span className="n" style={{ fontSize: 13, color: 'var(--aqua)', marginTop: 6 }}>AIS: {approachText(approach)}</span>
-      )}
-    </div>
-  );
-}
-
-/** Kaibelegg i dag: én bane per kai, kollisjoner skravert, strek for nå. */
+/**
+ * Dagens kaiplan: én bane per kai, kollisjoner skravert, strek for nå.
+ * Sammenlagt er den en smal stripe; åpen vokser den oppover. Vis/Skjul-knappen står på samme sted i begge.
+ */
 function Timeline({ calls, untimed, selected, onSelect, now, quays, open, onToggle }: {
   calls: PortCallView[]; untimed: number; selected?: string; onSelect: (id: string) => void; now: Date;
   quays: { id: string; name: string; nickname: string | null; company: string | null }[];
@@ -294,88 +257,79 @@ function Timeline({ calls, untimed, selected, onSelect, now, quays, open, onTogg
   const ticks: number[] = [];
   for (let h = Math.ceil(t0 / 2) * 2; h <= t1; h += 2) ticks.push(h);
   const nowH = hour(now.toISOString());
+  const span = (c: PortCallView) => { const a = hour(c.eta); return [a, Math.max(a + 0.25, hour(c.etd) < a ? 24 : hour(c.etd))]; };
+  const ownQuays = quays.filter(q => isOwnQuay(q) || calls.some(c => c.quay.id === q.id));
 
-  if (!open) {
-    // Sammenlagt: én smal stripe med en minitidslinje per kai.
-    const ownQuays = quays.filter(q => isOwnQuay(q) || calls.some(c => c.quay.id === q.id));
-    return (
-      <section className="ov glass kart-tl kart-tl-mini" aria-label="Kaibelegg i dag">
+  return (
+    <section className={`ov glass kart-tl${open ? ' kart-tl-open' : ' kart-tl-mini'}`} aria-labelledby="tl-h">
+      {open && (
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ minWidth: 520, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {quays.map(qy => (
+              <div key={qy.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 118, flex: 'none', paddingRight: 4 }}><QuayMark quay={qy} compact /></div>
+                <div style={{ position: 'relative', flex: 1, height: 36, borderRadius: 12,
+                  background: isOwnQuay(qy) ? 'rgba(var(--tint), .05)' : 'rgba(232,176,110,.07)', outline: isOwnQuay(qy) ? undefined : '1px solid rgba(232,176,110,.16)' }}>
+                  {calls.filter(c => c.quay.id === qy.id).map(c => {
+                    const st = STATUS_STYLE[c.status];
+                    const [a, b] = span(c);
+                    return (
+                      <button key={c.id} type="button" onClick={() => onSelect(c.id)} aria-label={`${c.boat.name}, ${timeRange(c)}, ${st.label}`}
+                        style={{ position: 'absolute', top: 4, bottom: 4, left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, borderRadius: 9, padding: '0 10px', fontSize: 12, cursor: 'pointer', textAlign: 'left', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: 'var(--fg)',
+                          background: `color-mix(in srgb, ${st.c} 26%, rgba(20,27,23,.6))`, opacity: c.status === 'ferdig' ? .55 : 1,
+                          border: `1.5px solid ${selected === c.id ? 'var(--aqua)' : `color-mix(in srgb, ${st.c} 65%, transparent)`}` }}>
+                        {c.boat.name}
+                      </button>
+                    );
+                  })}
+                  {zones.filter(z => z.kind === 'quay' && z.quay_id === qy.id).map(z => (
+                    <div key={z.calls.join()} className="hatch" style={{ position: 'absolute', top: 1, bottom: 1, left: `${pct(hour(z.from))}%`, width: `${pct(hour(z.to)) - pct(hour(z.from))}%`, border: '1px dashed #FF6B5E', borderRadius: 10, pointerEvents: 'none' }} />
+                  ))}
+                  {nowH >= t0 && nowH <= t1 && <div style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--aqua)', pointerEvents: 'none', left: `${pct(nowH)}%` }} />}
+                </div>
+              </div>
+            ))}
+            <div style={{ display: 'flex' }}>
+              <div style={{ width: 118, flex: 'none' }} />
+              <div style={{ position: 'relative', flex: 1, height: 16 }}>
+                {ticks.map(h => <span key={h} className="n" style={{ position: 'absolute', top: 0, transform: 'translateX(-50%)', fontSize: 11, color: 'var(--fg-55)', left: `${pct(h)}%` }}>{String(h % 24).padStart(2, '0')}</span>)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 150 }}>
-          <span style={{ fontSize: 15 }}>Kaibelegg i dag</span>
+          <span id="tl-h" style={{ fontSize: 15 }}>Dagens kaiplan</span>
           <span style={{ fontSize: 12, color: 'var(--fg-62)' }}>
             {remaining} gjenstår{untimed ? ` · ${untimed} uten tid` : ''}{zones.length ? <> · <span style={{ color: 'var(--bad-fg)' }}>{zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span></> : ''}
           </span>
         </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }} aria-hidden="true">
-          {ownQuays.map(qy => (
-            <div key={qy.id} style={{ position: 'relative', height: 7, borderRadius: 4, background: 'rgba(var(--tint), .08)' }}>
-              {calls.filter(c => c.quay.id === qy.id).map(c => {
-                const a = hour(c.eta), b = Math.max(a + 0.25, hour(c.etd) < a ? 24 : hour(c.etd));
-                return <span key={c.id} style={{ position: 'absolute', top: 0, bottom: 0, left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, borderRadius: 4, background: c.collisions.length ? 'var(--red-soft)' : STATUS_STYLE[c.status].c, opacity: c.status === 'ferdig' ? .4 : .85 }} />;
-              })}
-              {nowH >= t0 && nowH <= t1 && <span style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--fg)', left: `${pct(nowH)}%` }} />}
-            </div>
-          ))}
-        </div>
-        <button type="button" className="btn" onClick={onToggle} aria-expanded={false} style={{ minHeight: 36, fontSize: 13, padding: '0 14px' }}>Vis</button>
-      </section>
-    );
-  }
-
-  return (
-    <section className="ov panel-light kart-tl" aria-labelledby="tl-h">
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <h2 id="tl-h" style={{ margin: 0, fontSize: 26, fontWeight: 300, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 12 }}>
-            Kaibelegg i dag
-            <button type="button" className="btn" onClick={onToggle} aria-expanded={true} style={{ minHeight: 32, fontSize: 13, padding: '0 12px' }}>Skjul</button>
-          </h2>
-          <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{remaining} gjenstående anløp{untimed ? ` · ${untimed} uten tid` : ''} · {zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span>
-        </div>
-        <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--fg-62)', flexWrap: 'wrap' }}>
-          {(['ved_kai', 'paa_vei'] as const).map(s => (
-            <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 8, height: 8, background: `color-mix(in srgb, ${STATUS_STYLE[s].c} 70%, #1A231E)` }} />{STATUS_STYLE[s].label}</span>
-          ))}
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="hatch" style={{ width: 12, height: 8, borderRadius: 2, border: '1px dashed #FF6B5E' }} />Kollisjon</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 7, height: 7, background: '#B1C2B7' }} />Ferdig</span>
-        </div>
-      </div>
-      <div style={{ overflowX: 'auto', flex: 1 }}>
-        <div style={{ minWidth: 520, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {quays.map(qy => (
-            <div key={qy.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 118, flex: 'none', paddingRight: 4 }}>
-                <QuayMark quay={qy} compact />
-              </div>
-              <div style={{
-                position: 'relative', flex: 1, height: 38, borderRadius: 12,
-                background: isOwnQuay(qy) ? 'rgba(26,35,30,.05)' : 'rgba(232,176,110,.12)',
-                outline: isOwnQuay(qy) ? undefined : '1px solid rgba(232,176,110,.18)',
-              }}>
-                {calls.filter(c => c.quay.id === qy.id).map(c => {
-                  const s = STATUS_STYLE[c.status];
-                  const a = hour(c.eta), b = Math.max(a + 0.25, hour(c.etd) < a ? 24 : hour(c.etd));
-                  return (
-                    <button key={c.id} type="button" onClick={() => onSelect(c.id)} aria-label={`${c.boat.name}, ${timeRange(c)}, ${s.label}`}
-                      style={{ position: 'absolute', top: 4, bottom: 4, left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, borderRadius: 9, padding: '0 10px', fontSize: 12, cursor: 'pointer', textAlign: 'left', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: 'var(--fg)', background: `color-mix(in srgb, ${s.solid.startsWith('#') ? s.solid : s.c} 28%, #F2F5F3)`, border: `1.5px solid ${selected === c.id ? 'var(--fg)' : `color-mix(in srgb, ${s.c} 60%, #1A231E)`}` }}>
-                      {c.boat.name}
-                    </button>
-                  );
-                })}
-                {zones.filter(z => z.kind === 'quay' && z.quay_id === qy.id).map(z => (
-                  <div key={z.calls.join()} className="hatch" style={{ position: 'absolute', top: 1, bottom: 1, left: `${pct(hour(z.from))}%`, width: `${pct(hour(z.to)) - pct(hour(z.from))}%`, border: '1px dashed #FF6B5E', borderRadius: 10, pointerEvents: 'none' }} />
-                ))}
-                {nowH >= t0 && nowH <= t1 && <div style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--teal)', pointerEvents: 'none', left: `${pct(nowH)}%` }} />}
-              </div>
-            </div>
-          ))}
-          <div style={{ display: 'flex' }}>
-            <div style={{ width: 118, flex: 'none' }} />
-            <div style={{ position: 'relative', flex: 1, height: 16 }}>
-              {ticks.map(h => <span key={h} className="n" style={{ position: 'absolute', top: 0, transform: 'translateX(-50%)', fontSize: 11, color: 'var(--fg-55)', left: `${pct(h)}%` }}>{String(h % 24).padStart(2, '0')}</span>)}
-            </div>
+        {open ? (
+          <div style={{ flex: 1, display: 'flex', gap: 14, fontSize: 12, color: 'var(--fg-62)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {(['ved_kai', 'paa_vei'] as const).map(st => (
+              <span key={st} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 8, height: 8, background: STATUS_STYLE[st].c }} />{STATUS_STYLE[st].label}</span>
+            ))}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="hatch" style={{ width: 12, height: 8, borderRadius: 2, border: '1px dashed #FF6B5E' }} />Kollisjon</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 7, height: 7, background: '#B1C2B7' }} />Ferdig</span>
           </div>
-        </div>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }} aria-hidden="true">
+            {ownQuays.map(qy => (
+              <div key={qy.id} style={{ position: 'relative', height: 7, borderRadius: 4, background: 'rgba(var(--tint), .08)' }}>
+                {calls.filter(c => c.quay.id === qy.id).map(c => {
+                  const [a, b] = span(c);
+                  return <span key={c.id} style={{ position: 'absolute', top: 0, bottom: 0, left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, borderRadius: 4, background: c.collisions.length ? 'var(--red-soft)' : STATUS_STYLE[c.status].c, opacity: c.status === 'ferdig' ? .4 : .85 }} />;
+                })}
+                {nowH >= t0 && nowH <= t1 && <span style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--fg)', left: `${pct(nowH)}%` }} />}
+              </div>
+            ))}
+          </div>
+        )}
+        <button type="button" className="btn" onClick={onToggle} aria-expanded={open} aria-controls="tl-h" style={{ minHeight: 36, fontSize: 13, padding: '0 14px', width: 64, flex: 'none' }}>
+          {open ? 'Skjul' : 'Vis'}
+        </button>
       </div>
     </section>
   );

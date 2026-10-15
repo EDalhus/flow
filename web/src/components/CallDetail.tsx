@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { CollisionView, PortCallView, UserView } from '../../../shared/api.ts';
 import { CREW_ROLE_LABEL, CREW_ROLES, type CrewRole } from '../../../shared/domain/types.ts';
 import { errorText } from '../lib/api.ts';
@@ -12,8 +12,10 @@ import { BigNumber, FlagBadge, QuayMark, Rating, RatingBars, Segmented } from '.
 
 export type DetailTab = 'oversikt' | 'chat' | 'profil';
 
-export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClose }: {
+export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClose, extra }: {
   call: PortCallView; tab: DetailTab; onTab: (t: DetailTab) => void; onOpenKaibok: () => void; onOpenAlerts: () => void; onClose?: () => void;
+  /** Ekstra linje under navnet, f.eks. tid til kaia fra AIS. */
+  extra?: ReactNode;
 }) {
   const boat = useBoat(call.boat.id);
   const users = useUsers();
@@ -41,6 +43,7 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
           <Rating value={call.boat.rating_count ? call.boat.avg_total : null}
             suffix={<span style={{ color: 'var(--fg-62)' }}>· {call.boat.rating_count} {call.boat.rating_count === 1 ? 'kaibok' : 'kaibøker'}</span>} />
         </div>
+        {extra && <div style={{ marginTop: 8 }}>{extra}</div>}
       </div>
 
       <Segmented<DetailTab> label="Anløpsdetaljer" value={tab} onChange={onTab} stretch

@@ -40,7 +40,8 @@ export function MobileApp() {
   const screen = params.get('kaibok') && sel ? 'kaibok' : sel ? 'detail' : 'list';
   const go = (id: string | null, kaibok = false) => { setShipSel(null); setParams(id ? { id, ...(kaibok ? { kaibok: '1' } : {}) } : {}); };
   const fence = settings.data?.geofence ?? FALLBACK;
-  const { vessels, shipSel, setShipSel, selShip, layers, setZoomNames, trackError } = useTraffic(list, sel?.boat.id ?? null);
+  const t = useTraffic(list, sel?.boat.id ?? null, fence);
+  const { vessels, shipSel, setShipSel, selShip, layers, setZoomNames, trackError } = t;
   const [basemap, pickBasemap] = useBasemap();
   const mapRef = useRef<MapHandle>(null);
   // Fra søket: «Vis i kartet» sender posisjon og MMSI hit.
@@ -73,13 +74,13 @@ export function MobileApp() {
       <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: screen === 'list' ? 420 : 360, transition: 'height .4s ease' }}>
         {settings.isSuccess && (
           <FlowMap ref={mapRef} center={focus ? [focus.lon, focus.lat] : [fence.lon - 0.01, fence.lat]} zoom={12.4} geofence={fence} interactive={screen === 'list'} basemap={basemap}
-            traffic={layers} onShipClick={screen === 'list' ? setShipSel : undefined} onZoomNames={setZoomNames}
+            traffic={layers} onShipClick={screen === 'list' ? (mmsi, callId) => (callId ? go(callId) : setShipSel(mmsi)) : undefined} onZoomNames={setZoomNames}
             overlays={project => {
               const q = project(fence.lon, fence.lat);
               return (
                 <>
                   {q && <span style={{ position: 'absolute', left: q[0], top: q[1], transform: 'translate(-50%, -140%)', background: 'rgba(242,245,243,.95)', color: '#1A231E', borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', pointerEvents: 'none' }}>Vår kai</span>}
-                  <VesselLayer project={project} vessels={vessels} calls={list} selectedId={sel?.id} onSelect={id => go(id)} quayPos={quayPos} today={today} compact />
+                  <VesselLayer project={project} vessels={vessels} calls={list} selectedId={sel?.id} onSelect={id => go(id)} quayPos={quayPos} />
                 </>
               );
             }} />
@@ -103,7 +104,7 @@ export function MobileApp() {
           </div>
           <span style={{ position: 'absolute', top: 372, left: 12, right: 12, fontSize: 9.5, color: 'var(--fg-45)', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{attribution(basemap)}</span>
           {shipSel && selShip && (
-            <ShipCard v={selShip} now={now.getTime()} fence={fence} trackError={trackError} onClose={() => setShipSel(null)}
+            <ShipCard v={selShip} now={now.getTime()} approach={t.approach} trackError={trackError} onClose={() => setShipSel(null)}
               docked={{ position: 'absolute', top: 116, left: 10, right: 10, width: 'auto', zIndex: 30, maxHeight: 'calc(100% - 116px - var(--bottomnav, 62px) - 10px)', overflowY: 'auto' }} />
           )}
           {alerts && <div style={{ position: 'absolute', top: 70, left: 10, right: 10, zIndex: 40 }}><AlertsPanel onClose={() => setAlerts(false)} style={{ width: '100%' }} /></div>}

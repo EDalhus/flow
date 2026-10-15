@@ -115,8 +115,8 @@ interface Props {
   basemap?: Basemap;
   /** Trafikkbildet (AIS) som kartlag. */
   traffic?: TrafficLayers;
-  /** Klikk på et skip (MMSI), eller på tomt kart (null). */
-  onShipClick?: (mmsi: string | null) => void;
+  /** Klikk på et skip (MMSI og eventuelt anløp hos oss), eller på tomt kart (null). */
+  onShipClick?: (mmsi: string | null, callId?: string) => void;
   /** Kalles når zoomnivået krysser terskelen for skipsnavn. */
   onZoomNames?: (on: boolean) => void;
 }
@@ -189,8 +189,8 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
       setTrafficReady(true);
     });
     m.on('click', e => {
-      const hit = m.getLayer('ais-ships') ? m.queryRenderedFeatures(e.point, { layers: ['ais-ships'] })[0] : undefined;
-      clickRef.current?.(hit ? String(hit.properties.mmsi) : null);
+      const hit = m.getLayer('ais-ships') ? m.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ['ais-ships'] })[0] : undefined;
+      clickRef.current?.(hit ? String(hit.properties.mmsi) : null, hit?.properties.call ? String(hit.properties.call) : undefined);
     });
     m.on('mouseenter', 'ais-ships', () => { m.getCanvas().style.cursor = 'pointer'; });
     m.on('mouseleave', 'ais-ships', () => { m.getCanvas().style.cursor = ''; });
@@ -278,12 +278,14 @@ const EMPTY = { type: 'FeatureCollection' as const, features: [] };
 /** Kilder og lag for AIS-trafikken, i rekkefølge nedenfra: døgnspor, ringer, spor, kurslinje, skip. */
 function addTraffic(m: MlMap, basemap: Basemap) {
   for (const img of shipImages()) if (!m.hasImage(img.id)) m.addImage(img.id, img.data, { pixelRatio: 2 });
-  for (const key of ['track', 'rings', 'trails', 'predict', 'ships']) m.addSource(`ais-${key}`, { type: 'geojson', data: EMPTY });
+  for (const key of ['track', 'route', 'rings', 'trails', 'predict', 'ships']) m.addSource(`ais-${key}`, { type: 'geojson', data: EMPTY });
   const light = basemap === 'lys';
   const ink = light ? '#1A231E' : '#FFFFFF';
   const halo = light ? '#FFFFFF' : 'rgba(7,18,42,.9)';
   m.addLayer({ id: 'ais-track', type: 'line', source: 'ais-track', layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: { 'line-color': '#80EFDE', 'line-width': 2, 'line-opacity': 0.75 } });
+  m.addLayer({ id: 'ais-route', type: 'line', source: 'ais-route', layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': '#80EFDE', 'line-width': 2.2, 'line-opacity': 0.9, 'line-dasharray': [1, 2] } });
   m.addLayer({ id: 'ais-rings', type: 'line', source: 'ais-rings', paint: { 'line-color': ink, 'line-width': 1, 'line-opacity': 0.7, 'line-dasharray': [3, 3] } });
   m.addLayer({ id: 'ais-ring-labels', type: 'symbol', source: 'ais-rings',
     layout: { 'symbol-placement': 'line', 'symbol-spacing': 900, 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Regular'], 'text-size': 12, 'text-keep-upright': true },
@@ -295,10 +297,19 @@ function addTraffic(m: MlMap, basemap: Basemap) {
     layout: {
       'icon-image': ['get', 'icon'], 'icon-rotate': ['get', 'rot'], 'icon-rotation-alignment': 'map',
       'icon-allow-overlap': true, 'icon-ignore-placement': true,
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 8, 0.7, 11, 1, 14, 1.35],
-      'symbol-sort-key': ['case', ['get', 'sel'], 2, ['get', 'flow'], 1, 0],
+      // Våre båter litt større, valgt båt størst.
+      'icon-size': ['interpolate', ['linear'], ['zoom'],
+        8, ['case', ['get', 'sel'], 1, ['get', 'ours'], 0.85, 0.7],
+        11, ['case', ['get', 'sel'], 1.35, ['get', 'ours'], 1.15, 1],
+        14, ['case', ['get', 'sel'], 1.7, ['get', 'ours'], 1.5, 1.35]],
+      'symbol-sort-key': ['case', ['get', 'sel'], 2, ['get', 'ours'], 1, 0],
     } });
   m.addLayer({ id: 'ais-ship-names', type: 'symbol', source: 'ais-ships',
-    layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Regular'], 'text-size': 12, 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-optional': true },
-    paint: { 'text-color': light ? PALETTE.lys.trafficLabel : PALETTE.mork.trafficLabel, 'text-halo-color': halo, 'text-halo-width': 1.4 } });
+    // Navnet står rett ved siden av båten, i fet skrift for våre båter (som i Kystverkets kart).
+    layout: {
+      'text-field': ['get', 'label'], 'text-font': ['case', ['get', 'bold'], ['literal', ['Noto Sans Bold']], ['literal', ['Noto Sans Regular']]],
+      'text-size': ['case', ['get', 'bold'], 13, 11.5], 'text-anchor': 'left', 'text-offset': [1.1, 0], 'text-optional': true,
+      'symbol-sort-key': ['case', ['get', 'bold'], 0, 1],
+    },
+    paint: { 'text-color': light ? PALETTE.lys.trafficLabel : PALETTE.mork.trafficLabel, 'text-halo-color': halo, 'text-halo-width': 1.6 } });
 }

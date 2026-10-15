@@ -83,7 +83,7 @@ export function mergeArea(prev: AreaVessel[], fresh: AreaInput[], now: Date): Ar
     const old = byMmsi.get(mmsi);
     const ts = Date.parse(f.msgtime);
     if (!Number.isFinite(ts) || (old && ts <= Date.parse(old.ts))) continue;
-    const trail = [...(old?.trail ?? []), [f.longitude, f.latitude, Math.round(ts / 1000)] as [number, number, number]];
+    const trail = [...(old?.trail ?? []), [Math.round(f.longitude * 1e5) / 1e5, Math.round(f.latitude * 1e5) / 1e5, Math.round(ts / 1000)] as [number, number, number]];
     byMmsi.set(mmsi, {
       mmsi,
       name: f.name?.trim() || old?.name || null,
