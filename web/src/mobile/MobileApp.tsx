@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { PortCallView } from '../../../shared/api.ts';
 import { CREW_ROLE_LABEL } from '../../../shared/domain/types.ts';
@@ -6,12 +6,15 @@ import { AlertsPanel } from '../components/Alerts.tsx';
 import { Chat } from '../components/Chat.tsx';
 import { ArrowLeft, Check, Phone } from '../components/Icons.tsx';
 import { KaibokForm } from '../components/KaibokForm.tsx';
-import { BellButton, UserBadge } from '../components/Topbar.tsx';
+import { GlobalSearch } from '../components/GlobalSearch.tsx';
+import { BellButton, BoatTabs, Sidebar, UserBadge } from '../components/Topbar.tsx';
 import { Loading, QuayMark, StatusBadge } from '../components/ui.tsx';
-import { FlowMap } from '../map/FlowMap.tsx';
+import { BASEMAPS, FlowMap, attribution, type MapHandle } from '../map/FlowMap.tsx';
+import { ShipCard } from '../map/ShipCard.tsx';
+import { useBasemap, useTraffic } from '../map/useTraffic.ts';
 import { FLAG_STYLE, addDays, dayHeading, dayShort, fr, goodsParts, osloTime, quayLabel, telHref, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
-import { useAis, useBoat, useMe, usePortCalls, useQuays, useSettings, useUsers } from '../lib/queries.ts';
-import { VesselLayer, aisLive } from '../map/Vessels.tsx';
+import { useBoat, useMe, usePortCalls, useQuays, useSettings, useUsers } from '../lib/queries.ts';
+import { VesselLayer } from '../map/Vessels.tsx';
 import { canQuayLog } from '../lib/roles.ts';
 import { useNow } from '../lib/useNow.ts';
 
@@ -35,9 +38,19 @@ export function MobileApp() {
   const list = calls.data?.calls ?? [];
   const sel = list.find(c => c.id === params.get('id'));
   const screen = params.get('kaibok') && sel ? 'kaibok' : sel ? 'detail' : 'list';
-  const go = (id: string | null, kaibok = false) => setParams(id ? { id, ...(kaibok ? { kaibok: '1' } : {}) } : {});
+  const go = (id: string | null, kaibok = false) => { setShipSel(null); setParams(id ? { id, ...(kaibok ? { kaibok: '1' } : {}) } : {}); };
   const fence = settings.data?.geofence ?? FALLBACK;
-  const ais = useAis();
+  const { vessels, shipSel, setShipSel, selShip, layers, setZoomNames, trackError } = useTraffic(list, sel?.boat.id ?? null);
+  const [basemap, pickBasemap] = useBasemap();
+  const mapRef = useRef<MapHandle>(null);
+  // Fra søket: «Vis i kartet» sender posisjon og MMSI hit.
+  const focus = params.get('lat') && params.get('lon') ? { lat: Number(params.get('lat')), lon: Number(params.get('lon')), mmsi: params.get('mmsi') } : null;
+  useEffect(() => {
+    if (!focus) return;
+    mapRef.current?.flyTo(focus.lon, focus.lat, 12.5);
+    if (focus.mmsi) setShipSel(focus.mmsi);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.lat, focus?.lon, settings.isSuccess]);
   const quays = useQuays();
   const quayPos = (id: string) => {
     const q = quays.data?.find(x => x.id === id);
@@ -53,20 +66,20 @@ export function MobileApp() {
   }
 
   const left = list.filter(c => c.service_date === today && c.status !== 'ferdig').length;
-  const atQuay = list.filter(c => c.status === 'ved_kai').length;
   const clash = list.flatMap(c => c.collisions.map(x => ({ call: c, x }))).find(Boolean);
 
   return (
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: 'var(--bg)', fontSize: 16 }}>
       <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: screen === 'list' ? 420 : 360, transition: 'height .4s ease' }}>
         {settings.isSuccess && (
-          <FlowMap center={[fence.lon - 0.01, fence.lat]} zoom={12.4} geofence={fence} interactive={screen === 'list'}
+          <FlowMap ref={mapRef} center={focus ? [focus.lon, focus.lat] : [fence.lon - 0.01, fence.lat]} zoom={12.4} geofence={fence} interactive={screen === 'list'} basemap={basemap}
+            traffic={layers} onShipClick={screen === 'list' ? setShipSel : undefined} onZoomNames={setZoomNames}
             overlays={project => {
               const q = project(fence.lon, fence.lat);
               return (
                 <>
                   {q && <span style={{ position: 'absolute', left: q[0], top: q[1], transform: 'translate(-50%, -140%)', background: 'rgba(242,245,243,.95)', color: '#1A231E', borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', pointerEvents: 'none' }}>Vår kai</span>}
-                  <VesselLayer project={project} vessels={ais.data?.vessels ?? []} calls={list} selectedId={sel?.id} onSelect={id => go(id)} quayPos={quayPos} today={today} compact />
+                  <VesselLayer project={project} vessels={vessels} calls={list} selectedId={sel?.id} onSelect={id => go(id)} quayPos={quayPos} today={today} compact />
                 </>
               );
             }} />
@@ -75,21 +88,27 @@ export function MobileApp() {
 
       {screen === 'list' ? (
         <>
-          <header style={{ position: 'absolute', top: 14, left: 14, right: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
-            <UserBadge size={48} align="left" />
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 300, letterSpacing: '-0.01em', textShadow: '0 2px 12px rgba(0,0,0,.6)' }}>Flatholmen Havn</h1>
+          {/* Samme topplinje som på PC: bruker, globalt søk og varsler, med Båter-fanene under. */}
+          <header style={{ position: 'absolute', top: 12, left: 12, right: 12, display: 'flex', alignItems: 'center', gap: 8, zIndex: 3 }}>
+            <UserBadge size={44} align="left" />
+            <div style={{ flex: 1, minWidth: 0 }}><GlobalSearch /></div>
             <BellButton open={alerts} onToggle={() => setAlerts(!alerts)} glass />
           </header>
-          <div style={{ position: 'absolute', top: 76, left: 14, right: 14, display: 'flex', gap: 8, justifyContent: 'center', zIndex: 2 }}>
-            <span className="n" style={{ ...pill, minHeight: 44, padding: '0 16px', display: 'flex', alignItems: 'center', fontSize: 15 }}>{dayShort(today)} · {osloTime(now)}</span>
-            <span style={{ ...pill, minHeight: 44, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
-              <span className="dot" style={{ width: 8, height: 8, background: aisLive(ais.data?.status, now) ? '#5BD68A' : '#B1C2B7' }} />
-              {aisLive(ais.data?.status, now) ? `${list.filter(c => c.status === 'paa_vei').length} på vei · AIS` : `${atQuay} ved kai`}
-            </span>
+          <div style={{ position: 'absolute', top: 66, left: 12, right: 12, display: 'flex', justifyContent: 'center', zIndex: 2 }}><BoatTabs /></div>
+          <div role="group" aria-label="Kartvisning" className="pill seg" style={{ position: 'absolute', top: 336, right: 10, zIndex: 2, backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.7)' }}>
+            {BASEMAPS.map(b => (
+              <button key={b.value} type="button" className="tab" aria-pressed={basemap === b.value} onClick={() => pickBasemap(b.value)}
+                style={{ minHeight: 30, padding: '0 9px', fontSize: 12 }}>{b.label}</button>
+            ))}
           </div>
+          <span style={{ position: 'absolute', top: 372, left: 12, right: 12, fontSize: 9.5, color: 'var(--fg-45)', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{attribution(basemap)}</span>
+          {shipSel && selShip && (
+            <ShipCard v={selShip} now={now.getTime()} fence={fence} trackError={trackError} onClose={() => setShipSel(null)}
+              docked={{ position: 'absolute', top: 116, left: 10, right: 10, width: 'auto', zIndex: 30, maxHeight: 'calc(100% - 116px - var(--bottomnav, 62px) - 10px)', overflowY: 'auto' }} />
+          )}
           {alerts && <div style={{ position: 'absolute', top: 70, left: 10, right: 10, zIndex: 40 }}><AlertsPanel onClose={() => setAlerts(false)} style={{ width: '100%' }} /></div>}
 
-          <section aria-labelledby="m-list-h" style={{ ...sheet, top: 388 }}>
+          <section aria-labelledby="m-list-h" style={{ ...sheet, top: 388, bottom: 'var(--bottomnav, 0px)' }}>
             <Grabber />
             <div style={{ padding: '10px 20px 8px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flex: 'none' }}>
               <h2 id="m-list-h" style={{ margin: 0, fontSize: 22, fontWeight: 400 }}>Anløp</h2>
@@ -119,6 +138,7 @@ export function MobileApp() {
               {calls.isSuccess && !list.length && <p className="empty">Ingen anløp i dag eller i morgen.</p>}
             </div>
           </section>
+          <Sidebar />
         </>
       ) : sel && (
         <Detail call={sel} now={now} today={today} onBack={() => go(null)} onKaibok={() => go(sel.id, true)} canLog={canQuayLog(me.data)} />

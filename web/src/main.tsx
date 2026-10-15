@@ -30,7 +30,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const narrow = window.matchMedia('(max-width: 700px)');
+const narrow = window.matchMedia('(max-width: 900px)');
 const useNarrow = () => useSyncExternalStore(cb => { narrow.addEventListener('change', cb); return () => narrow.removeEventListener('change', cb); }, () => narrow.matches);
 
 function App() {

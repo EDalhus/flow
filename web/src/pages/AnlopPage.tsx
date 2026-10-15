@@ -70,7 +70,7 @@ export function AnlopPage() {
                 <span className="muted n" style={{ fontSize: 13 }}>{items.length} anløp · {fr(tonnes)} t</span>
               </div>
               <div className="panel-light" style={{ overflowX: 'auto', overflowY: 'hidden' }}>
-                <div style={{ minWidth: 900 }}>
+                <div className="arow-list">
                   {items.map((c, i) => <Row key={c.id} call={c} fresh={c.id === fresh} first={i === 0} />)}
                 </div>
               </div>

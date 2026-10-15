@@ -27,14 +27,14 @@ export function Sidebar() {
   );
   return (
     <nav className="sidebar" aria-label="Hovedmeny">
-      <Link to="/" aria-label="Flow – til kartet" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'auto' }}>
+      <Link to="/" aria-label="Flow – til kartet" className="side-logo" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'auto' }}>
         <Logo size={34} />
       </Link>
       {SECTIONS.map(s => item(s.to, s.label, s.icon, (s.paths as readonly string[]).includes(pathname)))}
-      <span aria-hidden="true" style={{ width: 28, height: 1, background: 'var(--line)', margin: '8px 0' }} />
+      <span aria-hidden="true" className="side-divider" style={{ width: 28, height: 1, background: 'var(--line)', margin: '8px 0' }} />
       {item('/rapporter', 'Rapporter', PieChart, pathname === '/rapporter')}
       {me.data?.roles.includes('admin') && item('/admin', 'Admin', Users, pathname === '/admin')}
-      <span style={{ marginTop: 'auto' }} />
+      <span className="side-end" style={{ marginTop: 'auto' }} />
     </nav>
   );
 }
@@ -46,7 +46,7 @@ export function BoatTabs({ wide }: { wide?: boolean }) {
   const tabs = [['/', 'Kart'], ['/anlop', 'Anløp'], ['/kaibok', 'Kaibok'], ['/baater', 'Båtregister']] as const;
   return (
     // wide: like bred som anløpspanelet på kartet (--col), med fanene jevnt fordelt.
-    <nav aria-label="Båter" className="pill seg" style={{ display: 'inline-flex', backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.6)', ...(wide ? { width: 'var(--col)', maxWidth: '100%' } : {}) }}>
+    <nav aria-label="Båter" className="pill seg boat-tabs" style={{ display: 'inline-flex', backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.6)', ...(wide ? { width: 'var(--col)', maxWidth: '100%' } : {}) }}>
       {tabs.map(([to, label]) => (
         <NavLink key={to} to={to} end className="tab" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', ...(wide ? { flex: 1 } : {}) }}
           aria-current={pathname === to ? 'page' : undefined} {...(pathname === to ? { 'aria-pressed': true } : {})}>
@@ -119,7 +119,7 @@ export function UserPill() {
   const body = (
     <>
       <Avatar initials={me.data?.initials} size={36} />
-      <span style={{ fontSize: 14 }}>{me.data?.short_name}</span>
+      <span className="user-name" style={{ fontSize: 14 }}>{me.data?.short_name}</span>
       {canSwitch && <Chevron size={16} style={{ transform: open ? 'rotate(180deg)' : undefined, opacity: .8 }} />}
     </>
   );
@@ -173,9 +173,9 @@ export function Topbar({ search, center, style, glass, alertsOpen, onAlerts }: {
 
   return (
     <header className="topbar" style={style}>
-      <div style={{ minWidth: 0 }}>{center ?? <BoatTabs />}</div>
+      <div className="topbar-tabs" style={{ minWidth: 0 }}>{center ?? <BoatTabs />}</div>
       <div className="topbar-search"><GlobalSearch /></div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
+      <div className="topbar-user" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
         {search}
         <UserPill />
         <BellButton open={alerts} onToggle={() => setAlerts(!alerts)} glass={glass} />

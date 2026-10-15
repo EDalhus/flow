@@ -8,6 +8,9 @@
   .mrow { grid-template-columns: 1fr auto; }
   .mrow .hide-s { display: none; }
 }
+@media (max-width: 600px) {
+  .mrow { grid-template-columns: 1fr; gap: 8px; padding: 14px; }
+}
 
 /* Store kvalitetsknapper for sjåføren. */
 .qbtn {
