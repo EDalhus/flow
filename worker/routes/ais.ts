@@ -38,6 +38,8 @@ app.post('/sync', requireRole(...CAN.admin), async c => {
   return c.json({
     result,
     secrets: { BW_CLIENT_ID: !!c.env.BW_CLIENT_ID, BW_CLIENT_SECRET: !!c.env.BW_CLIENT_SECRET },
+    // Klient-ID er «e-post:klientnavn». Klientnavnet (ikke hemmelig) viser hvilken klient som er lagt inn.
+    client_name: c.env.BW_CLIENT_ID?.trim().includes(':') ? c.env.BW_CLIENT_ID.trim().split(':').pop() : null,
     boats_with_mmsi: mmsi?.n ?? 0,
   });
 });

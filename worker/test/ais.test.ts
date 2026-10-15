@@ -94,6 +94,7 @@ describe('AIS-synk', () => {
     const res = await api('/ais/sync', { as: 'admin', body: {} });
     expect(res.status).toBe(200);
     expect(res.json.secrets).toEqual({ BW_CLIENT_ID: false, BW_CLIENT_SECRET: false });
+    expect(res.json.client_name).toBeNull();
     expect(res.json.result).toMatchObject({ ok: false, configured: false });
     expect(res.json.result.message).toContain('BW_CLIENT_ID og BW_CLIENT_SECRET');
     expect(res.json.result.message).toContain('ikke under Build');

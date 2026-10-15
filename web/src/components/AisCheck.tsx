@@ -8,6 +8,7 @@ type Diagnose = {
   result: { ok: boolean; configured: boolean; message: string | null; positions: number; boats: number; checked_at: string };
   secrets: { BW_CLIENT_ID: boolean; BW_CLIENT_SECRET: boolean };
   boats_with_mmsi: number;
+  client_name: string | null;
 };
 
 /** Admin: kjør AIS-sjekk nå og vis hva som mangler. Viser aldri nøkkelverdier, bare om de finnes. */
@@ -44,12 +45,17 @@ export function AisCheck({ onClose }: { onClose: () => void }) {
       {!d && !state.error && <p style={{ margin: 0, fontSize: 14, color: 'var(--fg-75)' }}>Henter posisjoner fra BarentsWatch nå og viser hva som eventuelt mangler.</p>}
       {d && (
         <div>
-          {row('BW_CLIENT_ID', d.secrets.BW_CLIENT_ID, d.secrets.BW_CLIENT_ID ? 'funnet' : 'mangler')}
+          {row('BW_CLIENT_ID', d.secrets.BW_CLIENT_ID, d.secrets.BW_CLIENT_ID ? (d.client_name ? `funnet · klient «${d.client_name}»` : 'funnet') : 'mangler')}
           {row('BW_CLIENT_SECRET', d.secrets.BW_CLIENT_SECRET, d.secrets.BW_CLIENT_SECRET ? 'funnet' : 'mangler')}
           {row('Båter med MMSI', d.boats_with_mmsi > 0, String(d.boats_with_mmsi))}
           {row('BarentsWatch', d.result.ok && d.result.configured,
             d.result.ok && d.result.configured ? `OK · ${d.result.positions} posisjoner` : d.result.configured ? 'feil' : 'ikke forsøkt')}
           {d.result.message && <p style={{ margin: '10px 0 0', fontSize: 13, color: 'var(--fg-75)' }}>{d.result.message}</p>}
+          {d.result.message?.includes('invalid_scope') && d.client_name && (
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--fg-75)' }}>
+              Klienten «{d.client_name}» er ikke en AIS-klient. Bruk klient-ID og hemmelighet fra AIS-klienten på Min side hos BarentsWatch.
+            </p>
+          )}
           <p className="n" style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--fg-55)' }}>Sjekket {osloTime(d.result.checked_at)}</p>
         </div>
       )}

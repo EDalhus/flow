@@ -1,5 +1,9 @@
 -- Kaier hos nabobedrifter: company er NULL for egne kaier, ellers bedriftsnavn.
 -- Navn er unikt per bedrift (Kai 1 hos oss og Kai 1 hos nabo er OK).
+--
+-- Tabellen bygges på nytt (UNIQUE på name kan ikke fjernes med ALTER). port_calls peker på quays,
+-- så fremmednøklene må sjekkes først når migrasjonen er ferdig – ellers stopper DROP TABLE.
+PRAGMA defer_foreign_keys = on;
 
 CREATE TABLE quays_new (
   id      TEXT PRIMARY KEY,
@@ -18,3 +22,5 @@ DROP TABLE quays;
 ALTER TABLE quays_new RENAME TO quays;
 
 CREATE UNIQUE INDEX quays_name_company ON quays (name, ifnull(company, ''));
+
+PRAGMA defer_foreign_keys = off;
