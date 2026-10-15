@@ -56,7 +56,13 @@ export async function syncAis(env: Env, now = new Date(), fetcher: Fetcher = fet
 
   let positions;
   try {
-    positions = await fetchLatest({ clientId: env.BW_CLIENT_ID, clientSecret: env.BW_CLIENT_SECRET }, boats.map(b => Number(b.mmsi)), fetcher);
+    const mmsi = boats.map(b => Number(b.mmsi)).filter(n => Number.isFinite(n) && n > 0);
+    if (!mmsi.length) {
+      const s = { ...base, boats: boats.length, ok: false, configured: true, message: 'Ingen gyldige MMSI blant båtene i kaiboka.' };
+      await saveStatus(db, s);
+      return s;
+    }
+    positions = await fetchLatest({ clientId: env.BW_CLIENT_ID, clientSecret: env.BW_CLIENT_SECRET }, mmsi, fetcher);
   } catch (e) {
     const s = { ...base, boats: boats.length, ok: false, configured: true, message: e instanceof Error ? e.message : 'Ukjent feil mot BarentsWatch.' };
     await saveStatus(db, s);
