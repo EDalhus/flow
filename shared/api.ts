@@ -330,3 +330,37 @@ export interface PackingLineView {
   filled_for_order: number;
   last_fill: { tonnes: number; filled_at: string; by: string | null } | null;
 }
+
+// ---------------------------------------------------------------- globalt søk
+
+/** Fartøy fra AIS (Kystverket via BarentsWatch), også båter som ikke er i båtregisteret. */
+export interface ExternalVessel {
+  mmsi: string;
+  name: string | null;
+  callsign: string | null;
+  imo: string | null;
+  ship_type: string | null;
+  length: number | null;
+  width: number | null;
+  draught: number | null;
+  destination: string | null;
+  country: string | null;
+  lat: number | null;
+  lon: number | null;
+  sog: number | null;
+  seen_at: string | null;
+  /** Båten finnes allerede i båtregisteret. */
+  boat_id: string | null;
+}
+
+export interface SearchResult {
+  q: string;
+  boats: { id: string; name: string; mmsi: string | null; flag: Flag }[];
+  calls: { id: string; boat_name: string; service_date: string; eta: string; time_known: boolean; type: CallType; status: CallStatus }[];
+  trucks: { id: string; customer: string; expected_date: string; reg_no: string | null; picked_up: boolean }[];
+  bulk: { id: string; truck: string; destination: string | null; status: string }[];
+  users: { id: string; name: string; title: string | null; phone: string | null }[];
+  vessels: ExternalVessel[];
+  /** Hvorfor AIS-søket ikke ga svar (ikke satt opp, feil fra BarentsWatch), ellers null. */
+  ais_error: string | null;
+}

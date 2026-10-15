@@ -6,15 +6,14 @@ import { CallDetail, type DetailTab } from '../components/CallDetail.tsx';
 import { Anchor, Minus, Plus, Target, TrendUp } from '../components/Icons.tsx';
 import { KaibokModal } from '../components/KaibokForm.tsx';
 import { BoatTabs, Sidebar, Topbar } from '../components/Topbar.tsx';
-import { CallIssues, Loading, QuayMark, Segmented, StatusBadge } from '../components/ui.tsx';
+import { QuayMark } from '../components/ui.tsx';
 import { BASEMAPS, FlowMap, attribution, type Basemap, type MapHandle, type Project } from '../map/FlowMap.tsx';
-import { STATUS_STYLE, addDays, nb, dayHeading, goodsShort, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
+import { STATUS_STYLE, addDays, nb, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo } from '../lib/format.ts';
 import { useAis, usePortCalls, useQuays, useSettings, useSummary } from '../lib/queries.ts';
 import { VesselLayer } from '../map/Vessels.tsx';
 import { useNow } from '../lib/useNow.ts';
 import './kart.css';
 
-type Filter = 'alle' | 'levering' | 'henting' | 'kollisjon';
 const FALLBACK = { lat: 62.47918, lon: 6.19292 };
 
 export function KartPage() {
@@ -25,8 +24,6 @@ export function KartPage() {
   const quays = useQuays();
   const settings = useSettings();
   const [params, setParams] = useSearchParams();
-  const [filter, setFilter] = useState<Filter>('alle');
-  const [q, setQ] = useState('');
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [kaibok, setKaibok] = useState(false);
   // Kaibelegget er lagt sammen som standard, så kartet får fokus. Valget huskes.
@@ -57,27 +54,24 @@ export function KartPage() {
     return qy?.lat != null && qy.lon != null ? { lat: qy.lat, lon: qy.lon } : fence;
   };
 
-  // Søk: båt, varer, selger, ansvarlig.
-  const needle = q.trim().toLowerCase();
-  const pass = (c: PortCallView) =>
-    (filter === 'alle' || (filter === 'kollisjon' ? c.collisions.length > 0 : c.type === filter)) &&
-    (!needle || [c.boat.name, goodsShort(c.goods), c.seller?.name, c.responsible?.name].some(s => s?.toLowerCase().includes(needle)));
-
   const todays = list.filter(c => c.service_date === today);
-  const active = list.filter(c => c.status !== 'ferdig');
-  const clashCount = active.filter(c => c.collisions.length).length;
-  const groups = [today, tomorrow].map(d => ({
-    date: d,
-    title: d === today ? 'I dag' : dayHeading(d, today),
-    items: list.filter(c => c.service_date === d && pass(c)),
-  })).filter(g => g.items.length);
 
   const ais = useAis();
   const vessels = ais.data?.vessels ?? [];
+
+  // Fra det globale søket: «Vis i kartet» sender posisjonen hit (også båter utenfor båtregisteret).
+  const focus = params.get('lat') && params.get('lon')
+    ? { lat: Number(params.get('lat')), lon: Number(params.get('lon')), name: params.get('name') ?? '', mmsi: params.get('mmsi') }
+    : null;
+  useEffect(() => {
+    if (!focus || !mapRef.current) return;
+    mapRef.current.flyTo(focus.lon, focus.lat, 12.5);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.lat, focus?.lon, settings.isSuccess]);
   // Første gang AIS-data finnes: vis kaia og båtene som skal til oss.
   const fitted = useRef(false);
   useEffect(() => {
-    if (fitted.current || !mapRef.current || !vessels.length || !calls.data) return;
+    if (fitted.current || focus || !mapRef.current || !vessels.length || !calls.data) return;
     const booked = new Set(list.filter(c => c.status !== 'ferdig').map(c => c.boat.id));
     const pts = vessels.filter(v => booked.has(v.boat_id)).map(v => [v.lon, v.lat] as [number, number]);
     mapRef.current.fitTo([[fence.lon, fence.lat], ...pts], 12.5);
@@ -112,6 +106,15 @@ export function KartPage() {
         )}
         <VesselLayer project={project} vessels={vessels} calls={list} selectedId={selected?.id} onSelect={id => select(id)}
           quayPos={quayPos} today={today} card={card} />
+        {focus && !vessels.some(v => v.mmsi === focus.mmsi) && (() => {
+          const pt = project(focus.lon, focus.lat);
+          return pt && (
+            <span style={{ position: 'absolute', left: pt[0], top: pt[1], transform: 'translate(-9px, -9px)', display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'none' }}>
+              <span className="ping" style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--aqua)', border: '3px solid #1A231E' }} />
+              <span className="vessel-label">{focus.name || `MMSI ${focus.mmsi}`}</span>
+            </span>
+          );
+        })()}
         {/* Valgt båt uten posisjon: kortet festes ved kaia. */}
         {selected && !selectedOnMap && quayPt && card(quayPt[0], quayPt[1])}
       </>
@@ -123,46 +126,15 @@ export function KartPage() {
       <Sidebar />
       <div className="kart-mapwrap" style={{ position: 'absolute', inset: 0 }}>
         {settings.isSuccess && (
-          <FlowMap ref={mapRef} center={[fence.lon - 0.06, fence.lat + 0.004]} zoom={11.4}
-            padding={{ top: 120, bottom: 236, left: 520, right: 320 }} geofence={fence} overlays={overlays} basemap={basemap} />
+          <FlowMap ref={mapRef} center={focus ? [focus.lon, focus.lat] : [fence.lon - 0.06, fence.lat + 0.004]} zoom={focus ? 12.5 : 11.4}
+            padding={{ top: 120, bottom: 160, left: 120, right: 320 }} geofence={fence} overlays={overlays} basemap={basemap} />
         )}
         <span className="kart-attr ov-hide">{attribution(basemap)}</span>
       </div>
 
       <div className="ov kart-top">
-        <Topbar glass alertsOpen={alertsOpen} onAlerts={setAlertsOpen} center={<BoatTabs wide />}
-          search={
-            <label className="pill ov-hide" style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 46, padding: '0 16px', width: 280, backdropFilter: 'blur(16px)' }}>
-              <span className="sr">Søk</span>
-              <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Søk båt, vare eller selger"
-                style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: 14, outlineOffset: 6 }} />
-            </label>
-          } />
+        <Topbar glass alertsOpen={alertsOpen} onAlerts={setAlertsOpen} center={<BoatTabs />} />
       </div>
-
-      <aside className="ov glass scroll kart-left" aria-label="Anløp">
-        <span className="eyebrow" style={{ padding: '4px 6px 0' }}>Anløp i dag og i morgen</span>
-        <div style={{ display: 'flex', gap: 8, padding: '0 6px', fontSize: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 8, height: 8, background: 'var(--green)' }} />{active.length - clashCount} i rute</span>
-          {clashCount > 0 && (
-            <button type="button" onClick={() => setFilter('kollisjon')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--bad-fg)' }}>
-              <span className="dot" style={{ width: 8, height: 8, background: 'var(--red)' }} />{clashCount} {clashCount === 1 ? 'kollisjon' : 'kollisjoner'}
-            </button>
-          )}
-        </div>
-        <Segmented<Filter> label="Filter" value={filter} onChange={setFilter} stretch
-          options={[{ value: 'alle', label: 'Alle' }, { value: 'levering', label: 'Levering' }, { value: 'henting', label: 'Henting' }, { value: 'kollisjon', label: 'Kollisjon' }]} />
-        {calls.isPending && <Loading />}
-        {groups.map(g => (
-          <div key={g.date} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <h2 style={{ margin: '4px 4px 0', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>{g.title}</h2>
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {g.items.map(c => <li key={c.id}><CallCard call={c} on={c.id === selected?.id} onClick={() => (c.id === selected?.id ? deselect() : select(c.id))} /></li>)}
-            </ul>
-          </div>
-        ))}
-        {calls.isSuccess && !groups.length && <p className="empty" style={{ padding: 20 }}>Ingen anløp i dette filteret.</p>}
-      </aside>
 
       {!selected && <MainStats />}
 
@@ -191,22 +163,6 @@ export function KartPage() {
 
       {kaibok && selected && <KaibokModal call={selected} onClose={() => setKaibok(false)} />}
     </div>
-  );
-}
-
-function CallCard({ call: c, on, onClick }: { call: PortCallView; on: boolean; onClick: () => void }) {
-  return (
-    <button type="button" className={`card${on ? ' on' : ''}${c.status === 'ferdig' ? ' done' : ''}`} onClick={onClick} aria-pressed={on} style={{ gap: 8, padding: '14px 16px' }}>
-      <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, width: '100%' }}>
-        <span style={{ fontSize: 18, letterSpacing: '-0.01em', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.boat.name}</span>
-        <StatusBadge status={c.status} basis={c.status_basis} />
-      </span>
-      <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span>{timeRange(c)}</span><span aria-hidden="true">·</span><QuayMark quay={c.quay} compact /><span aria-hidden="true">·</span><span>{typeLabel(c.type)}</span>
-      </span>
-      <span style={{ fontSize: 13, color: 'var(--fg-75)', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{goodsShort(c.goods)}</span>
-      <CallIssues call={c} />
-    </button>
   );
 }
 

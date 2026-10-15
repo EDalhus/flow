@@ -5,7 +5,6 @@
 .kart { --edge: calc(var(--sidebar) + 24px); --col: 380px; position: relative; height: 100vh; min-height: 820px; overflow: hidden; background: var(--bg); }
 .kart .ov { position: absolute; z-index: 5; }
 .kart-top { top: 20px; left: var(--edge); right: 32px; z-index: 20 !important; }
-.kart-left { top: 96px; left: var(--edge); bottom: 24px; width: var(--col); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 .kart-right { top: 96px; right: 32px; bottom: 24px; width: var(--col); padding: 14px; display: flex; flex-direction: column; gap: 14px; }
 .kart-stats {
   top: 96px; right: 32px; width: 270px; display: flex; flex-direction: column; gap: 16px; padding: 22px 24px; border-radius: 28px;
@@ -16,7 +15,7 @@
 .kart.has-sel .kart-zoom { right: calc(32px + var(--col) + 24px); }
 .kart.has-sel.tl-open .kart-zoom { bottom: 290px; }
 
-.kart-tl { left: calc(var(--edge) + var(--col) + 24px); right: 32px; bottom: 24px; min-height: 188px; padding: 20px 26px; display: flex; flex-direction: column; gap: 12px; }
+.kart-tl { left: var(--edge); right: 32px; bottom: 24px; min-height: 188px; padding: 20px 26px; display: flex; flex-direction: column; gap: 12px; }
 .kart.has-sel .kart-tl { right: calc(32px + var(--col) + 24px); }
 .kart-attr { position: absolute; right: 40px; bottom: 6px; font-size: 11px; color: var(--fg-45); z-index: 4; }
 .kart-alerts { top: 84px; right: 32px; z-index: 30 !important; }

@@ -13,6 +13,7 @@ import portCalls, { collisionsRoute } from './routes/portCalls.ts';
 import { photos, upload } from './routes/photos.ts';
 import { deliver, quayLogs } from './routes/quayLogs.ts';
 import reports from './routes/reports.ts';
+import search from './routes/search.ts';
 import type { AppEnv } from './types.ts';
 
 export const app = new Hono<AppEnv>().basePath('/api');
@@ -37,6 +38,7 @@ app.route('/quay-logs', quayLogs);
 app.route('/notifications', notifications);
 app.route('/boats', boats);
 app.route('/reports', reports);
+app.route('/search', search);
 
 // Sanntid: WebSocket videresendes til Durable Object-en, merket med brukeren.
 app.get('/ws', async c => {

@@ -83,3 +83,73 @@ export async function fetchLatest(
   };
   return call(true);
 }
+
+// ---------------------------------------------------------------- søk på navn
+
+/** Skipsdata og siste posisjon fra «latest/combined» (modelType Full). Feltene kan mangle. */
+export interface AisVesselInfo {
+  mmsi: number;
+  name?: string | null;
+  callSign?: string | null;
+  imoNumber?: number | null;
+  shipType?: number | null;
+  shipLength?: number | null;
+  shipWidth?: number | null;
+  draught?: number | null;
+  destination?: string | null;
+  eta?: string | null;
+  countryCode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  speedOverGround?: number | null;
+  courseOverGround?: number | null;
+  msgtime?: string | null;
+}
+
+// Alle fartøy BarentsWatch har sett siste 24 timer. BarentsWatch kan ikke søke på navn,
+// så listen hentes samlet og filtreres her. Den holdes i minnet et par minutter per isolat.
+let fleet: { at: number; key: string; list: AisVesselInfo[] } | null = null;
+const FLEET_TTL = 3 * 60_000;
+
+export async function fetchAllLatest(creds: { clientId: string; clientSecret: string }, fetcher: Fetcher = fetch): Promise<AisVesselInfo[]> {
+  const clientId = creds.clientId.trim();
+  const clientSecret = creds.clientSecret.trim();
+  if (fleet && fleet.key === clientId && Date.now() - fleet.at < FLEET_TTL) return fleet.list;
+  const call = async (retry: boolean): Promise<AisVesselInfo[]> => {
+    const t = await token(clientId, clientSecret, fetcher);
+    const res = await fetcher(`${LATEST_URL}?modelType=Full`, { headers: { authorization: `Bearer ${t}` } });
+    if (res.status === 401 && retry) { resetTokenCache(); return call(false); }
+    if (!res.ok) throw new Error(`BarentsWatch AIS svarte ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('BarentsWatch AIS svarte uten fartøyliste');
+    return data as AisVesselInfo[];
+  };
+  const list = await call(true);
+  fleet = { at: Date.now(), key: clientId, list };
+  return list;
+}
+
+export function resetFleetCache() {
+  fleet = null;
+}
+
+const norm = (s: string) => s.toLowerCase().replace(/^(ms|mv|mf|m\/s|m\/v)\s+/, '').replace(/[^a-z0-9æøå]/g, '');
+
+/** Treff på navn (uten «MS»/«MV» og tegnsetting), MMSI, IMO eller kallesignal. Best treff først. */
+export function matchVessels(list: AisVesselInfo[], q: string, limit = 8): AisVesselInfo[] {
+  const needle = norm(q);
+  const digits = q.replace(/\D/g, '');
+  if (needle.length < 2 && digits.length < 4) return [];
+  const scored: { v: AisVesselInfo; score: number }[] = [];
+  for (const v of list) {
+    const name = norm(v.name ?? '');
+    let score = 0;
+    if (digits.length >= 4 && (String(v.mmsi).startsWith(digits) || String(v.imoNumber ?? '').startsWith(digits))) score = 3;
+    else if (name && name === needle) score = 3;
+    else if (name.startsWith(needle)) score = 2;
+    else if (needle.length >= 3 && name.includes(needle)) score = 1;
+    else if (v.callSign && norm(v.callSign) === needle) score = 2;
+    if (score) scored.push({ v, score });
+  }
+  return scored.sort((a, b) => b.score - a.score || (a.v.name ?? '').localeCompare(b.v.name ?? '')).slice(0, limit).map(x => x.v);
+}

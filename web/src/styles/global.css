@@ -261,3 +261,17 @@ input::placeholder, textarea::placeholder { color: rgba(var(--tint), .45); }
 @media (prefers-reduced-motion: reduce) {
   .ring, .ping, .loading { animation: none; }
 }
+
+/* Topplinje: underfaner til venstre, globalt søk i midten, bruker og bjelle til høyre. */
+.topbar { position: relative; z-index: 20; display: grid; grid-template-columns: 1fr minmax(0, 460px) 1fr; align-items: center; gap: 16px; }
+.topbar-search { display: flex; justify-content: center; }
+@media (max-width: 1100px) {
+  .topbar { grid-template-columns: 1fr auto; }
+  .topbar-search { grid-column: 1 / -1; grid-row: 2; }
+}
+.search-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; text-align: left; cursor: pointer;
+  padding: 8px 10px; border-radius: 12px; border: none; background: transparent; color: var(--fg);
+}
+.search-item:hover, .search-item:focus-visible { background: rgba(var(--tint), .08); }
+.gsearch:focus-within { border-color: rgba(128, 239, 222, .6); }

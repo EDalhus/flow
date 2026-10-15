@@ -17,12 +17,16 @@ type Filter = 'idag' | 'uke' | 'kollisjon';
 
 export function AnlopPage() {
   const today = todayOslo();
-  const calls = usePortCalls(today, addDays(today, 7));
+  const [q, setQ] = useState('');
+  // Med søk vises de neste 60 dagene, ellers en uke.
+  const calls = usePortCalls(today, addDays(today, q.trim() ? 60 : 7));
   const me = useMe();
   const [filter, setFilter] = useState<Filter>('uke');
-  const [q, setQ] = useState('');
   const [params] = useSearchParams();
   const [showNew, setShowNew] = useState(params.get('ny') === '1');
+  // Fra det globale søket: /anlop?q=båtnavn
+  const urlQ = params.get('q');
+  useEffect(() => { if (urlQ) { setQ(urlQ); setFilter('uke'); } }, [urlQ]);
   const [fresh, setFresh] = useState<string | null>(null);
 
   const list = calls.data?.calls ?? [];
@@ -137,7 +141,7 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
   const [eta, setEta] = useState('12:00');
   const [etd, setEtd] = useState('15:00');
   const [lines, setLines] = useState<Line[]>([{ sku_id: '', quantity: '200' }]);
-  const [roles, setRoles] = useState<Record<CrewRole, number>>({ truck: 1, anhuker: 1, kaikran: 0 });
+  const [roles, setRoles] = useState<Record<CrewRole, number>>({ truck: 0, anhuker: 0, kaikran: 0 });
   const [crane, setCrane] = useState(true);
   const [sellerId, setSellerId] = useState('');
   const [check, setCheck] = useState<{ collisions: CollisionView[] } | null>(null);
@@ -185,7 +189,7 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
   };
 
   const tonnes = goods.reduce((sum, g) => sum + (g.sku ? (g.qty * g.sku.kg_per_unit) / 1000 : 0), 0);
-  const canSave = !!draft && (draft.goods?.length ?? 0) > 0 && total > 0 && !create.isPending;
+  const canSave = !!draft && (draft.goods?.length ?? 0) > 0 && !create.isPending;
   const save = () => draft && canSave && create.mutate(draft, { onSuccess: onCreated });
 
   const f = boat ? FLAG_STYLE[boat.flag] : null;
@@ -294,7 +298,7 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
         </button>
       </div>
 
-      <div className="field"><span>Roller som trengs</span>
+      <div className="field"><span>Mannskap (valgfritt – kan legges til senere)</span>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {CREW_ROLES.map(r => (
             <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 48, padding: '2px 4px 2px 14px', borderRadius: 16, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .06)' }}>

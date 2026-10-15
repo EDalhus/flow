@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router';
 import { chooseUser } from '../lib/api.ts';
 import { useMe, useUsers } from '../lib/queries.ts';
 import { AlertsPanel, useAlerts } from './Alerts.tsx';
+import { GlobalSearch } from './GlobalSearch.tsx';
 import { Bell, BulkTruck, Chevron, Factory, Logo, PieChart, Ship, Truck, Users } from './Icons.tsx';
 
 // Fire hovedseksjoner, med rapporter og admin nederst.
@@ -171,9 +172,10 @@ export function Topbar({ search, center, style, glass, alertsOpen, onAlerts }: {
   }, [alerts]);
 
   return (
-    <header style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', zIndex: 20, ...style }}>
-      <div style={{ flex: 1, minWidth: 0 }}>{center ?? <BoatTabs />}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <header className="topbar" style={style}>
+      <div style={{ minWidth: 0 }}>{center ?? <BoatTabs />}</div>
+      <div className="topbar-search"><GlobalSearch /></div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
         {search}
         <UserPill />
         <BellButton open={alerts} onToggle={() => setAlerts(!alerts)} glass={glass} />

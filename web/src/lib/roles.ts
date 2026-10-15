@@ -8,3 +8,4 @@ export const canPlan = (me?: Me) => has(me, 'salg', 'produksjon');
 export const canCrew = (me?: Me) => has(me, 'produksjon');
 export const canQuayLog = (me?: Me) => has(me, 'kaiarbeider', 'produksjon');
 export const canFlag = (me?: Me) => has(me, 'produksjon');
+export const canBoats = (me?: Me) => has(me, 'salg', 'produksjon');

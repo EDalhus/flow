@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import type { CollisionView, PortCallView, UserView } from '../../../shared/api.ts';
-import { CREW_ROLE_LABEL, type CrewRole } from '../../../shared/domain/types.ts';
+import { CREW_ROLE_LABEL, CREW_ROLES, type CrewRole } from '../../../shared/domain/types.ts';
 import { errorText } from '../lib/api.ts';
 import { dayRelative, ddmm, fr, goodsParts, hmFromIso, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
 import { osloToUtc } from '../../../shared/time.ts';
 import { useBoat, useMe, usePatchPortCall, usePutCrew, useUsers } from '../lib/queries.ts';
 import { canCrew, canPlan, canQuayLog } from '../lib/roles.ts';
 import { Chat } from './Chat.tsx';
-import { Check, Close, Phone } from './Icons.tsx';
+import { Check, Chevron, Close, Phone, Plus } from './Icons.tsx';
 import { BigNumber, FlagBadge, QuayMark, Rating, RatingBars, Segmented } from './ui.tsx';
 
 export type DetailTab = 'oversikt' | 'chat' | 'profil';
@@ -148,6 +148,9 @@ function CrewEditor({ call, users }: { call: PortCallView; users: UserView[] }) 
   const me = useMe();
   const put = usePutCrew();
   const [error, setError] = useState<string | null>(null);
+  // Mannskap er valgfritt: sammenfoldet som standard, åpnes når noen vil legge til eller endre.
+  const [open, setOpen] = useState(false);
+  const [newRole, setNewRole] = useState<CrewRole>('truck');
   const editable = canCrew(me.data) && call.status !== 'ferdig' && call.status !== 'avlyst';
   const auto = call.crew.length === 1;
   const hitRoles = new Set(call.collisions.flatMap(c => (c.kind === 'capacity' ? [c.role] : [])));
@@ -159,54 +162,73 @@ function CrewEditor({ call, users }: { call: PortCallView; users: UserView[] }) 
       { onError: e => setError(errorText(e)) });
   };
   const slots = call.crew.map(s => ({ crew_role: s.crew_role, user_id: s.user?.id ?? null }));
+  const named = call.crew.filter(s => s.user);
+  const summary = call.crew.length
+    ? `${named.length ? named.map(s => s.user!.short_name).join(', ') : 'Ingen navn ennå'} · ${call.crew.length} ${call.crew.length === 1 ? 'rolle' : 'roller'}`
+    : 'Ikke satt opp';
 
-  const ansText = call.responsible
-    ? (auto ? 'Eneste på båten = ansvarlig' : `Ansvarlig: ${call.responsible.short_name}`)
-    : (auto ? 'Velg person' : 'Velg ansvarlig');
+  if (!call.crew.length && !editable) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, margin: '0 6px' }}>
-        <h3 style={{ margin: 0, fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>Mannskap</h3>
-        {call.crew.length > 0 && <span style={{ fontSize: 13, color: call.responsible ? 'var(--fg-62)' : 'var(--warn-fg)' }}>{ansText}</span>}
-      </div>
-      {call.crew.map((s, i) => {
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderRadius: 16, background: 'rgba(var(--tint), .05)', padding: open ? '10px 10px 12px' : 0 }}>
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: 'none', color: 'var(--fg)', cursor: 'pointer', padding: open ? '0 2px 4px' : '10px 12px', textAlign: 'left' }}>
+        <span style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+          <span className="sub">Mannskap{call.responsible ? ` · ansvarlig ${call.responsible.short_name}` : ''}</span>
+          {!open && <span style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</span>}
+        </span>
+        <span style={{ fontSize: 13, color: 'var(--fg-62)', flex: 'none' }}>{open ? 'Lukk' : editable ? (call.crew.length ? 'Endre' : '+ Legg til') : 'Vis'}</span>
+        <Chevron size={15} style={{ flex: 'none', transform: open ? 'rotate(180deg)' : undefined }} />
+      </button>
+
+      {open && call.crew.map((s, i) => {
         const who = s.user?.id ?? '';
         const hit = hitRoles.has(s.crew_role) || (who && hitUsers.has(who));
         const isAns = !!who && call.responsible?.id === who;
         const options = users.filter(u => u.skills.includes(s.crew_role));
         return (
           <div key={s.id} style={{
-            display: 'flex', alignItems: 'center', gap: 8, minHeight: 46, padding: '3px 3px 3px 12px', borderRadius: 16,
-            ...(hit ? { background: 'rgba(255,107,94,.12)', border: '1px solid rgba(255,107,94,.35)' }
-              : who ? { background: 'rgba(var(--tint), .035)', border: '1px solid rgba(var(--tint), .06)' }
-              : { background: 'rgba(247,185,85,.07)', border: '1px dashed rgba(247,185,85,.4)' }),
+            display: 'flex', alignItems: 'center', gap: 8, minHeight: 46, padding: '3px 3px 3px 12px', borderRadius: 14,
+            ...(hit ? { background: 'rgba(255,107,94,.12)', border: '1px solid rgba(255,107,94,.35)' } : { background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .06)' }),
           }}>
             <label htmlFor={`crew-${s.id}`} style={{ width: 84, flex: 'none', fontSize: 13, color: 'rgba(var(--tint), .68)' }}>{CREW_ROLE_LABEL[s.crew_role]}</label>
             <select id={`crew-${s.id}`} className="sel" value={who} disabled={!editable || put.isPending}
-              onChange={e => save(slots.map((x, j) => (j === i ? { ...x, user_id: e.target.value || null } : x)))}
-              style={who ? undefined : { color: 'var(--warn-fg)' }}>
-              <option value="">Velg person</option>
+              onChange={e => save(slots.map((x, j) => (j === i ? { ...x, user_id: e.target.value || null } : x)))}>
+              <option value="">Ingen valgt</option>
               {options.map(u => <option key={u.id} value={u.id}>{u.short_name}</option>)}
             </select>
-            {auto && who && <span style={{ fontSize: 12, flex: 'none', minHeight: 40, padding: '0 12px', borderRadius: 999, background: '#F2F5F3', color: '#1A231E', display: 'flex', alignItems: 'center' }}>Ansvarlig</span>}
+            {who && (auto || !editable) && isAns && <span style={{ fontSize: 12, flex: 'none', minHeight: 36, padding: '0 10px', borderRadius: 999, background: '#F2F5F3', color: '#1A231E', display: 'flex', alignItems: 'center' }}>Ansvarlig</span>}
             {!auto && who && editable && (
               <button type="button" aria-pressed={isAns} aria-label={isAns ? `${s.user?.short_name} er ansvarlig` : `Gjør ${s.user?.short_name} til ansvarlig`}
                 onClick={() => save(slots, isAns ? null : who)} disabled={put.isPending}
-                style={{ fontSize: 12, cursor: 'pointer', flex: 'none', minHeight: 40, padding: '0 12px', borderRadius: 999,
+                style={{ fontSize: 12, cursor: 'pointer', flex: 'none', minHeight: 36, padding: '0 10px', borderRadius: 999,
                   ...(isAns ? { background: '#F2F5F3', color: '#1A231E', border: '1px solid #F2F5F3' } : { background: 'transparent', color: 'rgba(var(--tint), .62)', border: '1px dashed rgba(var(--tint), .3)' }) }}>
                 Ansvarlig
               </button>
             )}
-            {!auto && isAns && !editable && <span style={{ fontSize: 12, flex: 'none', minHeight: 40, padding: '0 12px', borderRadius: 999, background: '#F2F5F3', color: '#1A231E', display: 'flex', alignItems: 'center' }}>Ansvarlig</span>}
+            {editable && (
+              <button type="button" className="icon-btn" aria-label={`Fjern ${CREW_ROLE_LABEL[s.crew_role].toLowerCase()}`} disabled={put.isPending}
+                onClick={() => save(slots.filter((_, j) => j !== i), isAns ? null : undefined)} style={{ width: 34, height: 34, flex: 'none' }}>
+                <Close size={13} />
+              </button>
+            )}
           </div>
         );
       })}
-      {!call.crew.length && <span className="muted" style={{ margin: '0 6px', fontSize: 13 }}>Ingen roller satt opp.</span>}
-      {call.boat_crane && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .6)' }}>+ Båtens egen kran brukes</span>}
-      {!editable && call.crew.some(s => !s.user) && call.status !== 'ferdig' && (
-        <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .55)' }}>Navn og ansvarlig settes av produksjonen.</span>
+
+      {open && editable && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <select className="sel" aria-label="Rolle som skal legges til" value={newRole} onChange={e => setNewRole(e.target.value as CrewRole)} style={{ flex: 'none', width: 'auto' }}>
+            {CREW_ROLES.map(r => <option key={r} value={r}>{CREW_ROLE_LABEL[r]}</option>)}
+          </select>
+          <button type="button" className="btn" disabled={put.isPending} onClick={() => save([...slots, { crew_role: newRole, user_id: null }])}
+            style={{ minHeight: 40, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Plus size={13} /> Legg til rolle
+          </button>
+        </div>
       )}
+      {open && call.boat_crane && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .6)' }}>+ Båtens egen kran brukes</span>}
+      {open && !editable && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .55)' }}>Mannskap settes av produksjonen.</span>}
       {error && <div className="error-box" role="alert">{error}</div>}
     </div>
   );

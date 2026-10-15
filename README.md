@@ -9,6 +9,10 @@ Internt logistikksystem for kaia på Flatholmen i Ålesund. Menyen har fire hove
 | **Bulkbil** | Egne biler som henter salt i bulk. Sjåføren bestiller kvalitet (havsalt, steinsalt, blandet salt, veisalt) i opptil fire steg, f.eks. 16 t blandet på henger og så 12 t havsalt på bil, med pause (min:sek) mellom stegene. |
 | **Produksjon** | To pakkelinjer med 30 t silo hver. Viser hva som pakkes, beregnet nivå i siloen og når hjullasteren skal fylle eller stoppe før kvalitetsbytte. |
 
+**Søk øverst på alle sider** finner sider, båter, anløp, biler, bulkbiler og folk i Flow. Med BarentsWatch-nøklene på plass søker det også i AIS (Kystverkets data) på navn, MMSI, IMO eller kallesignal – også båter som ikke er i båtregisteret. Fra treffet kan båten legges til i båtregisteret, og «Vis i kartet» viser hvor den er nå. BarentsWatch kan ikke søke på navn, så Flow henter alle fartøy de har sett siste 24 timer i norske farvann og filtrerer selv (listen holdes i minnet i tre minutter). Båter som ikke har vært i området det siste døgnet, blir ikke funnet.
+
+Mannskap på anløp er valgfritt. Det ligger sammenfoldet på anløpet, og roller og personer kan legges til eller fjernes ved behov.
+
 Rapporter og administrasjon ligger nederst i menyen. `/hjullaster` er en fullskjermvisning for nettbrettet i hjullasteren: behov i traktene for bulkbilene, begge siloene og store knapper for å registrere påfylling.
 
 **Klokkeslett på anløp er valgfritt.** Tidene er sjelden kjent før ca. en time før båten kommer, så et anløp kan legges inn med bare dag. Tiden settes på anløpet («Sett tid») når den er kjent. Anløp uten tid er utenfor kollisjonssjekken og kaibelegget til tiden er satt.

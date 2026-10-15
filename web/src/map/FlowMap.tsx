@@ -116,7 +116,9 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
       for (const id of ALL_LAYERS) m.setLayoutProperty(id, 'visibility', LAYERS[basemap].includes(id) ? 'visible' : 'none');
       m.setPaintProperty('hav', 'background-color', basemap === 'lys' ? '#DCE3DF' : '#1B2A23');
     };
-    if (m.isStyleLoaded()) apply(); else m.once('load', apply);
+    // Lagene finnes så snart stilen er lest inn. isStyleLoaded() er false mens fliser lastes,
+    // og «load» har da allerede gått – derfor sjekkes laget direkte.
+    if (m.getLayer('esri-bilder')) apply(); else m.once('styledata', apply);
   }, [basemap]);
 
   useImperativeHandle(ref, () => ({
