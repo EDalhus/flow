@@ -18,7 +18,7 @@ function segments(body: string, users: UserView[], meId?: string): ReactNode[] {
     if (m.index! > last) out.push(body.slice(last, m.index));
     const u = names.find(x => x.short_name.toLowerCase() === m[1].toLowerCase());
     out.push(
-      <span key={m.index} style={u?.id === meId ? { background: '#F3F5F6', color: '#0B0E11', borderRadius: 6, padding: '0 4px' } : { color: '#9DB8FF' }}>{m[0]}</span>,
+      <span key={m.index} style={u?.id === meId ? { background: '#F2F5F3', color: '#1A231E', borderRadius: 6, padding: '0 4px' } : { color: '#80EFDE' }}>{m[0]}</span>,
     );
     last = m.index! + m[0].length;
   }
@@ -61,7 +61,7 @@ export function Chat({ callId, chips = [], variant = 'panel' }: { callId: string
 
       <div style={{ position: 'relative' }}>
         {suggestions.length > 0 && (
-          <div role="listbox" aria-label="Tagg person" className="glass" style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6, padding: 6, borderRadius: 18, display: 'flex', flexDirection: 'column', background: 'rgba(17,21,25,.95)' }}>
+          <div role="listbox" aria-label="Tagg person" className="glass" style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6, padding: 6, borderRadius: 18, display: 'flex', flexDirection: 'column', background: 'rgba(32,42,36,.95)' }}>
             {suggestions.map(u => (
               <button key={u.id} type="button" role="option" aria-selected="false" className="tab" style={{ justifyContent: 'flex-start', textAlign: 'left' }} onClick={() => insert(u.short_name)}>
                 @{u.short_name} <span className="muted" style={{ fontSize: 12 }}>· {u.title ?? u.roles.join(', ')}</span>
@@ -69,14 +69,14 @@ export function Chat({ callId, chips = [], variant = 'panel' }: { callId: string
             ))}
           </div>
         )}
-        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 4px 4px 16px', borderColor: 'rgba(255,255,255,.09)' }}>
+        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 4px 4px 16px', borderColor: 'rgba(var(--tint), .09)' }}>
           <label htmlFor={`chat-${callId}`} className="sr">Skriv melding</label>
           <input id={`chat-${callId}`} type="text" value={draft} onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
             placeholder="Melding, @ for å tagge" autoComplete="off"
             style={{ flex: 1, minWidth: 0, minHeight: mobile ? 48 : 44, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: mobile ? 16 : 14, outlineOffset: 6 }} />
           <button type="button" className="icon-btn" onClick={submit} aria-label="Send melding" disabled={!draft.trim() || send.isPending}
-            style={{ width: mobile ? 48 : 42, height: mobile ? 48 : 42, background: '#F3F5F6', color: '#0B0E11', opacity: draft.trim() ? 1 : .6 }}>
+            style={{ width: mobile ? 48 : 42, height: mobile ? 48 : 42, background: '#F2F5F3', color: '#1A231E', opacity: draft.trim() ? 1 : .6 }}>
             <ArrowRight size={mobile ? 18 : 16} strokeWidth={2} />
           </button>
         </div>
@@ -100,27 +100,27 @@ function Message({ m, author, users, meId, mobile }: { m: MessageView; author?: 
   const time = `${serviceDate(m.created_at) === serviceDate(new Date()) ? '' : `${dayRelative(serviceDate(m.created_at))} `}${osloTime(m.created_at)}`;
   const bubble = m.kind === 'system'
     ? { background: 'rgba(91,214,138,.08)', border: '1px solid rgba(91,214,138,.18)' }
-    : mentionsMe ? { background: 'rgba(157,184,255,.16)', border: '1px solid rgba(157,184,255,.25)' }
-    : mine ? { background: 'rgba(255,255,255,.1)' } : { background: 'rgba(255,255,255,.05)' };
+    : mentionsMe ? { background: 'rgba(128,239,222,.16)', border: '1px solid rgba(128,239,222,.25)' }
+    : mine ? { background: 'rgba(var(--tint), .1)' } : { background: 'rgba(var(--tint), .05)' };
   const who = m.author?.short_name ?? 'Flow';
 
   if (mobile) {
     return (
       <li style={{ borderRadius: 20, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 2, ...bubble }}>
-        <span style={{ fontSize: 13, color: 'rgba(243,245,246,.6)' }}><span style={{ color: 'var(--fg)' }}>{who}</span> · {time}</span>
+        <span style={{ fontSize: 13, color: 'rgba(var(--tint), .6)' }}><span style={{ color: 'var(--fg)' }}>{who}</span> · {time}</span>
         <span style={{ fontSize: 15 }}>{segments(m.body, users, meId)}</span>
       </li>
     );
   }
   return (
     <li style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-      <span style={{ width: 32, height: 32, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.1)' }}>
+      <span style={{ width: 32, height: 32, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, background: 'rgba(var(--tint), .08)', border: '1px solid rgba(var(--tint), .1)' }}>
         {m.author?.initials ?? 'F'}
       </span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
         <span style={{ fontSize: 13 }}>
           <span style={{ fontWeight: 500 }}>{who}</span>{' '}
-          <span style={{ color: 'rgba(243,245,246,.55)' }}>{author?.title ? `${author.title} · ` : m.kind === 'system' ? 'System · ' : ''}{time}</span>
+          <span style={{ color: 'rgba(var(--tint), .55)' }}>{author?.title ? `${author.title} · ` : m.kind === 'system' ? 'System · ' : ''}{time}</span>
         </span>
         <p style={{ margin: 0, padding: '9px 12px', borderRadius: '4px 16px 16px 16px', fontSize: 14, ...bubble }}>{segments(m.body, users, meId)}</p>
       </div>

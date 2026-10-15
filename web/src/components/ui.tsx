@@ -12,8 +12,8 @@ export function StatusBadge({ status, basis, size = 'sm' }: { status: CallStatus
     <span className="badge" title={estimated ? 'Anslått ut fra ETA/ETD – ingen AIS-posisjon ennå' : undefined}
       style={lg
         ? { background: s.solid, color: s.solidFg, padding: '6px 12px', fontSize: 14, fontWeight: 500, gap: 7 }
-        : { background: s.bg, color: s.c }}>
-      <span className="dot" style={{ background: lg ? s.solidFg === '#0B0E11' ? '#0B0E11' : s.c : s.c, width: lg ? 8 : 6, height: lg ? 8 : 6, opacity: lg && s.solidFg === '#0B0E11' ? .7 : 1 }} />
+        : ({ background: s.bg, '--badge-c': s.c, color: 'var(--badge-c)' } as CSSProperties)}>
+      <span className="dot" style={{ background: lg ? s.solidFg === '#1A231E' ? '#1A231E' : s.c : s.c, width: lg ? 8 : 6, height: lg ? 8 : 6, opacity: lg && s.solidFg === '#1A231E' ? .7 : 1 }} />
       {s.label}
     </span>
   );
@@ -22,7 +22,7 @@ export function StatusBadge({ status, basis, size = 'sm' }: { status: CallStatus
 export function FlagBadge({ flag, icon = true, style }: { flag: Flag; icon?: boolean; style?: CSSProperties }) {
   const f = FLAG_STYLE[flag];
   return (
-    <span className="badge" style={{ background: f.bg, color: f.c, gap: 5, padding: '3px 9px', ...style }}>
+    <span className="badge" style={{ background: f.bg, '--badge-c': f.c, color: 'var(--badge-c)', gap: 5, padding: '3px 9px', ...style } as CSSProperties}>
       {icon && <FlagIcon size={11} />}
       {f.label}
     </span>
@@ -37,8 +37,8 @@ export function QuayMark({ quay, compact }: { quay: Pick<QuayRef, 'name' | 'nick
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: compact ? 5 : 7, minWidth: 0, maxWidth: '100%' }}>
       <span className="badge" style={{
         flex: 'none', fontSize: compact ? 10 : 11, padding: compact ? '2px 6px' : '3px 8px', fontWeight: 500,
-        background: own ? 'rgba(255,255,255,.1)' : 'rgba(232,176,110,.18)',
-        color: own ? 'rgba(243,245,246,.78)' : '#E8B06E',
+        background: own ? 'rgba(var(--tint), .1)' : 'rgba(232,176,110,.18)',
+        color: own ? 'rgba(var(--tint), .78)' : '#E8B06E',
       }}>
         {own ? 'Vår' : 'Nabo'}
       </span>
@@ -76,7 +76,7 @@ export function BoatFlagLine({ boat }: { boat: BoatSummary }) {
 export function Stars({ value, size = 16, label }: { value: number; size?: number; label?: string }) {
   return (
     <span className="stars" role="img" aria-label={label ?? `${value} av 5`}>
-      {[1, 2, 3, 4, 5].map(n => <Star key={n} size={size} fill={n <= value ? '#F7B955' : 'rgba(243,245,246,.14)'} />)}
+      {[1, 2, 3, 4, 5].map(n => <Star key={n} size={size} fill={n <= value ? '#F7B955' : 'rgba(var(--tint), .14)'} />)}
     </span>
   );
 }
@@ -122,9 +122,9 @@ export function RatingBars({ values, variant = 'long' }: {
     return (
       <span style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
         {rows.map(([short, , v]) => (
-          <span key={short} style={{ display: 'grid', gridTemplateColumns: '72px 1fr 26px', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(243,245,246,.65)' }}>
+          <span key={short} style={{ display: 'grid', gridTemplateColumns: '72px 1fr 26px', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(var(--tint), .65)' }}>
             <span>{short}</span>
-            <span style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
+            <span style={{ height: 4, borderRadius: 2, background: 'rgba(var(--tint), .08)', overflow: 'hidden' }}>
               <span style={{ display: 'block', height: '100%', borderRadius: 2, width: v == null ? 0 : `${(v / 5) * 100}%`, background: v == null ? 'transparent' : ratingColor(v) }} />
             </span>
             <span className="n" style={{ textAlign: 'right' }}>{fr(v)}</span>
@@ -140,7 +140,7 @@ export function RatingBars({ values, variant = 'long' }: {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
             <span>{long}</span><span className="n" style={{ color: 'var(--fg-75)' }}>{fr(v)}</span>
           </div>
-          <div style={{ height: 4, background: 'rgba(255,255,255,.08)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ height: 4, background: 'rgba(var(--tint), .08)', borderRadius: 2, overflow: 'hidden' }}>
             <div style={{ height: '100%', borderRadius: 2, width: v == null ? 0 : `${(v / 5) * 100}%`, background: v == null ? 'transparent' : ratingColor(v) }} />
           </div>
         </div>

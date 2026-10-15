@@ -62,10 +62,10 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
           kartverket: { type: 'raster', tiles: [KARTVERKET_TILES], tileSize: 256, maxzoom: 18, attribution: ATTRIBUTION },
         },
         layers: [
-          { id: 'hav', type: 'background', paint: { 'background-color': '#0B1219' } },
+          { id: 'hav', type: 'background', paint: { 'background-color': '#1B2A23' } },
           {
             id: 'kartverket', type: 'raster', source: 'kartverket',
-            paint: { 'raster-brightness-min': 0.5, 'raster-brightness-max': 0.03, 'raster-saturation': -1, 'raster-contrast': -0.15, 'raster-opacity': 0.85 },
+            paint: { 'raster-brightness-min': 0.55, 'raster-brightness-max': 0.02, 'raster-saturation': -1, 'raster-contrast': -0.1, 'raster-opacity': 0.7 },
           },
         ],
       },
@@ -113,7 +113,7 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
       <div ref={el} style={{ position: 'absolute', inset: 0 }} aria-label="Kart over Ålesund med Flatholmen" role="region" />
       <div aria-hidden="true" style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'linear-gradient(90deg, rgba(7,9,11,.55) 0%, rgba(7,9,11,0) 32%, rgba(7,9,11,0) 68%, rgba(7,9,11,.55) 100%), linear-gradient(180deg, rgba(7,9,11,.5) 0%, rgba(7,9,11,0) 22%)',
+        background: 'linear-gradient(90deg, rgba(20,27,23,.55) 0%, rgba(20,27,23,0) 32%, rgba(20,27,23,0) 68%, rgba(20,27,23,.55) 100%), linear-gradient(180deg, rgba(20,27,23,.5) 0%, rgba(20,27,23,0) 22%)',
       }} />
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div style={{ pointerEvents: 'auto' }}>{map.current && overlays?.(project)}</div>

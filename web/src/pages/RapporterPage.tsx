@@ -137,13 +137,13 @@ function Outlook({ w, name, dirWord }: { w: WeeklyReport; name: string; dirWord:
     : `Uke ${last + 1}–${Math.min(last + 4, w.weeks_in_year)} ventes ${nb(o.next4_tonnes)} t (${pct(o.next4_tonnes, o.next4_tonnes_prev)} mot i fjor).` +
       (o.busiest_week ? ` Travleste uke ventes å bli uke ${o.busiest_week} med ca. ${o.busiest_calls} anløp og ${nb(o.busiest_tonnes)} t – ${versus} samme uke i fjor (${pct(o.busiest_tonnes, o.busiest_tonnes_prev)} tonn).` : '');
   return (
-    <div style={{ borderRadius: 22, padding: '16px 20px', background: 'rgba(157,184,255,.1)', border: '1px solid rgba(157,184,255,.22)', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-      <span style={{ width: 36, height: 36, flex: 'none', borderRadius: '50%', background: 'rgba(157,184,255,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C9D8FF' }}>
+    <div className="panel-accent" style={{ padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      <span style={{ width: 36, height: 36, flex: 'none', borderRadius: '50%', background: 'rgba(128,239,222,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C2F7EE' }}>
         <TrendUp size={18} style={up ? undefined : { transform: 'scaleY(-1)' }} />
       </span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={{ fontSize: 16 }}>{title}</span>
-        <span style={{ fontSize: 14, color: 'var(--fg-75)' }}>{text}</span>
+        <span style={{ fontSize: 26, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{title}</span>
+        <span style={{ fontSize: 15, color: 'var(--fg-85)', marginTop: 4 }}>{text}</span>
         <span style={{ fontSize: 12, color: 'var(--fg-55)' }}>
           Prognose = fjorårets tall for samme uke × årets trend siste 8 uker ({pct(w.trend.tonnes, 1)} mot {w.prev_year}). Tallene er eksempeldata.
         </span>
@@ -178,10 +178,10 @@ function MainChart({ w, name, dirWord, dir, prodSelected, hover, onHover }: {
   const bars = (values: number[], max: number) => values.map((v, i) => {
     const on = i === hw;
     const fill = fc(i)
-      ? { background: `rgba(157,184,255,${on ? '.5' : '.28'})`, border: '1px dashed #9DB8FF', borderBottom: 'none' }
-      : { background: on ? '#C9D8FF' : '#9DB8FF' };
+      ? { background: `rgba(128,239,222,${on ? '.5' : '.28'})`, border: '1px dashed #80EFDE', borderBottom: 'none' }
+      : { background: on ? '#C2F7EE' : '#80EFDE' };
     return (
-      <div key={i} className="wk" onMouseEnter={() => onHover(i)} style={on ? { background: 'rgba(255,255,255,.06)', borderRadius: 4 } : undefined}>
+      <div key={i} className="wk" onMouseEnter={() => onHover(i)} style={on ? { background: 'rgba(var(--tint), .06)', borderRadius: 4 } : undefined}>
         <div style={{ width: '100%', borderRadius: '3px 3px 0 0', height: `${((v / max) * 100).toFixed(1)}%`, ...fill }} />
       </div>
     );
@@ -192,19 +192,19 @@ function MainChart({ w, name, dirWord, dir, prodSelected, hover, onHover }: {
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div><h2 id="c-main" className="ttl" style={{ fontSize: 20 }}>Varer og anløp per uke</h2>
           <span className="sub">{name.charAt(0).toUpperCase() + name.slice(1)} · {dirWord} · hold over en uke for detaljer</span></div>
-        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'rgba(243,245,246,.7)', flexWrap: 'wrap' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 10, borderRadius: 2, background: '#9DB8FF' }} />{w.year}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 10, borderRadius: 2, background: 'rgba(157,184,255,.28)', border: '1px dashed #9DB8FF' }} />Prognose</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 2, background: '#E8ECEF' }} />{w.prev_year}</span>
+        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'rgba(var(--tint), .7)', flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 10, borderRadius: 2, background: '#80EFDE' }} />{w.year}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 10, borderRadius: 2, background: 'rgba(128,239,222,.28)', border: '1px dashed #80EFDE' }} />Prognose</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 2, background: '#D6E0D9' }} />{w.prev_year}</span>
         </div>
       </div>
 
-      <div role="status" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(170px, 100%), 1fr))', gap: 10, padding: '12px 14px', borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.06)' }}>
+      <div role="status" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(170px, 100%), 1fr))', gap: 10, padding: '12px 14px', borderRadius: 16, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .06)' }}>
         {readout.map(r => (
           <div key={r.label} style={{ display: 'flex', flexDirection: 'column' }}>
             <span className="sub">{r.label}</span>
             <span className="n" style={{ fontSize: 18 }}>{r.v}</span>
-            <span className="n" style={{ fontSize: 12, color: 'rgba(243,245,246,.6)' }}>{r.cmp}</span>
+            <span className="n" style={{ fontSize: 12, color: 'rgba(var(--tint), .6)' }}>{r.cmp}</span>
           </div>
         ))}
       </div>
@@ -237,14 +237,14 @@ function ChartArea({ height, axis, nowPos, showNowLabel, children }: { height: n
   const [barsEl, lineEl] = [children.slice(0, -1), children[children.length - 1]];
   return (
     <div style={{ display: 'flex', gap: 10, marginTop: showNowLabel ? 0 : 6 }}>
-      <div className="n" style={{ width: 52, flex: 'none', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height, textAlign: 'right', fontSize: 11, color: 'rgba(243,245,246,.5)' }}>
+      <div className="n" style={{ width: 52, flex: 'none', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height, textAlign: 'right', fontSize: 11, color: 'rgba(var(--tint), .5)' }}>
         {axis.map(a => <span key={a}>{a}</span>)}
       </div>
-      <div style={{ flex: 1, position: 'relative', height, borderBottom: '1px solid rgba(255,255,255,.2)', backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px)', backgroundSize: `100% ${height / (axis.length - 1)}px` }}>
+      <div style={{ flex: 1, position: 'relative', height, borderBottom: '1px solid rgba(var(--tint), .2)', backgroundImage: 'linear-gradient(rgba(var(--tint), .06) 1px, transparent 1px)', backgroundSize: `100% ${height / (axis.length - 1)}px` }}>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 2, alignItems: 'flex-end' }}>{barsEl}</div>
         {lineEl}
-        <div style={{ position: 'absolute', top: showNowLabel ? -8 : -4, bottom: -4, width: 0, borderLeft: '1px dashed rgba(243,245,246,.55)', pointerEvents: 'none', left: nowPos }} />
-        {showNowLabel && <span className="n" style={{ position: 'absolute', top: -22, transform: 'translateX(-50%)', fontSize: 11, background: '#F3F5F6', color: '#0B0E11', borderRadius: 999, padding: '0 7px', left: nowPos }}>Nå</span>}
+        <div style={{ position: 'absolute', top: showNowLabel ? -8 : -4, bottom: -4, width: 0, borderLeft: '1px dashed rgba(var(--tint), .55)', pointerEvents: 'none', left: nowPos }} />
+        {showNowLabel && <span className="n" style={{ position: 'absolute', top: -22, transform: 'translateX(-50%)', fontSize: 11, background: '#F2F5F3', color: '#1A231E', borderRadius: 999, padding: '0 7px', left: nowPos }}>Nå</span>}
       </div>
     </div>
   );
@@ -252,7 +252,7 @@ function ChartArea({ height, axis, nowPos, showNowLabel, children }: { height: n
 
 const Line = ({ points, n }: { points: string; n: number }) => (
   <svg viewBox={`0 0 ${n} 100`} preserveAspectRatio="none" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-    <polyline points={points} fill="none" stroke="#E8ECEF" strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+    <polyline points={points} fill="none" stroke="#D6E0D9" strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
   </svg>
 );
 
@@ -271,7 +271,7 @@ function WeekTable({ w, name, dirWord }: { w: WeeklyReport; name: string; dirWor
                 <td className="r n">{nb(r.tonnes ?? r.forecast_tonnes ?? 0)}</td>
                 <td className="r n">{r.calls_prev}</td>
                 <td className="r n">{r.calls ?? r.forecast_calls}</td>
-                <td style={{ color: 'rgba(243,245,246,.6)' }}>{r.kind === 'faktisk' ? 'Faktisk' : 'Prognose'}</td>
+                <td style={{ color: 'rgba(var(--tint), .6)' }}>{r.kind === 'faktisk' ? 'Faktisk' : 'Prognose'}</td>
               </tr>
             ))}
           </tbody>
@@ -286,7 +286,7 @@ function ProductTable({ rows, last, dirWord, selected, onPick }: { rows: Product
   const weeks = rows[0]?.series.length ?? 52;
   const chg = (a: number, b: number) => (b > 0.5 ? `${arrow(a, b)}${pct(a, b)}` : '–');
   return (
-    <section className="glass" aria-labelledby="c-prod" style={{ padding: '18px 8px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <section className="panel-light" aria-labelledby="c-prod" style={{ padding: '18px 8px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ padding: '0 14px' }}>
         <h2 id="c-prod" className="ttl" style={{ fontSize: 20 }}>Varer {dirWord}</h2>
         <span className="sub">Hittil i år mot samme uker i fjor, og prognose for resten av året. Velg en vare for å se den i grafen.</span>
@@ -302,18 +302,18 @@ function ProductTable({ rows, last, dirWord, selected, onPick }: { rows: Product
             const pts = (arr: number[], from: number, to: number) => arr.slice(from, to).map((v, k) => `${(from + k + 0.5).toFixed(1)},${(24 - (v / mx) * 22).toFixed(1)}`).join(' ');
             return (
               <button key={r.product_id} type="button" className="prow" aria-pressed={selected === r.product_id} onClick={() => onPick(r.product_id)}
-                style={selected === r.product_id ? { background: 'rgba(157,184,255,.12)' } : undefined}>
+                style={selected === r.product_id ? { background: 'rgba(128,239,222,.12)' } : undefined}>
                 <span style={{ fontSize: 15 }}>{r.name}</span>
-                <span style={{ fontSize: 13, color: 'rgba(243,245,246,.65)' }}>{r.packaging}</span>
+                <span style={{ fontSize: 13, color: 'rgba(var(--tint), .65)' }}>{r.packaging}</span>
                 <span className="n r">{r.ytd_tonnes > 0.5 ? nb(r.ytd_tonnes) : '–'}</span>
-                <span className="n r" style={{ color: 'rgba(243,245,246,.7)' }}>{r.ytd_tonnes_prev > 0.5 ? nb(r.ytd_tonnes_prev) : '–'}</span>
+                <span className="n r" style={{ color: 'rgba(var(--tint), .7)' }}>{r.ytd_tonnes_prev > 0.5 ? nb(r.ytd_tonnes_prev) : '–'}</span>
                 <span className="n r">{chg(r.ytd_tonnes, r.ytd_tonnes_prev)}</span>
                 <span className="n r">{r.forecast_tonnes > 0.5 ? nb(r.forecast_tonnes) : '–'}</span>
                 <span className="n r">{chg(r.forecast_tonnes, r.forecast_tonnes_prev)}</span>
                 <svg viewBox={`0 0 ${weeks} 24`} preserveAspectRatio="none" role="img" aria-label={`${r.name}: ${chg(r.ytd_tonnes, r.ytd_tonnes_prev)} hittil i år`} style={{ width: 130, height: 26, overflow: 'visible' }}>
                   <polyline points={pts(r.series_prev, 0, weeks)} fill="none" stroke="rgba(232,236,239,.55)" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
-                  <polyline points={pts(r.series, 0, last)} fill="none" stroke="#9DB8FF" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
-                  <polyline points={pts(r.series, Math.max(0, last - 1), weeks)} fill="none" stroke="#9DB8FF" strokeWidth="1.6" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
+                  <polyline points={pts(r.series, 0, last)} fill="none" stroke="#80EFDE" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
+                  <polyline points={pts(r.series, Math.max(0, last - 1), weeks)} fill="none" stroke="#80EFDE" strokeWidth="1.6" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
                 </svg>
               </button>
             );
@@ -321,7 +321,7 @@ function ProductTable({ rows, last, dirWord, selected, onPick }: { rows: Product
           <div className="prow" style={{ cursor: 'default', fontWeight: 500 }}>
             <span>Sum alle varer</span><span />
             <span className="n r">{nb(tot.y)}</span>
-            <span className="n r" style={{ color: 'rgba(243,245,246,.7)' }}>{nb(tot.y5)}</span>
+            <span className="n r" style={{ color: 'rgba(var(--tint), .7)' }}>{nb(tot.y5)}</span>
             <span className="n r">{chg(tot.y, tot.y5)}</span>
             <span className="n r">{nb(tot.p)}</span>
             <span className="n r">{chg(tot.p, tot.p5)}</span>
@@ -343,18 +343,18 @@ function Punctuality({ points }: { points: { week: number; share: number | null;
     <section className="glass" aria-labelledby="c2" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div><h2 id="c2" className="ttl">Punktlighet</h2><span className="sub">Andel anløp innenfor ±30 min av ETA · siste {points.length} uker</span></div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <div className="n" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 140, fontSize: 11, color: 'rgba(243,245,246,.5)', textAlign: 'right', width: 34 }}>
+        <div className="n" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 140, fontSize: 11, color: 'rgba(var(--tint), .5)', textAlign: 'right', width: 34 }}>
           <span>100 %</span><span>75 %</span><span>50 %</span>
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ position: 'relative', height: 140, borderBottom: '1px solid rgba(255,255,255,.18)', backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px)', backgroundSize: '100% 70px' }}>
+          <div style={{ position: 'relative', height: 140, borderBottom: '1px solid rgba(var(--tint), .18)', backgroundImage: 'linear-gradient(rgba(var(--tint), .06) 1px, transparent 1px)', backgroundSize: '100% 70px' }}>
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
-              <polyline points={valid.map(p => `${x(p.i).toFixed(2)},${y(p.share! * 100).toFixed(2)}`).join(' ')} fill="none" stroke="#9DB8FF" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+              <polyline points={valid.map(p => `${x(p.i).toFixed(2)},${y(p.share! * 100).toFixed(2)}`).join(' ')} fill="none" stroke="#80EFDE" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
             </svg>
             {valid.map(p => (
               <div key={p.week} onMouseEnter={() => setHl(p.i)} onMouseLeave={() => setHl(null)}
                 style={{ position: 'absolute', top: 0, bottom: 0, width: `${100 / points.length}%`, transform: 'translateX(-50%)', left: `${x(p.i)}%` }}>
-                <span style={{ position: 'absolute', left: '50%', width: 9, height: 9, margin: '-4.5px 0 0 -4.5px', borderRadius: '50%', background: '#9DB8FF', boxShadow: '0 0 0 2px #14191E', top: `${y(p.share! * 100)}%` }} />
+                <span style={{ position: 'absolute', left: '50%', width: 9, height: 9, margin: '-4.5px 0 0 -4.5px', borderRadius: '50%', background: '#80EFDE', boxShadow: '0 0 0 2px #1C2620', top: `${y(p.share! * 100)}%` }} />
                 {hl === p.i && (
                   <span className="tip n" style={{ left: '50%', top: `${y(p.share! * 100)}%` }}>
                     Uke {p.week}: {Math.round(p.share! * 100)} % ({p.on_time} av {p.calls})
@@ -376,8 +376,8 @@ function HBar({ label, value, share, height, labelWidth }: { label: string; valu
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `${labelWidth}px 1fr 28px`, alignItems: 'center', gap: 10, fontSize: 14 }}>
       <span>{label}</span>
-      <span style={{ height, borderRadius: '0 4px 4px 0', background: 'rgba(255,255,255,.04)' }}>
-        <span style={{ display: 'block', height: '100%', borderRadius: '0 4px 4px 0', background: '#9DB8FF', width: `${Math.max(0, Math.min(1, share)) * 100}%` }} />
+      <span style={{ height, borderRadius: '0 4px 4px 0', background: 'rgba(var(--tint), .04)' }}>
+        <span style={{ display: 'block', height: '100%', borderRadius: '0 4px 4px 0', background: '#80EFDE', width: `${Math.max(0, Math.min(1, share)) * 100}%` }} />
       </span>
       <span className="n" style={{ textAlign: 'right' }}>{value}</span>
     </div>

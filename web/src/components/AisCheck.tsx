@@ -30,14 +30,14 @@ export function AisCheck({ onClose }: { onClose: () => void }) {
 
   const d = state.data;
   const row = (label: string, ok: boolean, text: string) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,.06)', fontSize: 14 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '7px 0', borderBottom: '1px solid rgba(var(--tint), .06)', fontSize: 14 }}>
       <span>{label}</span>
       <span style={{ color: ok ? '#7FE0A3' : '#FF8A80', textAlign: 'right' }}>{text}</span>
     </div>
   );
 
   return (
-    <div className="glass" role="dialog" aria-label="AIS-sjekk" style={{ width: 380, padding: 16, display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(17,21,25,.92)', pointerEvents: 'auto' }}>
+    <div className="glass" role="dialog" aria-label="AIS-sjekk" style={{ width: 380, padding: 16, display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(32,42,36,.92)', pointerEvents: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 17 }}>AIS-tilkobling</span>
         <button type="button" className="icon-btn pill" onClick={onClose} aria-label="Lukk" style={{ width: 36, height: 36 }}><Close size={14} /></button>

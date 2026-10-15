@@ -18,10 +18,10 @@ import { useNow } from '../lib/useNow.ts';
 const FALLBACK = { lat: 62.47918, lon: 6.19292, radius_m: 300, label: '' };
 const sheet: React.CSSProperties = {
   position: 'absolute', left: 0, right: 0, bottom: 0, borderRadius: '34px 34px 0 0', borderBottom: 'none', display: 'flex', flexDirection: 'column',
-  background: 'rgba(17,21,25,.62)', backdropFilter: 'blur(22px) saturate(140%)', WebkitBackdropFilter: 'blur(22px) saturate(140%)', border: '1px solid rgba(255,255,255,.09)',
+  background: 'rgba(32,42,36,.62)', backdropFilter: 'blur(22px) saturate(140%)', WebkitBackdropFilter: 'blur(22px) saturate(140%)', border: '1px solid rgba(var(--tint), .09)',
 };
-const pill: React.CSSProperties = { background: 'rgba(17,21,25,.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 999 };
-const Grabber = () => <div aria-hidden="true" style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(243,245,246,.3)', margin: '10px auto 0', flex: 'none' }} />;
+const pill: React.CSSProperties = { background: 'rgba(32,42,36,.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(var(--tint), .1)', borderRadius: 999 };
+const Grabber = () => <div aria-hidden="true" style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(var(--tint), .3)', margin: '10px auto 0', flex: 'none' }} />;
 
 /** Kaiarbeidervisning: store trykkflater, ett anløp om gangen. */
 export function MobileApp() {
@@ -65,7 +65,7 @@ export function MobileApp() {
               const q = project(fence.lon, fence.lat);
               return (
                 <>
-                  {q && <span style={{ position: 'absolute', left: q[0], top: q[1], transform: 'translate(-50%, -140%)', background: 'rgba(243,245,246,.95)', color: '#0B0E11', borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', pointerEvents: 'none' }}>Vår kai</span>}
+                  {q && <span style={{ position: 'absolute', left: q[0], top: q[1], transform: 'translate(-50%, -140%)', background: 'rgba(242,245,243,.95)', color: '#1A231E', borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', pointerEvents: 'none' }}>Vår kai</span>}
                   <VesselLayer project={project} vessels={ais.data?.vessels ?? []} calls={list} selectedId={sel?.id} onSelect={id => go(id)} quayPos={quayPos} today={today} compact />
                 </>
               );
@@ -83,7 +83,7 @@ export function MobileApp() {
           <div style={{ position: 'absolute', top: 76, left: 14, right: 14, display: 'flex', gap: 8, justifyContent: 'center', zIndex: 2 }}>
             <span className="n" style={{ ...pill, minHeight: 44, padding: '0 16px', display: 'flex', alignItems: 'center', fontSize: 15 }}>{dayShort(today)} · {osloTime(now)}</span>
             <span style={{ ...pill, minHeight: 44, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
-              <span className="dot" style={{ width: 8, height: 8, background: aisLive(ais.data?.status, now) ? '#5BD68A' : '#A3ACB3' }} />
+              <span className="dot" style={{ width: 8, height: 8, background: aisLive(ais.data?.status, now) ? '#5BD68A' : '#B1C2B7' }} />
               {aisLive(ais.data?.status, now) ? `${list.filter(c => c.status === 'paa_vei').length} på vei · AIS` : `${atQuay} ved kai`}
             </span>
           </div>
@@ -102,7 +102,7 @@ export function MobileApp() {
                   <span className="n" style={{ width: 22, height: 22, flex: 'none', borderRadius: '50%', background: '#E5484D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, marginTop: 2 }}>!</span>
                   <span style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: 16 }}>{clash.x.kind === 'quay' ? `Kollisjon på ${quayLabel(clash.call.quay)}` : 'Booket for tett'}</span>
-                    <span style={{ fontSize: 14, color: 'rgba(243,245,246,.7)' }}>{[clash.call.boat.name, ...clash.x.with.map(w => w.boat_name)].join(' og ')} · {clash.x.text}</span>
+                    <span style={{ fontSize: 14, color: 'rgba(var(--tint), .7)' }}>{[clash.call.boat.name, ...clash.x.with.map(w => w.boat_name)].join(' og ')} · {clash.x.text}</span>
                   </span>
                 </div>
               )}
@@ -132,11 +132,11 @@ function MobileCard({ call: c, onOpen }: { call: PortCallView; onOpen: () => voi
   const boats = [...new Set(c.collisions.flatMap(x => x.with.map(w => w.boat_name)))];
   return (
     <button type="button" className="card" onClick={onOpen} aria-label={`${c.boat.name}, ${typeLabel(c.type)} ${quayLabel(c.quay)}, ETA ${osloTime(c.eta)}`}
-      style={{ borderRadius: 24, gap: 10, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.07)', ...(c.status === 'ferdig' ? { opacity: .6 } : {}) }}>
+      style={{ borderRadius: 24, gap: 10, background: 'rgba(var(--tint), .05)', border: '1px solid rgba(var(--tint), .07)', ...(c.status === 'ferdig' ? { opacity: .6 } : {}) }}>
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%' }}>
         <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span style={{ fontSize: 21, letterSpacing: '-0.01em' }}>{c.boat.name}</span>
-          <span style={{ fontSize: 14, color: 'rgba(243,245,246,.65)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 14, color: 'rgba(var(--tint), .65)', display: 'flex', alignItems: 'center', gap: 8 }}>
             {typeLabel(c.type)} · <QuayMark quay={c.quay} compact />
           </span>
         </span>
@@ -146,7 +146,7 @@ function MobileCard({ call: c, onOpen }: { call: PortCallView; onOpen: () => voi
         <StatusBadge status={c.status} basis={c.status_basis} size="lg" />
         <span className="badge" style={{ padding: '6px 11px', fontSize: 13, background: f.bg, color: f.c }}>{f.label} · {c.boat.rating_count ? fr(c.boat.avg_total) : '–'}</span>
       </span>
-      {c.collisions.length > 0 && <span style={{ fontSize: 14, color: '#FF9A91' }}>{boats.length ? `Kolliderer med ${boats.join(', ')}` : c.collisions[0].text}</span>}
+      {c.collisions.length > 0 && <span style={{ fontSize: 14, color: 'var(--bad-fg)' }}>{boats.length ? `Kolliderer med ${boats.join(', ')}` : c.collisions[0].text}</span>}
     </button>
   );
 }
@@ -183,7 +183,7 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
         </span>
         <span style={{ width: 48 }} />
       </header>
-      <div className="glass" style={{ position: 'absolute', left: 16, top: 168, width: 200, padding: '14px 16px', borderRadius: 22, background: 'rgba(40,46,44,.5)', display: 'flex', flexDirection: 'column', zIndex: 2 }}>
+      <div className="glass" style={{ position: 'absolute', left: 16, top: 168, width: 200, padding: '14px 16px', borderRadius: 22, background: 'rgba(51,64,56,.5)', display: 'flex', flexDirection: 'column', zIndex: 2 }}>
         <span style={{ fontSize: 15 }}>{card.title}</span>
         <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{card.sub}</span>
         <span className="n" style={{ fontSize: 44, fontWeight: 200, lineHeight: 1.1, marginTop: 6 }}>{card.big}<span style={{ color: 'var(--fg-45)', fontSize: 22 }}>{card.dim}</span></span>
@@ -196,19 +196,19 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
             <h2 id="m-sel-h" style={{ margin: 0, fontSize: 32, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{c.boat.name}</h2>
             <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 14 }}>
               <span style={{ borderRadius: 999, padding: '4px 11px', background: f.bg, color: f.c }}>{f.label} · {c.boat.rating_count ? fr(c.boat.avg_total) : '–'}</span>
-              <span className="n" style={{ color: 'rgba(243,245,246,.65)' }}>{timeRange(c)}</span>
+              <span className="n" style={{ color: 'rgba(var(--tint), .65)' }}>{timeRange(c)}</span>
               <StatusBadge status={c.status} basis={c.status_basis} />
             </span>
-            {c.boat.flag_reason && <span style={{ fontSize: 14, color: 'rgba(243,245,246,.65)' }}>{c.boat.flag_reason}</span>}
+            {c.boat.flag_reason && <span style={{ fontSize: 14, color: 'rgba(var(--tint), .65)' }}>{c.boat.flag_reason}</span>}
           </div>
 
-          {c.status === 'ferdig' && <div style={{ borderRadius: 20, padding: 16, background: 'rgba(163,172,179,.14)' }}>Ferdig – kaibok levert.</div>}
+          {c.status === 'ferdig' && <div style={{ borderRadius: 20, padding: 16, background: 'rgba(177,194,183,.14)' }}>Ferdig – kaibok levert.</div>}
 
           {c.collisions.length > 0 && (
             <div role="alert" className="alert-red" style={{ borderRadius: 22, padding: '14px 16px', background: 'rgba(120,42,38,.5)', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ fontSize: 16 }}>Booket for tett</span>
               {c.collisions.map((x, i) => (
-                <span key={i} className="n" style={{ fontSize: 14, color: 'rgba(243,245,246,.75)', borderLeft: '1px solid rgba(243,245,246,.35)', paddingLeft: 10 }}>
+                <span key={i} className="n" style={{ fontSize: 14, color: 'rgba(var(--tint), .75)', borderLeft: '1px solid rgba(var(--tint), .35)', paddingLeft: 10 }}>
                   {x.text} · {osloTime(x.from)}–{osloTime(x.to)}{x.with.length ? ` · ${x.with.map(w => w.boat_name).join(', ')}` : ''}
                 </span>
               ))}
@@ -218,38 +218,38 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '0 4px' }}>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 400, color: 'var(--fg-62)' }}>Mannskap</h3>
-              <span style={{ fontSize: 14, color: c.responsible ? 'var(--fg-62)' : '#F7C873' }}>
+              <span style={{ fontSize: 14, color: c.responsible ? 'var(--fg-62)' : 'var(--warn-fg)' }}>
                 {c.responsible ? (auto ? 'Eneste på båten = ansvarlig' : `Ansvarlig: ${c.responsible.short_name}`) : 'Ansvarlig ikke valgt'}
               </span>
             </div>
-            <div style={{ borderRadius: 22, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', padding: '2px 6px' }}>
+            <div style={{ borderRadius: 22, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)', padding: '2px 6px' }}>
               {c.crew.map(s => {
                 const mine = s.user?.id === me.data?.id;
                 return (
-                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 54, padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 54, padding: '6px 10px', borderBottom: '1px solid rgba(var(--tint), .06)' }}>
                     <span style={{ width: 34, height: 34, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
-                      ...(mine ? { background: '#F3F5F6', color: '#0B0E11' } : s.user ? { background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.1)' } : { border: '1px dashed rgba(247,185,85,.5)', color: '#F7C873' }) }}>
+                      ...(mine ? { background: '#F2F5F3', color: '#1A231E' } : s.user ? { background: 'rgba(var(--tint), .08)', border: '1px solid rgba(var(--tint), .1)' } : { border: '1px dashed rgba(247,185,85,.5)', color: 'var(--warn-fg)' }) }}>
                       {s.user?.initials ?? '?'}
                     </span>
                     <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25, flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 16, color: s.user ? undefined : '#F7C873' }}>{s.user ? `${s.user.short_name}${mine ? ' (deg)' : ''}` : 'Ikke satt'}</span>
-                      <span style={{ fontSize: 13, color: 'rgba(243,245,246,.6)' }}>{CREW_ROLE_LABEL[s.crew_role]}</span>
+                      <span style={{ fontSize: 16, color: s.user ? undefined : 'var(--warn-fg)' }}>{s.user ? `${s.user.short_name}${mine ? ' (deg)' : ''}` : 'Ikke satt'}</span>
+                      <span style={{ fontSize: 13, color: 'rgba(var(--tint), .6)' }}>{CREW_ROLE_LABEL[s.crew_role]}</span>
                     </span>
-                    {s.user && c.responsible?.id === s.user.id && <span style={{ fontSize: 13, borderRadius: 999, padding: '5px 12px', background: '#F3F5F6', color: '#0B0E11' }}>Ansvarlig</span>}
+                    {s.user && c.responsible?.id === s.user.id && <span style={{ fontSize: 13, borderRadius: 999, padding: '5px 12px', background: '#F2F5F3', color: '#1A231E' }}>Ansvarlig</span>}
                   </div>
                 );
               })}
-              {c.boat_crane && <div style={{ padding: 10, fontSize: 14, color: 'rgba(243,245,246,.65)' }}>+ Båtens egen kran brukes</div>}
+              {c.boat_crane && <div style={{ padding: 10, fontSize: 14, color: 'rgba(var(--tint), .65)' }}>+ Båtens egen kran brukes</div>}
             </div>
           </div>
 
-          <div style={{ borderRadius: 22, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', padding: '4px 16px' }}>
+          <div style={{ borderRadius: 22, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)', padding: '4px 16px' }}>
             {c.goods.map(g => {
               const [q, d] = goodsParts(g);
               return (
-                <div key={g.id} style={{ display: 'flex', gap: 12, alignItems: 'baseline', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+                <div key={g.id} style={{ display: 'flex', gap: 12, alignItems: 'baseline', padding: '12px 0', borderBottom: '1px solid rgba(var(--tint), .06)' }}>
                   <span className="n" style={{ minWidth: 74 }}>{q}</span>
-                  <span style={{ color: 'rgba(243,245,246,.8)', fontSize: 15 }}>{d}</span>
+                  <span style={{ color: 'rgba(var(--tint), .8)', fontSize: 15 }}>{d}</span>
                 </div>
               );
             })}
@@ -258,12 +258,12 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {contacts.map(([kind, name, phone]) => (
               <a key={kind} href={telHref(phone)} aria-label={`Ring ${kind.toLowerCase()}, ${name}`}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 64, padding: '8px 8px 8px 16px', borderRadius: 22, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.07)', textDecoration: 'none', color: '#F3F5F6' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 64, padding: '8px 8px 8px 16px', borderRadius: 22, background: 'rgba(var(--tint), .05)', border: '1px solid rgba(var(--tint), .07)', textDecoration: 'none', color: 'var(--fg)' }}>
                 <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3, flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: 13, color: 'rgba(243,245,246,.6)' }}>{kind}</span>
+                  <span style={{ fontSize: 13, color: 'rgba(var(--tint), .6)' }}>{kind}</span>
                   <span>{name}</span>
                 </span>
-                <span style={{ width: 48, height: 48, flex: 'none', borderRadius: '50%', background: '#5BD68A', color: '#0B0E11', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Phone size={20} strokeWidth={2} /></span>
+                <span style={{ width: 48, height: 48, flex: 'none', borderRadius: '50%', background: '#5BD68A', color: '#1A231E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Phone size={20} strokeWidth={2} /></span>
               </a>
             ))}
           </div>
@@ -273,7 +273,7 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
         {c.status !== 'ferdig' && canLog && (
           <div style={{ flex: 'none', padding: '10px 16px 20px' }}>
             <button type="button" onClick={onKaibok}
-              style={{ width: '100%', minHeight: 60, borderRadius: 999, border: 'none', background: '#F3F5F6', color: '#0B0E11', fontSize: 17, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+              style={{ width: '100%', minHeight: 60, borderRadius: 999, border: 'none', background: '#F2F5F3', color: '#1A231E', fontSize: 17, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <Check size={20} strokeWidth={2.2} />Ferdigstill og fyll ut kaibok
             </button>
           </div>

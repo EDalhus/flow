@@ -60,20 +60,20 @@ export function VesselLayer({ project, vessels, calls, selectedId, onSelect, qua
           const on = v === sel;
           return (
             <polyline key={v.key} points={pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')} fill="none"
-              stroke={on ? 'rgba(243,245,246,.9)' : 'rgba(243,245,246,.28)'} strokeWidth={on ? 2 : 1.4} strokeDasharray={compact ? '4 5' : '5 6'} strokeLinecap="round" strokeLinejoin="round" />
+              stroke={on ? '#80EFDE' : 'rgba(var(--tint), .3)'} strokeWidth={on ? 2.2 : 1.4} strokeDasharray={compact ? '4 5' : '5 6'} strokeLinecap="round" strokeLinejoin="round" />
           );
         })}
       </svg>
 
       {gray.map(v => (
         <span key={v.key} title={`${v.name} – i kaiboka, ikke booket`}
-          style={{ position: 'absolute', left: v.x, top: v.y, width: 22, height: 22, transform: 'translate(-11px, -11px)', borderRadius: '50%', background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Vessel size={11} fill="rgba(243,245,246,.7)" rotate={v.rot} />
+          style={{ position: 'absolute', left: v.x, top: v.y, width: 22, height: 22, transform: 'translate(-11px, -11px)', borderRadius: '50%', background: 'rgba(var(--tint), .14)', border: '1px solid rgba(var(--tint), .18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Vessel size={11} fill="rgba(var(--tint), .7)" rotate={v.rot} />
         </span>
       ))}
 
       {sel && (
-        <span className="ring" aria-hidden="true" style={{ position: 'absolute', left: sel.x, top: sel.y, width: compact ? 110 : 132, height: compact ? 110 : 132, borderRadius: '50%', border: '1.5px dashed rgba(243,245,246,.55)', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(243,245,246,.07), rgba(243,245,246,0) 70%)' }} />
+        <span className="ring" aria-hidden="true" style={{ position: 'absolute', left: sel.x, top: sel.y, width: compact ? 110 : 132, height: compact ? 110 : 132, borderRadius: '50%', border: '1.5px dashed rgba(128,239,222,.6)', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(128,239,222,.1), rgba(128,239,222,0) 70%)' }} />
       )}
 
       {hot.map(v => {
@@ -85,9 +85,9 @@ export function VesselLayer({ project, vessels, calls, selectedId, onSelect, qua
             aria-label={`${c.boat.name}, ${v.inGeofence ? 'ved vår kai' : `ETA ${osloTime(c.eta)}`}, ${s.label}`}
             style={{ position: 'absolute', left: v.x, top: v.y, zIndex: on ? 4 : 3, padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transform: `translate(-${size / 2}px, -${size / 2}px)`, minWidth: 44, minHeight: 44 }}>
             <span style={{ position: 'relative', width: size, height: size, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)',
-              ...(on ? { background: '#F3F5F6', boxShadow: '0 0 0 6px rgba(243,245,246,.16)' } : { background: 'rgba(30,36,40,.7)', border: '1px solid rgba(255,255,255,.22)' }) }}>
-              <Vessel size={compact ? 15 : 16} fill={on ? '#0B0E11' : '#F3F5F6'} rotate={v.rot} />
-              <span style={{ position: 'absolute', top: -1, right: -1, width: 11, height: 11, borderRadius: '50%', border: '2px solid #0B0E11', background: c.collisions.length ? '#E5484D' : s.c }} />
+              ...(on ? { background: '#80EFDE', boxShadow: '0 0 0 8px rgba(128,239,222,.2)', width: size + 14, height: size + 14 } : { background: 'rgba(51,64,56,.85)', border: '1px solid rgba(var(--tint), .25)' }) }}>
+              <Vessel size={compact ? 15 : 16} fill={on ? '#1A231E' : '#F2F5F3'} rotate={v.rot} />
+              <span style={{ position: 'absolute', top: -1, right: -1, width: 11, height: 11, borderRadius: '50%', border: '2px solid #1A231E', background: c.collisions.length ? '#E5484D' : s.c }} />
             </span>
             {!compact && <span className="vessel-label">{c.boat.name} <span className="n" style={{ color: 'var(--fg-62)' }}>{tag(v)}</span></span>}
           </button>

@@ -69,7 +69,7 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
 
   return (
     <div className="glass scroll" role="dialog" aria-label="Varsler"
-      style={{ width: 360, maxHeight: 600, padding: 14, zIndex: 30, background: 'rgba(17,21,25,.88)', ...style }}>
+      style={{ width: 360, maxHeight: 600, padding: 14, zIndex: 30, background: 'rgba(32,42,36,.88)', ...style }}>
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 40, padding: '0 2px 0 6px' }}>
           <span style={{ fontSize: 18 }}>Varsler</span>
@@ -122,7 +122,7 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
           const red = c.boat.flag === 'red';
           return (
             <div key={id} className={red ? 'alert-red' : 'alert-yellow'} style={{ borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, ...(red ? { background: 'rgba(120,42,38,.3)' } : {}) }}>
-              <AlertHead badge="!" badgeStyle={red ? { background: '#E5484D', color: '#fff' } : { background: '#F7B955', color: '#0B0E11' }}
+              <AlertHead badge="!" badgeStyle={red ? { background: '#E5484D', color: '#fff' } : { background: '#F7B955', color: '#1A231E' }}
                 title={`${red ? 'Rødt flagg' : 'Gult varsel'}: ${c.boat.name}`}
                 sub={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{dayRelative(c.service_date)} {osloTime(c.eta)} · <QuayMark quay={c.quay} compact /></span>}
                 open={isOpen} onClick={() => toggle(id)} />
@@ -146,14 +146,14 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
         )}
         {a.notifications.slice(0, 12).map(n => (
           <button key={n.id} type="button" onClick={() => { if (!n.read_at) read.mutate({ ids: [n.id] }); goTo(n.port_call_id, n.kind === 'mention' ? 'chat' : undefined); }}
-            style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 18, padding: '10px 14px', border: '1px solid rgba(255,255,255,.06)', background: n.read_at ? 'rgba(255,255,255,.03)' : 'rgba(157,184,255,.12)', display: 'flex', flexDirection: 'column' }}>
+            style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 18, padding: '10px 14px', border: '1px solid rgba(var(--tint), .06)', background: n.read_at ? 'rgba(var(--tint), .03)' : 'rgba(128,239,222,.12)', display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontSize: 14 }}>{n.text}</span>
-            <span className="n" style={{ fontSize: 12, color: 'rgba(243,245,246,.6)' }}>{dayRelative(n.created_at.slice(0, 10))} {osloTime(n.created_at)}</span>
+            <span className="n" style={{ fontSize: 12, color: 'rgba(var(--tint), .6)' }}>{dayRelative(n.created_at.slice(0, 10))} {osloTime(n.created_at)}</span>
           </button>
         ))}
 
         {!a.collisions.length && !a.flagged.length && !a.notifications.length && (
-          <p style={{ margin: 0, padding: '12px 16px', borderRadius: 18, background: 'rgba(91,214,138,.1)', color: '#9BE7B6', fontSize: 14 }}>Ingen aktive varsler.</p>
+          <p style={{ margin: 0, padding: '12px 16px', borderRadius: 18, background: 'rgba(91,214,138,.1)', color: 'var(--ok-fg)', fontSize: 14 }}>Ingen aktive varsler.</p>
         )}
       </section>
     </div>
@@ -169,7 +169,7 @@ function AlertHead({ badge, badgeStyle, title, sub, open, onClick }: {
       <span className="n" style={{ width: 20, height: 20, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, marginTop: 2, ...badgeStyle }}>{badge}</span>
       <span style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
         <span style={{ fontSize: 15 }}>{title}</span>
-        <span style={{ fontSize: 12, color: 'rgba(243,245,246,.6)' }}>{sub}</span>
+        <span style={{ fontSize: 12, color: 'rgba(var(--tint), .6)' }}>{sub}</span>
       </span>
       <Chevron size={16} style={{ marginTop: 3, transform: open ? 'rotate(180deg)' : undefined }} />
     </button>
@@ -177,8 +177,8 @@ function AlertHead({ badge, badgeStyle, title, sub, open, onClick }: {
 }
 
 const Line = ({ a, b }: { a: string; b: string }) => (
-  <div style={{ borderLeft: '1px solid rgba(243,245,246,.35)', paddingLeft: 12, display: 'flex', flexDirection: 'column' }}>
+  <div style={{ borderLeft: '1px solid rgba(var(--tint), .35)', paddingLeft: 12, display: 'flex', flexDirection: 'column' }}>
     <span style={{ fontSize: 14 }}>{a}</span>
-    <span className="n" style={{ fontSize: 12, color: 'rgba(243,245,246,.6)' }}>{b}</span>
+    <span className="n" style={{ fontSize: 12, color: 'rgba(var(--tint), .6)' }}>{b}</span>
   </div>
 );

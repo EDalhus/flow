@@ -53,8 +53,9 @@ export function AnlopPage() {
           </div>
         </div>
 
-        <section className="glass" aria-label="Anløpsliste" style={{ overflow: 'hidden' }}>
-          <div className="arow hide-s" style={{ fontSize: 12, color: 'var(--fg-55)', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+        <section className="panel-light scroll" aria-label="Anløpsliste" style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+          <div style={{ minWidth: 960 }}>
+          <div className="arow hide-s" style={{ fontSize: 12, color: 'var(--fg-55)', borderBottom: '1px solid rgba(var(--tint), .07)' }}>
             <span>Tid</span><span>Båt</span><span>Type</span><span>Kai</span><span>Varer</span><span>Mannskap</span><span>Status</span>
           </div>
           <div className="scroll" style={{ maxHeight: 'calc(100vh - 290px)', minHeight: 200 }}>
@@ -72,6 +73,7 @@ export function AnlopPage() {
             })}
             {calls.isSuccess && !days.length && <p className="empty">Ingen anløp matcher søket.</p>}
           </div>
+          </div>
         </section>
       </div>
 
@@ -88,25 +90,25 @@ function Row({ call: c, fresh }: { call: PortCallView; fresh: boolean }) {
   const boats = [...new Set(c.collisions.flatMap(x => x.with.map(w => w.boat_name)))];
   return (
     <Link to={`/?id=${c.id}`} className="arow arow-link" aria-label={`${c.boat.name}, ${timeRange(c)} – åpne i kartet`}
-      style={{ borderTop: '1px solid rgba(255,255,255,.05)', ...(fresh ? { background: 'rgba(157,184,255,.08)' } : c.status === 'ferdig' ? { opacity: .55 } : {}) }}>
+      style={{ borderTop: '1px solid rgba(var(--tint), .05)', ...(fresh ? { background: 'rgba(128,239,222,.08)' } : c.status === 'ferdig' ? { opacity: .55 } : {}) }}>
       <span className="n" style={{ fontSize: 15 }}>{timeRange(c)}</span>
       <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <span style={{ fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
           {c.boat.name}
-          {fresh && <span style={{ fontSize: 11, borderRadius: 999, padding: '1px 8px', background: '#9DB8FF', color: '#0B0E11' }}>Ny</span>}
+          {fresh && <span style={{ fontSize: 11, borderRadius: 999, padding: '1px 8px', background: '#80EFDE', color: '#1A231E' }}>Ny</span>}
         </span>
         <BoatFlagLine boat={c.boat} />
       </span>
-      <span style={{ fontSize: 14, color: 'rgba(243,245,246,.8)' }}>{typeLabel(c.type)}</span>
+      <span style={{ fontSize: 14, color: 'rgba(var(--tint), .8)' }}>{typeLabel(c.type)}</span>
       <span style={{ fontSize: 14, minWidth: 0 }}><QuayMark quay={c.quay} compact /></span>
-      <span style={{ fontSize: 14, color: 'rgba(243,245,246,.8)' }}>{goodsShort(c.goods) || '–'}</span>
+      <span style={{ fontSize: 14, color: 'rgba(var(--tint), .8)' }}>{goodsShort(c.goods) || '–'}</span>
       <span style={{ display: 'flex', flexDirection: 'column', fontSize: 13, lineHeight: 1.35 }}>
-        <span style={{ color: crew.ansWarn ? '#F7C873' : undefined }}>{crew.ansText}</span>
+        <span style={{ color: crew.ansWarn ? 'var(--warn-fg)' : undefined }}>{crew.ansText}</span>
         <span style={{ color: 'var(--fg-55)' }}>{crew.crewText}</span>
       </span>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
         <StatusBadge status={c.status} basis={c.status_basis} />
-        {c.collisions.length > 0 && <span style={{ fontSize: 12, color: '#FF9A91' }}>{boats.length ? `Kolliderer med ${boats.join(', ')}` : c.collisions[0].text}</span>}
+        {c.collisions.length > 0 && <span style={{ fontSize: 12, color: 'var(--bad-fg)' }}>{boats.length ? `Kolliderer med ${boats.join(', ')}` : c.collisions[0].text}</span>}
       </span>
     </Link>
   );
@@ -206,11 +208,11 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
       </label>
       {boat && f && (
         <div className={boat.flag === 'red' ? 'alert-red' : boat.flag === 'yellow' ? 'alert-yellow' : ''}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, borderRadius: 16, padding: '10px 12px', ...(boat.flag === 'green' || boat.flag === 'none' ? { background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)' } : {}) }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 10, borderRadius: 16, padding: '10px 12px', ...(boat.flag === 'green' || boat.flag === 'none' ? { background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)' } : {}) }}>
           <span className="dot" style={{ width: 8, height: 8, background: f.dot }} />
           <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.35, fontSize: 13 }}>
             <span>{FLAG_LABEL[boat.flag]}{boat.rating_count ? ` · ${fr(boat.avg_total)} av 5 · ${boat.rating_count} kaibøker` : ''}</span>
-            <span style={{ color: 'rgba(243,245,246,.65)' }}>{boat.note ?? boat.flag_reason}</span>
+            <span style={{ color: 'rgba(var(--tint), .65)' }}>{boat.note ?? boat.flag_reason}</span>
           </span>
         </div>
       )}
@@ -271,7 +273,7 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
                   <input className="inp n" type="number" min={1} inputMode="numeric" value={l.quantity} placeholder="Antall"
                     onChange={e => setLines(lines.map((x, j) => (j === i ? { ...x, quantity: e.target.value } : x)))} />
                 </label>
-                <span style={{ fontSize: 14, color: 'rgba(243,245,246,.7)' }}>
+                <span style={{ fontSize: 14, color: 'rgba(var(--tint), .7)' }}>
                   {g.sku?.unit === 'pall' ? 'paller' : 'BB'}{g.sku && g.qty ? ` = ${nb((g.qty * g.sku.kg_per_unit) / 1000)} tonn` : ''}
                 </span>
               </div>
@@ -286,7 +288,7 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
       <div className="field"><span>Roller som trengs</span>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {CREW_ROLES.map(r => (
-            <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 48, padding: '2px 4px 2px 14px', borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.06)' }}>
+            <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 48, padding: '2px 4px 2px 14px', borderRadius: 16, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .06)' }}>
               <span style={{ flex: 1 }}>{CREW_ROLE_LABEL[r]}</span>
               <button type="button" className="icon-btn pill" onClick={() => setRoles({ ...roles, [r]: Math.max(0, roles[r] - 1) })} aria-label={`Én ${CREW_ROLE_LABEL[r].toLowerCase()} mindre`} style={{ width: 40, height: 40 }}><Minus size={14} strokeWidth={2} /></button>
               <span className="n" style={{ width: 22, textAlign: 'center', fontSize: 17 }} aria-live="polite">{roles[r]}</span>
@@ -294,7 +296,7 @@ function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; 
             </div>
           ))}
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, padding: '0 6px', fontSize: 14, cursor: 'pointer' }}>
-            <input type="checkbox" checked={crane} onChange={e => setCrane(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#F3F5F6' }} />
+            <input type="checkbox" checked={crane} onChange={e => setCrane(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#F2F5F3' }} />
             Båtens egen kran brukes
           </label>
           <span style={{ fontSize: 12, color: 'var(--fg-55)', padding: '0 6px' }}>
@@ -332,10 +334,10 @@ function CheckBox({ timesOk, check, error, boats, onApply }: {
   const unique = suggestions.filter((s, i) => suggestions.findIndex(x => x.text === s.text) === i);
   return (
     <div role="status" className={cls}
-      style={{ borderRadius: 16, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14, ...(cls ? {} : { background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)' }) }}>
+      style={{ borderRadius: 16, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14, ...(cls ? {} : { background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)' }) }}>
       <span>{title}</span>
       {timesOk && check?.collisions.map((c, i) => (
-        <span key={i} style={{ fontSize: 13, color: 'rgba(243,245,246,.72)' }}>
+        <span key={i} style={{ fontSize: 13, color: 'rgba(var(--tint), .72)' }}>
           {c.with.map(w => w.boat_name || boats.get(w.id)).filter(Boolean).join(', ') || 'Kapasitet'}: {c.text}
         </span>
       ))}

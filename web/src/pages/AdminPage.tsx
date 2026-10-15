@@ -52,8 +52,8 @@ function UsersSection() {
           {users.isPending && <Loading />}
           {(users.data ?? []).map(u => (
             <button key={u.id} type="button" onClick={() => setEditing(u)}
-              style={{ width: '100%', textAlign: 'left', cursor: 'pointer', display: 'grid', gridTemplateColumns: '46px minmax(160px, 1.2fr) minmax(180px, 1.4fr) minmax(160px, 1fr)', gap: 14, alignItems: 'center', padding: '12px 18px', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,.05)', opacity: u.active ? 1 : .5 }}>
-              <span style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{u.initials}</span>
+              style={{ width: '100%', textAlign: 'left', cursor: 'pointer', display: 'grid', gridTemplateColumns: '46px minmax(160px, 1.2fr) minmax(180px, 1.4fr) minmax(160px, 1fr)', gap: 14, alignItems: 'center', padding: '12px 18px', background: 'transparent', border: 'none', borderTop: '1px solid rgba(var(--tint), .05)', opacity: u.active ? 1 : .5 }}>
+              <span style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(var(--tint), .08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{u.initials}</span>
               <span style={{ display: 'flex', flexDirection: 'column' }}>
                 <span>{u.name} <span className="muted" style={{ fontSize: 13 }}>· {u.short_name}</span></span>
                 <span className="muted" style={{ fontSize: 13 }}>{u.email}{u.active ? '' : ' · deaktivert'}</span>
@@ -110,13 +110,13 @@ function QuaysSection() {
 }
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
-  return <div style={{ padding: '10px 18px 4px', fontSize: 12, color: 'var(--fg-55)', borderTop: '1px solid rgba(255,255,255,.05)' }}>{children}</div>;
+  return <div style={{ padding: '10px 18px 4px', fontSize: 12, color: 'var(--fg-55)', borderTop: '1px solid rgba(var(--tint), .05)' }}>{children}</div>;
 }
 
 function QuayRow({ quay, onClick }: { quay: Quay; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
-      style={{ width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', padding: '12px 18px', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,.05)', opacity: quay.active ? 1 : .5 }}>
+      style={{ width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', padding: '12px 18px', background: 'transparent', border: 'none', borderTop: '1px solid rgba(var(--tint), .05)', opacity: quay.active ? 1 : .5 }}>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
         <QuayMark quay={quay} />
         <span className="muted" style={{ fontSize: 13 }}>
@@ -183,13 +183,13 @@ function QuayForm({ quay, onDone }: { quay?: Quay; onDone: () => void }) {
           <input className="inp n" value={f.lon} onChange={e => setF({ ...f, lon: e.target.value })} placeholder="6.193" inputMode="decimal" />
         </label>
       </div>
-      <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span style={{ fontSize: 12, color: 'var(--fg-55)' }}>Slik det vises</span>
         <QuayMark quay={preview} />
       </div>
       {quay && (
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, cursor: 'pointer' }}>
-          <input type="checkbox" checked={f.active} onChange={e => setF({ ...f, active: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#F3F5F6' }} />
+          <input type="checkbox" checked={f.active} onChange={e => setF({ ...f, active: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#F2F5F3' }} />
           Aktiv (kan velges på anløp)
         </label>
       )}
@@ -243,7 +243,7 @@ function UserForm({ user, isMe, onDone }: { user?: UserView; isMe: boolean; onDo
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {USER_ROLES.map(r => (
             <button key={r} type="button" className="tab" aria-pressed={f.roles.includes(r)} disabled={isMe && r === 'admin'}
-              onClick={() => setF({ ...f, roles: toggle(f.roles, r) })} style={{ border: '1px solid rgba(255,255,255,.1)' }}>{ROLE_LABEL[r]}</button>
+              onClick={() => setF({ ...f, roles: toggle(f.roles, r) })} style={{ border: '1px solid rgba(var(--tint), .1)' }}>{ROLE_LABEL[r]}</button>
           ))}
         </div>
       </fieldset>
@@ -252,13 +252,13 @@ function UserForm({ user, isMe, onDone }: { user?: UserView; isMe: boolean; onDo
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {CREW_ROLES.map(r => (
             <button key={r} type="button" className="tab" aria-pressed={f.skills.includes(r)}
-              onClick={() => setF({ ...f, skills: toggle(f.skills, r) })} style={{ border: '1px solid rgba(255,255,255,.1)' }}>{CREW_ROLE_LABEL[r]}</button>
+              onClick={() => setF({ ...f, skills: toggle(f.skills, r) })} style={{ border: '1px solid rgba(var(--tint), .1)' }}>{CREW_ROLE_LABEL[r]}</button>
           ))}
         </div>
       </fieldset>
       {user && !isMe && (
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, cursor: 'pointer' }}>
-          <input type="checkbox" checked={f.active} onChange={e => setF({ ...f, active: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#F3F5F6' }} />
+          <input type="checkbox" checked={f.active} onChange={e => setF({ ...f, active: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#F2F5F3' }} />
           Aktiv (kan logge inn)
         </label>
       )}

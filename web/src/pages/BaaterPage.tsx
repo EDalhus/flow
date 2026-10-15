@@ -42,7 +42,7 @@ export function BaaterPage() {
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <div role="group" aria-label="Filtrer på flagg" className="pill seg">
-              {([['alle', 'Alle', '#F3F5F6'], ['red', 'Rødt', '#FF6B5E'], ['yellow', 'Gult', '#F7B955'], ['green', 'Grønt', '#5BD68A']] as const).map(([k, l, c]) => (
+              {([['alle', 'Alle', '#F2F5F3'], ['red', 'Rødt', '#FF6B5E'], ['yellow', 'Gult', '#F7B955'], ['green', 'Grønt', '#5BD68A']] as const).map(([k, l, c]) => (
                 <button key={k} type="button" className="tab" aria-pressed={filter === k} onClick={() => setFilter(k)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span className="dot" style={{ width: 7, height: 7, background: c }} />{l}
                 </button>
@@ -65,7 +65,7 @@ export function BaaterPage() {
             return (
               <button key={b.id} type="button" aria-pressed={on} onClick={() => setParams({ id: b.id }, { replace: true })}
                 style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 24, padding: 18, display: 'flex', flexDirection: 'column', gap: 12, backdropFilter: 'blur(18px)', transition: 'background .2s',
-                  ...(on ? { background: 'linear-gradient(160deg, rgba(255,255,255,.16), rgba(255,255,255,.05))', border: '1px solid rgba(255,255,255,.24)' } : { background: 'rgba(17,21,25,.6)', border: '1px solid rgba(255,255,255,.08)' }) }}>
+                  ...(on ? { background: 'linear-gradient(160deg, rgba(var(--tint), .16), rgba(var(--tint), .05))', border: '1px solid rgba(var(--tint), .24)' } : { background: 'rgba(32,42,36,.6)', border: '1px solid rgba(var(--tint), .08)' }) }}>
                 <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, width: '100%' }}>
                   <span style={{ fontSize: 19, lineHeight: 1.2 }}>{b.name}</span>
                   <FlagBadge flag={b.flag} icon={false} />
@@ -73,7 +73,7 @@ export function BaaterPage() {
                 <BigNumber value={b.rating_count ? b.avg_total : null} />
                 <RatingBars variant="card" values={{ p: b.avg_punctuality, s: b.avg_cooperation, u: b.avg_equipment }} />
                 <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{b.rating_count ? `${b.rating_count} kaibøker · sist ${ddmm(b.last_log_at!)}` : 'Ingen kaibøker ennå'}</span>
-                {next && <span style={{ fontSize: 13, color: '#9DB8FF' }}>Neste: {next}</span>}
+                {next && <span style={{ fontSize: 13, color: '#80EFDE' }}>Neste: {next}</span>}
               </button>
             );
           })}
@@ -124,7 +124,7 @@ function BoatProfile({ id, onEdit }: { id: string; onEdit?: () => void }) {
       <RatingBars values={{ p: b.avg_punctuality, s: b.avg_cooperation, u: b.avg_equipment }} />
 
       {next && b.next_call && (
-        <Link to={`/?id=${b.next_call.id}`} style={{ borderRadius: 18, padding: '12px 14px', background: 'rgba(157,184,255,.1)', border: '1px solid rgba(157,184,255,.2)', display: 'flex', flexDirection: 'column', textDecoration: 'none' }}>
+        <Link to={`/?id=${b.next_call.id}`} style={{ borderRadius: 18, padding: '12px 14px', background: 'rgba(128,239,222,.1)', border: '1px solid rgba(128,239,222,.2)', display: 'flex', flexDirection: 'column', textDecoration: 'none' }}>
           <span style={{ fontSize: 12, color: 'var(--fg-62)' }}>Neste anløp</span>
           <span>{next}</span>
         </Link>
@@ -136,11 +136,11 @@ function BoatProfile({ id, onEdit }: { id: string; onEdit?: () => void }) {
           {contacts.map(([kind, name, phone]) => (
             <a key={kind} className="tel" href={telHref(phone)} style={{ minHeight: 56, padding: '8px 8px 8px 14px', borderRadius: 18 }} aria-label={`Ring ${kind.toLowerCase()}, ${name}`}>
               <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3, flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: 12, color: 'rgba(243,245,246,.6)' }}>{kind}</span>
+                <span style={{ fontSize: 12, color: 'rgba(var(--tint), .6)' }}>{kind}</span>
                 <span style={{ fontSize: 14 }}>{name}</span>
               </span>
               <span className="n" style={{ fontSize: 13, color: 'var(--fg-75)' }}>{phone}</span>
-              <span style={{ width: 36, height: 36, flex: 'none', borderRadius: '50%', background: '#5BD68A', color: '#0B0E11', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Phone size={15} strokeWidth={2} /></span>
+              <span style={{ width: 36, height: 36, flex: 'none', borderRadius: '50%', background: '#5BD68A', color: '#1A231E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Phone size={15} strokeWidth={2} /></span>
             </a>
           ))}
         </div>
@@ -149,9 +149,9 @@ function BoatProfile({ id, onEdit }: { id: string; onEdit?: () => void }) {
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>Siste kaibøker</h3>
         {b.recent_logs.map(l => (
-          <div key={l.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.06)', display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span className="n" style={{ fontSize: 12, color: 'rgba(243,245,246,.6)' }}>
-              {ddmm(l.delivered_at)} · {l.delivered_by?.short_name} · {fr(l.avg)}/5{l.had_deviation && <span style={{ color: '#FF8A80' }}> · Avvik</span>}
+          <div key={l.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(var(--tint), .06)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <span className="n" style={{ fontSize: 12, color: 'rgba(var(--tint), .6)' }}>
+              {ddmm(l.delivered_at)} · {l.delivered_by?.short_name} · {fr(l.avg)}/5{l.had_deviation && <span style={{ color: 'var(--bad-fg)' }}> · Avvik</span>}
             </span>
             <span style={{ fontSize: 14 }}>{l.had_deviation && l.description ? l.description : l.boat_note ?? '—'}</span>
           </div>
@@ -170,7 +170,7 @@ function FlagOverride({ boat }: { boat: BoatView }) {
 
   if (boat.flag_overridden && !open) {
     return (
-      <div style={{ borderRadius: 16, padding: '10px 12px', background: 'rgba(255,255,255,.04)', border: '1px dashed rgba(243,245,246,.25)', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+      <div style={{ borderRadius: 16, padding: '10px 12px', background: 'rgba(var(--tint), .04)', border: '1px dashed rgba(var(--tint), .25)', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
         <span className="muted">Overstyrt av {boat.flag_override_by?.short_name ?? 'ukjent'} · automatisk ville vært «{FLAG_LABEL[boat.flag_auto]}»</span>
         <div style={{ display: 'flex', gap: 6 }}>
           <button type="button" className="btn" style={{ minHeight: 36, fontSize: 13 }} onClick={() => { setFlag(boat.flag); setOpen(true); }}>Endre</button>
@@ -184,11 +184,11 @@ function FlagOverride({ boat }: { boat: BoatView }) {
   }
   return (
     <form onSubmit={e => { e.preventDefault(); mut.mutate({ flag, reason }, { onSuccess: () => { setOpen(false); setReason(''); } }); }}
-      style={{ borderRadius: 18, padding: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      style={{ borderRadius: 18, padding: 12, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div role="group" aria-label="Flagg" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {FLAGS.map(f => (
           <button key={f} type="button" aria-pressed={flag === f} onClick={() => setFlag(f)} className="badge"
-            style={{ cursor: 'pointer', minHeight: 34, fontSize: 13, background: flag === f ? FLAG_STYLE[f].bg : 'transparent', color: FLAG_STYLE[f].c, border: `1px solid ${flag === f ? FLAG_STYLE[f].c : 'rgba(255,255,255,.12)'}` }}>
+            style={{ cursor: 'pointer', minHeight: 34, fontSize: 13, background: flag === f ? FLAG_STYLE[f].bg : 'transparent', color: FLAG_STYLE[f].c, border: `1px solid ${flag === f ? FLAG_STYLE[f].c : 'rgba(var(--tint), .12)'}` }}>
             {FLAG_LABEL[f]}
           </button>
         ))}

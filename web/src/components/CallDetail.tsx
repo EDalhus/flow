@@ -55,9 +55,9 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
             {call.goods.map(g => {
               const [q, d] = goodsParts(g);
               return (
-                <div key={g.id} style={{ display: 'flex', gap: 12, alignItems: 'baseline', padding: '6px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+                <div key={g.id} style={{ display: 'flex', gap: 12, alignItems: 'baseline', padding: '6px', borderBottom: '1px solid rgba(var(--tint), .06)' }}>
                   <span className="n" style={{ fontSize: 15, minWidth: 70 }}>{q}</span>
-                  <span style={{ fontSize: 14, color: 'rgba(243,245,246,.8)' }}>{d}</span>
+                  <span style={{ fontSize: 14, color: 'rgba(var(--tint), .8)' }}>{d}</span>
                 </div>
               );
             })}
@@ -72,17 +72,17 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
             ].filter((x): x is string[] => !!x).map(([kind, name, phone]) => (
               <a key={kind} className="tel" href={telHref(phone)} aria-label={`Ring ${kind.toLowerCase()}, ${name}, ${phone}`}
                 style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1, padding: '9px 12px', minHeight: 64, minWidth: 0 }}>
-                <span style={{ fontSize: 11, color: 'rgba(243,245,246,.6)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 11, color: 'rgba(var(--tint), .6)', display: 'flex', alignItems: 'center', gap: 5 }}>
                   <Phone size={11} strokeWidth={2.4} style={{ color: '#5BD68A' }} />{kind}
                 </span>
                 <span style={{ fontSize: 13, maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
-                <span className="n" style={{ fontSize: 12, color: '#8FE3AE' }}>{telShort(phone)}</span>
+                <span className="n" style={{ fontSize: 12, color: '#80EFDE' }}>{telShort(phone)}</span>
               </a>
             ))}
           </div>
 
           {call.status === 'ferdig' ? (
-            <div style={{ borderRadius: 16, padding: '14px 16px', background: 'rgba(163,172,179,.12)', color: '#D3D8DC', fontSize: 14 }}>Ferdig – kaibok er levert for dette anløpet.</div>
+            <div style={{ borderRadius: 16, padding: '14px 16px', background: 'rgba(177,194,183,.12)', color: '#D6E0D9', fontSize: 14 }}>Ferdig – kaibok er levert for dette anløpet.</div>
           ) : canQuayLog(me.data) ? (
             <button type="button" className="btn btn-w" onClick={onOpenKaibok} style={{ minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 15 }}>
               <Check size={17} strokeWidth={2.2} />Ferdigstill og fyll ut kaibok
@@ -110,10 +110,10 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ margin: '0 6px 4px', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>Siste kaibøker</h3>
             {(boat.data?.recent_logs ?? []).slice(0, 5).map(l => (
-              <div key={l.id} style={{ padding: '10px 6px', borderBottom: '1px solid rgba(255,255,255,.06)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span className="n" style={{ fontSize: 12, color: 'rgba(243,245,246,.6)' }}>
+              <div key={l.id} style={{ padding: '10px 6px', borderBottom: '1px solid rgba(var(--tint), .06)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span className="n" style={{ fontSize: 12, color: 'rgba(var(--tint), .6)' }}>
                   {ddmm(l.delivered_at)} · {l.delivered_by?.short_name} · {fr(l.avg)}/5
-                  {l.had_deviation && <span style={{ color: '#FF8A80' }}> · Avvik</span>}
+                  {l.had_deviation && <span style={{ color: 'var(--bad-fg)' }}> · Avvik</span>}
                 </span>
                 <span style={{ fontSize: 14 }}>{l.boat_note ?? l.description ?? '—'}</span>
               </div>
@@ -134,9 +134,9 @@ function ClashButton({ collisions, onClick }: { collisions: CollisionView[]; onC
       <span className="dot" style={{ width: 8, height: 8, background: '#E5484D' }} />
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
         <span style={{ fontSize: 14 }}>{boats.length ? `Kolliderer med ${boats.join(', ')}` : 'Kapasitet overskredet'}</span>
-        <span style={{ fontSize: 12, color: 'rgba(243,245,246,.65)' }}>{collisions.map(c => c.text).join(' · ')}</span>
+        <span style={{ fontSize: 12, color: 'rgba(var(--tint), .65)' }}>{collisions.map(c => c.text).join(' · ')}</span>
       </span>
-      <span style={{ flex: 'none', fontSize: 13, borderRadius: 999, padding: '6px 12px', background: 'rgba(255,255,255,.1)' }}>Løs</span>
+      <span style={{ flex: 'none', fontSize: 13, borderRadius: 999, padding: '6px 12px', background: 'rgba(var(--tint), .1)' }}>Løs</span>
     </button>
   );
 }
@@ -166,7 +166,7 @@ function CrewEditor({ call, users }: { call: PortCallView; users: UserView[] }) 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, margin: '0 6px' }}>
         <h3 style={{ margin: 0, fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>Mannskap</h3>
-        {call.crew.length > 0 && <span style={{ fontSize: 13, color: call.responsible ? 'var(--fg-62)' : '#F7C873' }}>{ansText}</span>}
+        {call.crew.length > 0 && <span style={{ fontSize: 13, color: call.responsible ? 'var(--fg-62)' : 'var(--warn-fg)' }}>{ansText}</span>}
       </div>
       {call.crew.map((s, i) => {
         const who = s.user?.id ?? '';
@@ -177,33 +177,33 @@ function CrewEditor({ call, users }: { call: PortCallView; users: UserView[] }) 
           <div key={s.id} style={{
             display: 'flex', alignItems: 'center', gap: 8, minHeight: 46, padding: '3px 3px 3px 12px', borderRadius: 16,
             ...(hit ? { background: 'rgba(255,107,94,.12)', border: '1px solid rgba(255,107,94,.35)' }
-              : who ? { background: 'rgba(255,255,255,.035)', border: '1px solid rgba(255,255,255,.06)' }
+              : who ? { background: 'rgba(var(--tint), .035)', border: '1px solid rgba(var(--tint), .06)' }
               : { background: 'rgba(247,185,85,.07)', border: '1px dashed rgba(247,185,85,.4)' }),
           }}>
-            <label htmlFor={`crew-${s.id}`} style={{ width: 84, flex: 'none', fontSize: 13, color: 'rgba(243,245,246,.68)' }}>{CREW_ROLE_LABEL[s.crew_role]}</label>
+            <label htmlFor={`crew-${s.id}`} style={{ width: 84, flex: 'none', fontSize: 13, color: 'rgba(var(--tint), .68)' }}>{CREW_ROLE_LABEL[s.crew_role]}</label>
             <select id={`crew-${s.id}`} className="sel" value={who} disabled={!editable || put.isPending}
               onChange={e => save(slots.map((x, j) => (j === i ? { ...x, user_id: e.target.value || null } : x)))}
-              style={who ? undefined : { color: '#F7C873' }}>
+              style={who ? undefined : { color: 'var(--warn-fg)' }}>
               <option value="">Velg person</option>
               {options.map(u => <option key={u.id} value={u.id}>{u.short_name}</option>)}
             </select>
-            {auto && who && <span style={{ fontSize: 12, flex: 'none', minHeight: 40, padding: '0 12px', borderRadius: 999, background: '#F3F5F6', color: '#0B0E11', display: 'flex', alignItems: 'center' }}>Ansvarlig</span>}
+            {auto && who && <span style={{ fontSize: 12, flex: 'none', minHeight: 40, padding: '0 12px', borderRadius: 999, background: '#F2F5F3', color: '#1A231E', display: 'flex', alignItems: 'center' }}>Ansvarlig</span>}
             {!auto && who && editable && (
               <button type="button" aria-pressed={isAns} aria-label={isAns ? `${s.user?.short_name} er ansvarlig` : `Gjør ${s.user?.short_name} til ansvarlig`}
                 onClick={() => save(slots, isAns ? null : who)} disabled={put.isPending}
                 style={{ fontSize: 12, cursor: 'pointer', flex: 'none', minHeight: 40, padding: '0 12px', borderRadius: 999,
-                  ...(isAns ? { background: '#F3F5F6', color: '#0B0E11', border: '1px solid #F3F5F6' } : { background: 'transparent', color: 'rgba(243,245,246,.62)', border: '1px dashed rgba(243,245,246,.3)' }) }}>
+                  ...(isAns ? { background: '#F2F5F3', color: '#1A231E', border: '1px solid #F2F5F3' } : { background: 'transparent', color: 'rgba(var(--tint), .62)', border: '1px dashed rgba(var(--tint), .3)' }) }}>
                 Ansvarlig
               </button>
             )}
-            {!auto && isAns && !editable && <span style={{ fontSize: 12, flex: 'none', minHeight: 40, padding: '0 12px', borderRadius: 999, background: '#F3F5F6', color: '#0B0E11', display: 'flex', alignItems: 'center' }}>Ansvarlig</span>}
+            {!auto && isAns && !editable && <span style={{ fontSize: 12, flex: 'none', minHeight: 40, padding: '0 12px', borderRadius: 999, background: '#F2F5F3', color: '#1A231E', display: 'flex', alignItems: 'center' }}>Ansvarlig</span>}
           </div>
         );
       })}
       {!call.crew.length && <span className="muted" style={{ margin: '0 6px', fontSize: 13 }}>Ingen roller satt opp.</span>}
-      {call.boat_crane && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(243,245,246,.6)' }}>+ Båtens egen kran brukes</span>}
+      {call.boat_crane && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .6)' }}>+ Båtens egen kran brukes</span>}
       {!editable && call.crew.some(s => !s.user) && call.status !== 'ferdig' && (
-        <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(243,245,246,.55)' }}>Navn og ansvarlig settes av produksjonen.</span>
+        <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .55)' }}>Navn og ansvarlig settes av produksjonen.</span>
       )}
       {error && <div className="error-box" role="alert">{error}</div>}
     </div>

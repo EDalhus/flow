@@ -3,12 +3,12 @@ import { useSearchParams } from 'react-router';
 import type { PortCallView } from '../../../shared/api.ts';
 import { AlertsPanel, useAlerts } from '../components/Alerts.tsx';
 import { CallDetail, type DetailTab } from '../components/CallDetail.tsx';
-import { Anchor, Check, Clock, Minus, Plus, Target, Warning } from '../components/Icons.tsx';
+import { Anchor, Check, Minus, Plus, Target, TrendUp, Warning } from '../components/Icons.tsx';
 import { KaibokModal } from '../components/KaibokForm.tsx';
-import { Topbar } from '../components/Topbar.tsx';
+import { Sidebar, Topbar } from '../components/Topbar.tsx';
 import { FlagBadge, Loading, QuayMark, Rating, Segmented, StatusBadge } from '../components/ui.tsx';
 import { ATTRIBUTION, FlowMap, type MapHandle, type Project } from '../map/FlowMap.tsx';
-import { STATUS_STYLE, addDays, crewSummary, dayHeading, goodsShort, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
+import { STATUS_STYLE, addDays, nb, crewSummary, dayHeading, goodsShort, isOwnQuay, osloTime, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useAis, useMe, usePortCalls, useQuays, useSettings } from '../lib/queries.ts';
 import { AisCheck } from '../components/AisCheck.tsx';
 import { VesselLayer, aisLive } from '../map/Vessels.tsx';
@@ -71,6 +71,13 @@ export function KartPage() {
     { n: list.filter(c => c.service_date === tomorrow).length, label: 'i morgen' },
   ];
   const clashCount = active.filter(c => c.collisions.length).length;
+  const tonnesToday = todays.reduce((t, c) => t + c.tonnes_in + c.tonnes_out, 0);
+  const stats = [
+    { label: 'Anløp i dag', value: String(counts[0].n), note: `${todays.filter(c => c.status !== 'ferdig').length} gjenstår` },
+    { label: 'Ved kai nå', value: String(counts[1].n), note: '' },
+    { label: 'På vei til oss', value: String(counts[2].n), note: '' },
+    { label: 'Tonn over kaia i dag', value: nb(tonnesToday), note: `${counts[3].n} anløp i morgen` },
+  ];
   const groups = [today, tomorrow].map(d => ({
     date: d,
     title: d === today ? 'I dag' : dayHeading(d, today),
@@ -121,8 +128,8 @@ export function KartPage() {
     return (
       <>
         {quayPt && (
-          <span style={{ position: 'absolute', left: quayPt[0], top: quayPt[1], transform: 'translate(-50%, -150%)', display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(243,245,246,.95)', color: '#0B0E11', borderRadius: 999, padding: '4px 10px 4px 6px', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#0B0E11', color: '#F3F5F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Anchor size={11} /></span>
+          <span style={{ position: 'absolute', left: quayPt[0], top: quayPt[1], transform: 'translate(-50%, -150%)', display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(242,245,243,.95)', color: '#1A231E', borderRadius: 999, padding: '4px 10px 4px 6px', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#1A231E', color: 'var(--fg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Anchor size={11} /></span>
             Vår kai · {(() => {
               const own = (quays.data ?? []).filter(x => !x.company);
               return own.length ? own.map(x => quayTitle(x)).join(' · ') : 'Flatholmen';
@@ -138,11 +145,12 @@ export function KartPage() {
   };
 
   return (
-    <div className="kart">
+    <div className={`kart${selected ? ' has-sel' : ''}`}>
+      <Sidebar />
       <div className="kart-mapwrap" style={{ position: 'absolute', inset: 0 }}>
         {settings.isSuccess && (
           <FlowMap ref={mapRef} center={[fence.lon - 0.06, fence.lat + 0.004]} zoom={11.4}
-            padding={{ top: 96, bottom: 228, left: 404, right: 404 }} geofence={fence} overlays={overlays} />
+            padding={{ top: 120, bottom: 236, left: 520, right: 320 }} geofence={fence} overlays={overlays} />
         )}
         <span className="kart-attr ov-hide">{ATTRIBUTION}</span>
       </div>
@@ -159,39 +167,31 @@ export function KartPage() {
       </div>
 
       <div className="ov kart-title">
-        <h1 style={{ margin: 0, fontSize: 60, fontWeight: 300, letterSpacing: '-0.035em', lineHeight: 1, textShadow: '0 2px 24px rgba(0,0,0,.5)' }}>Flatholmen</h1>
-        <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto', flexWrap: 'wrap' }}>
-          <span className="pill" style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 42, padding: '0 16px', backdropFilter: 'blur(16px)', background: 'rgba(17,21,25,.55)', fontSize: 14 }}>
-            <Clock size={16} />
-            <span>{WEEKDAYS[new Date(`${today}T12:00:00Z`).getUTCDay()]} {Number(today.slice(8))}. {MONTHS[Number(today.slice(5, 7)) - 1]} · <span className="n">{osloTime(now)}</span></span>
-          </span>
-          <button type="button" className="pill" onClick={isAdmin ? () => setAisCheck(!aisCheck) : undefined} aria-expanded={isAdmin ? aisCheck : undefined}
-            title={`${ais.data?.status?.message ?? ''}${ais.data?.status?.checked_at ? ` (sjekket ${osloTime(ais.data.status.checked_at)})` : ''}${isAdmin ? ' – klikk for å sjekke' : ''}`.trim()}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 42, padding: '0 16px', backdropFilter: 'blur(16px)', background: 'rgba(17,21,25,.55)', fontSize: 14, cursor: isAdmin ? 'pointer' : 'default' }}>
-            <span className={live ? 'dot ping' : 'dot'} style={{ width: 8, height: 8, background: live ? '#5BD68A' : '#A3ACB3' }} />
-            {aisText}
+        <h1 style={{ margin: 0, fontSize: 76, fontWeight: 300, letterSpacing: '-0.04em', lineHeight: 1, textShadow: '0 2px 30px rgba(0,0,0,.45)' }}>Flatholmen</h1>
+        <div style={{ display: 'flex', gap: 10, pointerEvents: 'auto', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+          <button type="button" onClick={isAdmin ? () => setAisCheck(!aisCheck) : undefined} aria-expanded={isAdmin ? aisCheck : undefined}
+            title={`${aisText}${ais.data?.status?.checked_at ? ` (sjekket ${osloTime(ais.data.status.checked_at)})` : ''}${isAdmin ? ' – klikk for å sjekke' : ''}`}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 36, padding: '0 6px', background: 'none', border: 'none', cursor: isAdmin ? 'pointer' : 'default', color: 'var(--fg)' }}>
+            <span className={live ? 'dot ping' : 'dot'} style={{ width: 8, height: 8, background: live ? 'var(--aqua)' : 'var(--sage)' }} />
+            <span className="eyebrow" style={{ color: 'var(--fg)' }}>{live ? 'AIS live' : ais.data?.status?.configured === false ? 'AIS ikke tilkoblet' : 'AIS venter'}</span>
+            <span className="n" style={{ fontSize: 15, color: 'var(--sage)' }}>
+              {WEEKDAYS[new Date(`${today}T12:00:00Z`).getUTCDay()].slice(0, 3)} {Number(today.slice(8))}. {MONTHS[Number(today.slice(5, 7)) - 1]} · {osloTime(now)}
+            </span>
           </button>
           {alertSummary && (
             <button type="button" className="pill" onClick={() => setAlertsOpen(!alertsOpen)} aria-expanded={alertsOpen}
-              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 42, padding: '0 16px', backdropFilter: 'blur(16px)', background: 'rgba(120,42,38,.55)', borderColor: 'rgba(255,107,94,.25)', fontSize: 14 }}>
-              <span className="dot" style={{ width: 8, height: 8, background: '#E5484D' }} />{alertSummary}
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 36, padding: '0 14px', backdropFilter: 'blur(16px)', background: 'rgba(120,42,38,.55)', borderColor: 'rgba(255,107,94,.25)', fontSize: 13 }}>
+              <span className="dot" style={{ width: 7, height: 7, background: '#E5484D' }} />{alertSummary}
             </button>
           )}
         </div>
-        {aisCheck && <div style={{ pointerEvents: 'auto' }}><AisCheck onClose={() => setAisCheck(false)} /></div>}
+        {aisCheck && <div style={{ pointerEvents: 'auto', textAlign: 'left' }}><AisCheck onClose={() => setAisCheck(false)} /></div>}
       </div>
 
       <aside className="ov glass scroll kart-left" aria-label="Anløp">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
-          {counts.map(c => (
-            <div key={c.label} className="pill" style={{ minHeight: 52, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.2, borderRadius: 18 }}>
-              <span className="n" style={{ fontSize: 17 }}>{c.n}</span>
-              <span style={{ fontSize: 12, color: 'var(--fg-62)' }}>{c.label}</span>
-            </div>
-          ))}
-        </div>
+        <span className="eyebrow" style={{ padding: '4px 6px 0' }}>Anløp i dag og i morgen</span>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-          <Stat icon={<span style={{ width: 22, height: 22, borderRadius: '50%', background: '#5BD68A', color: '#0B0E11', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={13} strokeWidth={3} /></span>}
+          <Stat icon={<span style={{ width: 22, height: 22, borderRadius: '50%', background: '#5BD68A', color: '#1A231E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={13} strokeWidth={3} /></span>}
             label="I rute" value={active.length - clashCount} />
           <Stat icon={<Warning />} label="Kollisjon" value={clashCount} onClick={clashCount ? () => setFilter('kollisjon') : undefined} />
         </div>
@@ -209,10 +209,26 @@ export function KartPage() {
         {calls.isSuccess && !groups.length && <p className="empty" style={{ padding: 20 }}>Ingen anløp i dette filteret.</p>}
       </aside>
 
+      {!selected && (
+        <aside className="ov kart-stats" aria-label="Hovedtall">
+          <h2 style={{ margin: '0 0 4px', fontSize: 32, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.08 }}>Hovedtall<br />i dag</h2>
+          {stats.map(st => (
+            <div key={st.label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ fontSize: 14, color: 'var(--sage)' }}>{st.label}</span>
+              <span style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                <span className="n" style={{ fontSize: 38, fontWeight: 200, lineHeight: 1.05, letterSpacing: '-0.02em' }}>{st.value}</span>
+                {st.note && <span className="n" style={{ fontSize: 14, color: 'var(--aqua)', display: 'flex', alignItems: 'center', gap: 4 }}><TrendUp size={14} />{st.note}</span>}
+              </span>
+            </div>
+          ))}
+        </aside>
+      )}
+
       <div className="ov kart-zoom">
-        <button type="button" className="icon-btn glass" onClick={() => mapRef.current?.zoomIn()} aria-label="Zoom inn" style={{ borderRadius: '50%' }}><Plus size={18} /></button>
-        <button type="button" className="icon-btn glass" onClick={() => mapRef.current?.flyTo(fence.lon, fence.lat, 14)} aria-label="Sentrer på kaia" style={{ borderRadius: '50%' }}><Target size={19} /></button>
-        <button type="button" className="icon-btn glass" onClick={() => mapRef.current?.zoomOut()} aria-label="Zoom ut" style={{ borderRadius: '50%' }}><Minus size={18} /></button>
+        <span style={{ fontSize: 15, marginRight: 6 }}>Zoom</span>
+        <button type="button" className="zoom-btn" onClick={() => mapRef.current?.zoomIn()} aria-label="Zoom inn"><Plus size={16} /></button>
+        <button type="button" className="zoom-btn" onClick={() => mapRef.current?.zoomOut()} aria-label="Zoom ut"><Minus size={16} /></button>
+        <button type="button" className="zoom-btn solid" onClick={() => mapRef.current?.flyTo(fence.lon, fence.lat, 14)} aria-label="Sentrer på kaia"><Target size={17} /></button>
       </div>
 
       <Timeline calls={todays} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} />
@@ -238,7 +254,7 @@ function Stat({ icon, label, value, onClick }: { icon: React.ReactNode; label: s
       <span className="n" style={{ fontSize: 40, fontWeight: 200, lineHeight: 1 }}>{value}</span>
     </>
   );
-  const style: React.CSSProperties = { borderRadius: 20, background: 'rgba(255,255,255,.035)', border: '1px solid rgba(255,255,255,.06)', padding: '14px 16px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', textAlign: 'left' };
+  const style: React.CSSProperties = { borderRadius: 20, background: 'rgba(var(--tint), .035)', border: '1px solid rgba(var(--tint), .06)', padding: '14px 16px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', textAlign: 'left' };
   return onClick
     ? <button type="button" onClick={onClick} style={{ ...style, cursor: 'pointer' }}>{body}</button>
     : <div style={style}>{body}</div>;
@@ -262,10 +278,10 @@ function CallCard({ call: c, on, onClick }: { call: PortCallView; on: boolean; o
       <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 12 }}>
         <FlagBadge flag={c.boat.flag} />
         <Rating value={c.boat.rating_count ? c.boat.avg_total : null} />
-        <span style={{ color: crew.ansWarn ? '#F7C873' : 'var(--fg-62)' }}>{crew.ansText}{crew.open ? ` · ${crew.open} uten navn` : ''}</span>
+        <span style={{ color: crew.ansWarn ? 'var(--warn-fg)' : 'var(--fg-62)' }}>{crew.ansText}{crew.open ? ` · ${crew.open} uten navn` : ''}</span>
       </span>
       {c.collisions.length > 0 && (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#FF8A80', fontSize: 12 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--bad-fg)', fontSize: 12 }}>
           <span className="dot" style={{ background: '#E5484D' }} />
           {boats.length ? `Kolliderer med ${boats.join(', ')}` : c.collisions[0].text}
         </span>
@@ -295,13 +311,13 @@ function MapCard({ call, x, y, now, today, onChat }: { call: PortCallView; x: nu
   const left = x + 52 + 248 > window.innerWidth - 420 ? x - 52 - 248 : x + 52;
   const top = Math.min(Math.max(y + 44, 230), window.innerHeight - 240 - 170);
   return (
-    <div className="glass ov-hide" style={{ position: 'absolute', left, top, width: 248, padding: '18px 18px 16px', borderRadius: 22, background: 'rgba(40,46,44,.5)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div className="glass ov-hide" style={{ position: 'absolute', left, top, width: 248, padding: '18px 18px 16px', borderRadius: 22, background: 'rgba(51,64,56,.5)', display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: 16 }}>{call.boat.name}</span>
           <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{sub}</span>
         </div>
-        <button type="button" className="icon-btn" onClick={onChat} aria-label="Åpne chat for anløpet" style={{ width: 36, height: 36, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.1)' }}>
+        <button type="button" className="icon-btn" onClick={onChat} aria-label="Åpne chat for anløpet" style={{ width: 36, height: 36, background: 'var(--aqua)', color: 'var(--ink)' }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7" /><path d="M8 7h9v9" /></svg>
         </button>
       </div>
@@ -332,18 +348,18 @@ function Timeline({ calls, selected, onSelect, now, quays }: {
   const nowH = hour(now.toISOString());
 
   return (
-    <section className="ov glass kart-tl" aria-labelledby="tl-h">
+    <section className="ov panel-light kart-tl" aria-labelledby="tl-h">
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <h2 id="tl-h" style={{ margin: 0, fontSize: 16, fontWeight: 400 }}>Kaibelegg i dag</h2>
+          <h2 id="tl-h" style={{ margin: 0, fontSize: 26, fontWeight: 300, letterSpacing: '-0.02em' }}>Kaibelegg i dag</h2>
           <span style={{ fontSize: 13, color: 'var(--fg-62)' }}>{remaining} gjenstående anløp · {zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span>
         </div>
         <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--fg-62)', flexWrap: 'wrap' }}>
           {(['ved_kai', 'paa_vei'] as const).map(s => (
-            <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 7, height: 7, background: STATUS_STYLE[s].c }} />{STATUS_STYLE[s].label}</span>
+            <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 8, height: 8, background: `color-mix(in srgb, ${STATUS_STYLE[s].c} 70%, #1A231E)` }} />{STATUS_STYLE[s].label}</span>
           ))}
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="hatch" style={{ width: 12, height: 8, borderRadius: 2, border: '1px dashed #FF6B5E' }} />Kollisjon</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 7, height: 7, background: '#A3ACB3' }} />Ferdig</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 7, height: 7, background: '#B1C2B7' }} />Ferdig</span>
         </div>
       </div>
       <div style={{ overflowX: 'auto', flex: 1 }}>
@@ -355,7 +371,7 @@ function Timeline({ calls, selected, onSelect, now, quays }: {
               </div>
               <div style={{
                 position: 'relative', flex: 1, height: 38, borderRadius: 12,
-                background: isOwnQuay(qy) ? 'rgba(255,255,255,.03)' : 'rgba(232,176,110,.06)',
+                background: isOwnQuay(qy) ? 'rgba(26,35,30,.05)' : 'rgba(232,176,110,.12)',
                 outline: isOwnQuay(qy) ? undefined : '1px solid rgba(232,176,110,.18)',
               }}>
                 {calls.filter(c => c.quay.id === qy.id).map(c => {
@@ -363,7 +379,7 @@ function Timeline({ calls, selected, onSelect, now, quays }: {
                   const a = hour(c.eta), b = Math.max(a + 0.25, hour(c.etd) < a ? 24 : hour(c.etd));
                   return (
                     <button key={c.id} type="button" onClick={() => onSelect(c.id)} aria-label={`${c.boat.name}, ${timeRange(c)}, ${s.label}`}
-                      style={{ position: 'absolute', top: 4, bottom: 4, left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, borderRadius: 9, padding: '0 10px', fontSize: 12, cursor: 'pointer', textAlign: 'left', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: '#F3F5F6', background: s.bg, border: `1px solid ${selected === c.id ? 'rgba(243,245,246,.85)' : s.c + '55'}` }}>
+                      style={{ position: 'absolute', top: 4, bottom: 4, left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, borderRadius: 9, padding: '0 10px', fontSize: 12, cursor: 'pointer', textAlign: 'left', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: 'var(--fg)', background: `color-mix(in srgb, ${s.solid.startsWith('#') ? s.solid : s.c} 28%, #F2F5F3)`, border: `1.5px solid ${selected === c.id ? 'var(--fg)' : `color-mix(in srgb, ${s.c} 60%, #1A231E)`}` }}>
                       {c.boat.name}
                     </button>
                   );
@@ -371,14 +387,14 @@ function Timeline({ calls, selected, onSelect, now, quays }: {
                 {zones.filter(z => z.kind === 'quay' && z.quay_id === qy.id).map(z => (
                   <div key={z.calls.join()} className="hatch" style={{ position: 'absolute', top: 1, bottom: 1, left: `${pct(hour(z.from))}%`, width: `${pct(hour(z.to)) - pct(hour(z.from))}%`, border: '1px dashed #FF6B5E', borderRadius: 10, pointerEvents: 'none' }} />
                 ))}
-                {nowH >= t0 && nowH <= t1 && <div style={{ position: 'absolute', top: -3, bottom: -3, width: 1.5, background: '#F3F5F6', pointerEvents: 'none', left: `${pct(nowH)}%` }} />}
+                {nowH >= t0 && nowH <= t1 && <div style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--teal)', pointerEvents: 'none', left: `${pct(nowH)}%` }} />}
               </div>
             </div>
           ))}
           <div style={{ display: 'flex' }}>
             <div style={{ width: 118, flex: 'none' }} />
             <div style={{ position: 'relative', flex: 1, height: 16 }}>
-              {ticks.map(h => <span key={h} className="n" style={{ position: 'absolute', top: 0, transform: 'translateX(-50%)', fontSize: 11, color: 'rgba(243,245,246,.5)', left: `${pct(h)}%` }}>{String(h % 24).padStart(2, '0')}</span>)}
+              {ticks.map(h => <span key={h} className="n" style={{ position: 'absolute', top: 0, transform: 'translateX(-50%)', fontSize: 11, color: 'var(--fg-55)', left: `${pct(h)}%` }}>{String(h % 24).padStart(2, '0')}</span>)}
             </div>
           </div>
         </div>

@@ -1,34 +1,62 @@
-/* Flow – felles stiler, hentet fra designtavlene (Kaiplan – Produksjon MVP). */
+/*
+ * Flow – felles stiler.
+ * Farger og prinsipper fra GC Rieber (gcrieber.com): mørk skoggrønn bunn, lys mint tekst,
+ * salvie som dempet tekst, aqua som aksent og teal på handlingsknapper. Pilleknapper med
+ * store, sperrede bokstaver. Oppsett inspirert av «Global View»: smal ikonmeny, stor sentrert
+ * tittel på kartet, hovedtall uten bokser og lyse paneler for tabeller.
+ */
 
 :root {
   color-scheme: dark;
-  --bg: #07090B;
-  --bg-map: #090D11;
-  --ink: #0B0E11;
-  --fg: #F3F5F6;
-  --fg-85: rgba(243, 245, 246, .85);
-  --fg-75: rgba(243, 245, 246, .75);
-  --fg-62: rgba(243, 245, 246, .62);
-  --fg-55: rgba(243, 245, 246, .55);
-  --fg-45: rgba(243, 245, 246, .45);
-  --line: rgba(255, 255, 255, .08);
-  --line-soft: rgba(255, 255, 255, .06);
 
+  /* Flater, fra mørkest til lysest */
+  --bg: #141B17;
+  --bg-map: #16201B;
+  --surface-1: #1C2620;
+  --surface-2: #28332C;      /* GC Rieber hovedbunn */
+  --surface-3: #334038;
+  --surface-4: #3D4D43;
+  --surface-5: #475A4E;
+  --ink: #1A231E;            /* mørk tekst på lyse flater */
+
+  /* Tekst */
+  --fg: #F2F5F3;             /* GC Rieber mint-hvit */
+  --fg-85: rgba(var(--tint), .85);
+  --fg-75: rgba(var(--tint), .75);
+  --fg-62: rgba(var(--tint), .62);
+  --fg-55: rgba(var(--tint), .55);
+  --fg-45: rgba(var(--tint), .45);
+  --sage: #B1C2B7;           /* dempet tekst og navigasjon */
+  --line: rgba(var(--tint), .09);
+  --line-soft: rgba(var(--tint), .06);
+
+  /* Aksenter */
+  --aqua: #80EFDE;           /* valgt, aktiv, «live» */
+  --aqua-soft: rgba(128, 239, 222, .14);
+  --teal: #007E6A;           /* handlingsknapper */
+  --teal-hover: #00927B;
+
+  /* Status (beholdt for lesbarhet, tonet inn i paletten) */
   --green: #5BD68A;
   --green-fg: #7FE0A3;
-  --green-solid: #3DBE6E;
-  --blue: #9DB8FF;
-  --blue-light: #C9D8FF;
   --yellow: #F7B955;
   --yellow-fg: #F7C873;
   --red: #E5484D;
   --red-soft: #FF6B5E;
   --red-fg: #FF8A80;
   --red-fg2: #FF9A91;
-  --grey: #A3ACB3;
-  --focus: #8FB4FF;
+  --grey: #B1C2B7;
+  /* Tekst i statusfarger; mørkere varianter i lyse paneler. */
+  --warn-fg: #F7C873;
+  --bad-fg: #FF9A91;
+  --ok-fg: #7FE0A3;
+  --focus: #80EFDE;
 
-  --font: 'Outfit', system-ui, sans-serif;
+  /* Grunnfarge for halvgjennomsiktige flater, linjer og dempet tekst. Snus i lyse paneler. */
+  --tint: 242, 245, 243;
+
+  --sidebar: 88px;
+  --font: 'Outfit', 'filson-pro', system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -38,92 +66,138 @@ body {
   font-family: var(--font);
   font-size: 15px;
   line-height: 1.45;
+  letter-spacing: .01em;
   -webkit-font-smoothing: antialiased;
 }
 a { color: var(--fg); }
-button, input, select, textarea { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-input::placeholder, textarea::placeholder { color: rgba(243, 245, 246, .45); }
+input::placeholder, textarea::placeholder { color: rgba(var(--tint), .45); }
 
 .n { font-variant-numeric: tabular-nums; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .muted { color: var(--fg-62); }
-.sub { font-size: 13px; color: rgba(243, 245, 246, .6); }
+.sub { font-size: 13px; color: var(--sage); }
 .ttl { margin: 0; font-size: 16px; font-weight: 400; }
+/* Små etiketter med store, sperrede bokstaver («LIVE TRACKING», «HOW IT WORKS»). */
+.eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--sage); }
 
 .glass {
-  background: rgba(17, 21, 25, .66);
-  backdrop-filter: blur(22px) saturate(140%);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  background: rgba(32, 42, 36, .72);
+  backdrop-filter: blur(22px) saturate(130%);
+  -webkit-backdrop-filter: blur(22px) saturate(130%);
   border: 1px solid var(--line);
-  border-radius: 26px;
-  box-shadow: 0 20px 40px -20px rgba(0, 0, 0, .6);
+  border-radius: 28px;
+  box-shadow: 0 24px 48px -24px rgba(0, 0, 0, .55);
 }
-.pill { background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .07); border-radius: 999px; }
-.scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .18) transparent; }
+/* Lyst panel (tabeller, kaibelegg) – som «Activities» i referansen. */
+.panel-light {
+  --fg: #1A231E;
+  --fg-85: rgba(26, 35, 30, .85);
+  --fg-75: rgba(26, 35, 30, .75);
+  --fg-62: rgba(26, 35, 30, .62);
+  --fg-55: rgba(26, 35, 30, .55);
+  --fg-45: rgba(26, 35, 30, .45);
+  --sage: #5E7266;
+  --line: rgba(26, 35, 30, .1);
+  --line-soft: rgba(26, 35, 30, .07);
+  --tint: 26, 35, 30;
+  --ink: #F2F5F3;
+  --warn-fg: #8A5A00;
+  --bad-fg: #B3261E;
+  --ok-fg: #1E7A4C;
+  color: var(--fg);
+  background: #F2F5F3;
+  border: none;
+  border-radius: 28px;
+  box-shadow: 0 24px 48px -24px rgba(0, 0, 0, .5);
+}
+/* Statusmerker blir mørkere og mer mettet på lys bunn, så de er lesbare. */
+.panel-light .badge { color: color-mix(in srgb, var(--badge-c, currentColor) 45%, #1A231E) !important; }
+.panel-light .badge .dot { filter: saturate(1.2) brightness(.8); }
+
+/* Aksentpanel – som «Risk of Cargo Loss» i referansen, i GC Rieber-teal. */
+.panel-accent {
+  background: linear-gradient(150deg, #0A6B5B, #00594C);
+  border: 1px solid rgba(128, 239, 222, .22);
+  border-radius: 28px;
+}
+
+.pill { background: rgba(var(--tint), .07); border: 1px solid var(--line); border-radius: 999px; }
+.scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(var(--tint), .18) transparent; }
 .scroll-none { overflow-y: auto; scrollbar-width: none; }
 
 .btn {
   cursor: pointer; color: var(--fg);
-  background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .09);
-  border-radius: 999px; min-height: 44px; padding: 0 18px; transition: background .15s;
+  background: rgba(var(--tint), .08); border: 1px solid var(--line);
+  border-radius: 999px; min-height: 44px; padding: 0 18px; transition: background .15s, color .15s;
 }
-.btn:hover { background: rgba(255, 255, 255, .13); }
+.btn:hover { background: rgba(var(--tint), .14); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
-.btn-w { background: var(--fg); color: var(--ink); border-color: var(--fg); font-weight: 500; }
-.btn-w:hover { background: #FFFFFF; }
+/* Hovedknapp: GC Rieber-pille med store, sperrede bokstaver. */
+.btn-w {
+  background: var(--aqua); color: #1A231E; border-color: var(--aqua); font-weight: 500;
+  text-transform: uppercase; letter-spacing: .08em; font-size: 14px;
+}
+.btn-w:hover { background: #A2F5E8; }
+.btn-teal {
+  background: var(--teal); color: var(--fg); border-color: var(--teal); font-weight: 500;
+  text-transform: uppercase; letter-spacing: .08em; font-size: 14px;
+}
+.btn-teal:hover { background: var(--teal-hover); }
 
 .icon-btn {
   width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   cursor: pointer; color: var(--fg); padding: 0; border: none; background: transparent;
 }
-.icon-btn.pill { border: 1px solid rgba(255, 255, 255, .07); background: rgba(255, 255, 255, .06); }
+.icon-btn.pill { border: 1px solid var(--line); background: rgba(var(--tint), .07); }
 
 .nav {
-  font-size: 15px; color: rgba(243, 245, 246, .72); background: transparent; border: 1px solid transparent;
+  font-size: 15px; color: var(--sage); background: transparent; border: 1px solid transparent;
   border-radius: 999px; padding: 0 18px; min-height: 44px; cursor: pointer; text-decoration: none;
   display: flex; align-items: center;
 }
 .nav:hover { color: var(--fg); }
-.nav.active { background: rgba(255, 255, 255, .1); color: var(--fg); border-color: var(--line); }
+.nav.active { background: rgba(var(--tint), .1); color: var(--fg); border-color: var(--line); }
 
 .seg { display: flex; padding: 3px; gap: 2px; }
 .tab {
   font-size: 14px; cursor: pointer; border: none; border-radius: 999px; min-height: 38px; padding: 0 14px;
-  background: transparent; color: rgba(243, 245, 246, .64);
+  background: transparent; color: var(--sage);
 }
 .tab:hover { color: var(--fg); }
-.tab[aria-pressed='true'], .tab[aria-selected='true'] { background: rgba(255, 255, 255, .12); color: var(--fg); }
+/* Aktivt valg i segmenter: lys pille med mørk tekst (som 3D/2D-velgeren i referansen). */
+.tab[aria-pressed='true'], .tab[aria-selected='true'] { background: var(--fg); color: var(--ink); }
 
 .card {
-  color: inherit; text-align: left; cursor: pointer; width: 100%; border-radius: 20px; padding: 16px;
+  color: inherit; text-align: left; cursor: pointer; width: 100%; border-radius: 22px; padding: 16px;
   display: flex; flex-direction: column; gap: 12px;
-  background: rgba(255, 255, 255, .035); border: 1px solid var(--line-soft); transition: background .2s;
+  background: rgba(var(--tint), .04); border: 1px solid var(--line-soft); transition: background .2s, border-color .2s;
 }
-.card:hover { background: rgba(255, 255, 255, .07); }
-.card.on { background: linear-gradient(160deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .05)); border-color: rgba(255, 255, 255, .22); }
+.card:hover { background: rgba(var(--tint), .08); }
+.card.on { background: linear-gradient(160deg, rgba(128, 239, 222, .16), rgba(128, 239, 222, .04)); border-color: rgba(128, 239, 222, .45); }
 .card.done { opacity: .6; }
 
 .tel {
   display: flex; align-items: center; gap: 12px; min-height: 50px; padding: 5px 8px 5px 12px; border-radius: 16px;
-  text-decoration: none; color: var(--fg); background: rgba(255, 255, 255, .04); border: 1px solid var(--line-soft);
+  text-decoration: none; color: var(--fg); background: rgba(var(--tint), .05); border: 1px solid var(--line-soft);
 }
-.tel:hover { background: rgba(255, 255, 255, .08); }
+.tel:hover { background: rgba(var(--tint), .1); }
 
 .sel {
-  flex: 1; min-width: 0; min-height: 40px; border-radius: 999px; background: rgba(255, 255, 255, .06); color: var(--fg);
-  border: 1px solid rgba(255, 255, 255, .1); padding: 0 12px; font-size: 14px; cursor: pointer;
+  flex: 1; min-width: 0; min-height: 40px; border-radius: 999px; background: rgba(var(--tint), .07); color: var(--fg);
+  border: 1px solid var(--line); padding: 0 12px; font-size: 14px; cursor: pointer;
 }
 .sel option, .inp option, .inp optgroup { color: var(--ink); background: var(--fg); }
 .sel:disabled { opacity: .7; cursor: default; }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field > span, .lbl { font-size: 13px; color: var(--fg-62); }
+.field > span, .lbl { font-size: 13px; color: var(--sage); }
 .inp {
-  font-size: 15px; color: var(--fg); background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .1);
+  font-size: 15px; color: var(--fg); background: rgba(var(--tint), .07); border: 1px solid var(--line);
   border-radius: 14px; min-height: 44px; padding: 0 12px; width: 100%;
 }
 .inp-round { border-radius: 999px; font-size: 14px; min-height: 42px; padding: 0 14px; width: auto; }
@@ -139,12 +213,34 @@ input::placeholder, textarea::placeholder { color: rgba(243, 245, 246, .45); }
 .alert-yellow { background: rgba(110, 80, 30, .28); border: 1px solid rgba(247, 185, 85, .16); }
 .alert-ok { background: rgba(91, 214, 138, .1); border: 1px solid rgba(91, 214, 138, .25); }
 
+/* ---------------------------------------------------------------- ramme med ikonmeny */
+
+.shell { min-height: 100vh; padding-left: var(--sidebar); }
+.sidebar {
+  position: fixed; inset: 0 auto 0 0; width: var(--sidebar); z-index: 25;
+  display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px 0 20px;
+  background: rgba(20, 27, 23, .82); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border-right: 1px solid var(--line);
+}
+.side-link {
+  position: relative; width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: var(--sage); text-decoration: none; transition: background .15s, color .15s;
+}
+.side-link:hover { color: var(--fg); background: rgba(var(--tint), .06); }
+.side-link.active { color: var(--ink); background: var(--fg); }
+.side-link .side-tip {
+  position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%); white-space: nowrap;
+  background: var(--fg); color: var(--ink); border-radius: 999px; padding: 4px 12px; font-size: 13px;
+  opacity: 0; pointer-events: none; transition: opacity .12s;
+}
+.side-link:hover .side-tip, .side-link:focus-visible .side-tip { opacity: 1; }
+
 /* Sider med kystbakgrunn (alt utenom kartet). */
 .page { position: relative; min-height: 100vh; overflow: hidden; }
-.page-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .32; pointer-events: none; }
-.page-veil { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(7, 9, 11, .55), rgba(7, 9, 11, .85)); pointer-events: none; }
-.page-main { position: relative; padding: 28px 24px 24px; display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
-.page-title { margin: 0; font-size: 52px; font-weight: 300; letter-spacing: -0.035em; line-height: 1; }
+.page-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .28; pointer-events: none; filter: sepia(.25) hue-rotate(60deg) saturate(.7); }
+.page-veil { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20, 27, 23, .55), rgba(20, 27, 23, .9)); pointer-events: none; }
+.page-main { position: relative; padding: 28px 32px 32px; display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.page-title { margin: 0; font-size: 56px; font-weight: 300; letter-spacing: -0.035em; line-height: 1; }
 
 .stars { display: inline-flex; gap: 2px; }
 
@@ -153,11 +249,15 @@ input::placeholder, textarea::placeholder { color: rgba(243, 245, 246, .45); }
 
 @keyframes ring { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
 .ring { animation: ring 40s linear infinite; }
-@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(91, 214, 138, .55); } 100% { box-shadow: 0 0 0 8px rgba(91, 214, 138, 0); } }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(128, 239, 222, .55); } 100% { box-shadow: 0 0 0 8px rgba(128, 239, 222, 0); } }
 .ping { animation: ping 1.8s ease-out infinite; }
 @keyframes shimmer { from { opacity: .45; } to { opacity: .8; } }
 .loading { animation: shimmer .9s ease-in-out infinite alternate; color: var(--fg-62); }
 
+@media (max-width: 1100px) {
+  :root { --sidebar: 72px; }
+  .page-main { padding: 20px 16px 24px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .ring, .ping, .loading { animation: none; }
 }

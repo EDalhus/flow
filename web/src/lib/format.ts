@@ -48,19 +48,19 @@ export function dayRelative(date: string, today = todayOslo()): string {
 export const ddmm = (iso: string) => { const d = serviceDate(iso); return `${d.slice(8, 10)}.${d.slice(5, 7)}`; };
 
 export const STATUS_STYLE: Record<CallStatus, { label: string; c: string; bg: string; solid: string; solidFg: string }> = {
-  ved_kai: { label: 'Ved kai', c: '#5BD68A', bg: 'rgba(91,214,138,.15)', solid: '#3DBE6E', solidFg: '#0B0E11' },
-  paa_vei: { label: 'På vei', c: '#9DB8FF', bg: 'rgba(157,184,255,.15)', solid: '#9DB8FF', solidFg: '#0B0E11' },
-  planlagt: { label: 'Planlagt', c: '#C9D0D5', bg: 'rgba(201,208,213,.12)', solid: 'rgba(255,255,255,.12)', solidFg: '#F3F5F6' },
-  kaibok_mangler: { label: 'Kaibok mangler', c: '#F7C873', bg: 'rgba(247,185,85,.15)', solid: '#F7B955', solidFg: '#0B0E11' },
-  ferdig: { label: 'Ferdig', c: '#A3ACB3', bg: 'rgba(163,172,179,.12)', solid: 'rgba(255,255,255,.1)', solidFg: '#C9D0D5' },
-  avlyst: { label: 'Avlyst', c: '#A3ACB3', bg: 'rgba(163,172,179,.12)', solid: 'rgba(255,255,255,.1)', solidFg: '#C9D0D5' },
+  ved_kai: { label: 'Ved kai', c: '#5BD68A', bg: 'rgba(91,214,138,.15)', solid: '#3DBE6E', solidFg: '#1A231E' },
+  paa_vei: { label: 'På vei', c: '#80EFDE', bg: 'rgba(128,239,222,.15)', solid: '#80EFDE', solidFg: '#1A231E' },
+  planlagt: { label: 'Planlagt', c: '#C9D6CD', bg: 'rgba(177,194,183,.12)', solid: 'rgba(var(--tint), .12)', solidFg: '#F2F5F3' },
+  kaibok_mangler: { label: 'Kaibok mangler', c: '#F7C873', bg: 'rgba(247,185,85,.15)', solid: '#F7B955', solidFg: '#1A231E' },
+  ferdig: { label: 'Ferdig', c: '#B1C2B7', bg: 'rgba(177,194,183,.12)', solid: 'rgba(var(--tint), .1)', solidFg: '#C9D6CD' },
+  avlyst: { label: 'Avlyst', c: '#B1C2B7', bg: 'rgba(177,194,183,.12)', solid: 'rgba(var(--tint), .1)', solidFg: '#C9D6CD' },
 };
 
 export const FLAG_STYLE: Record<Flag, { label: string; c: string; bg: string; dot: string }> = {
   green: { label: 'Grønt', c: '#7FE0A3', bg: 'rgba(91,214,138,.13)', dot: '#5BD68A' },
   yellow: { label: 'Gult varsel', c: '#F7C873', bg: 'rgba(247,185,85,.14)', dot: '#F7B955' },
   red: { label: 'Rødt flagg', c: '#FF8A80', bg: 'rgba(255,107,94,.15)', dot: '#FF6B5E' },
-  none: { label: 'Ingen historikk', c: '#C9D0D5', bg: 'rgba(201,208,213,.1)', dot: '#A3ACB3' },
+  none: { label: 'Ingen historikk', c: '#C9D6CD', bg: 'rgba(177,194,183,.1)', dot: '#B1C2B7' },
 };
 
 export const ratingColor = (v: number) => (v >= 4 ? '#5BD68A' : v >= 3 ? '#F7B955' : '#FF6B5E');

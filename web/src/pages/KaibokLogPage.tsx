@@ -51,7 +51,7 @@ export function KaibokLogPage() {
           ))}
         </div>
 
-        <section className="glass" aria-label="Kaibøker" style={{ overflow: 'hidden' }}>
+        <section className="panel-light" aria-label="Kaibøker" style={{ overflow: 'hidden' }}>
           <div className="krow hide-s" style={{ cursor: 'default', fontSize: 12, color: 'var(--fg-55)', borderTop: 'none' }}>
             <span>Dato</span><span>Båt</span><span>Ansvarlig</span><span>Avvik</span><span>Vurdering</span><span>Bilder</span>
           </div>
@@ -59,7 +59,7 @@ export function KaibokLogPage() {
             {logs.isPending && <Loading />}
             {items.map(l => (
               <button key={l.id} type="button" className="krow" aria-pressed={sel?.id === l.id} onClick={() => setParams({ id: l.id }, { replace: true })}
-                style={sel?.id === l.id ? { background: 'rgba(255,255,255,.08)' } : undefined}>
+                style={sel?.id === l.id ? { background: 'rgba(var(--tint), .08)' } : undefined}>
                 <span className="n" style={{ fontSize: 15 }}>{ddmm(l.delivered_at)}</span>
                 <span style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: 16 }}>{l.boat.name}</span>
@@ -69,12 +69,12 @@ export function KaibokLogPage() {
                 <span className="hide-s" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {l.had_deviation
                     ? (l.categories.length ? l.categories : ['annet' as const]).map(c => (
-                      <span key={c} style={{ fontSize: 12, borderRadius: 999, padding: '2px 9px', background: 'rgba(255,107,94,.15)', color: '#FF9A91' }}>{CATEGORY_LABEL[c]}</span>
+                      <span key={c} style={{ fontSize: 12, borderRadius: 999, padding: '2px 9px', background: 'rgba(255,107,94,.15)', color: 'var(--bad-fg)' }}>{CATEGORY_LABEL[c]}</span>
                     ))
                     : <span style={{ fontSize: 13, color: 'var(--fg-55)' }}>Ingen avvik</span>}
                 </span>
                 <span className="n hide-s" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 15 }}><Star size={13} />{fr(l.avg)}</span>
-                <span className="n hide-s" style={{ fontSize: 14, color: 'rgba(243,245,246,.7)' }}>{l.photos.length ? `${l.photos.length} stk` : '–'}</span>
+                <span className="n hide-s" style={{ fontSize: 14, color: 'rgba(var(--tint), .7)' }}>{l.photos.length ? `${l.photos.length} stk` : '–'}</span>
               </button>
             ))}
             {logs.isSuccess && !items.length && <p className="empty">Ingen kaibøker matcher.</p>}
@@ -112,7 +112,7 @@ function LogDetail({ log: l }: { log: QuayLogView }) {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span className="dot" style={{ width: 8, height: 8, background: '#E5484D' }} />Avvik registrert</span>
           {l.categories.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {l.categories.map(c => <span key={c} style={{ fontSize: 13, borderRadius: 999, padding: '4px 11px', background: 'rgba(255,255,255,.1)' }}>{CATEGORY_LABEL[c]}</span>)}
+              {l.categories.map(c => <span key={c} style={{ fontSize: 13, borderRadius: 999, padding: '4px 11px', background: 'rgba(var(--tint), .1)' }}>{CATEGORY_LABEL[c]}</span>)}
             </div>
           )}
           {l.description && <p style={{ margin: 0, fontSize: 15 }}>{l.description}</p>}
@@ -120,7 +120,7 @@ function LogDetail({ log: l }: { log: QuayLogView }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
               {l.photos.map((p, i) => (
                 <a key={p.id} href={p.url} target="_blank" rel="noreferrer" aria-label={`Bilde ${i + 1}`}
-                  style={{ aspectRatio: '1 / 1', borderRadius: 14, overflow: 'hidden', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-62)' }}>
+                  style={{ aspectRatio: '1 / 1', borderRadius: 14, overflow: 'hidden', background: 'rgba(var(--tint), .06)', border: '1px solid rgba(var(--tint), .08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-62)' }}>
                   {p.thumb_url ? <img src={p.thumb_url} alt={`Avviksbilde ${i + 1}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Camera size={20} />}
                 </a>
               ))}
