@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
-import type { UserView } from '../../shared/api.ts';
+import { HTTPException } from 'hono/http-exception';
+import type { Quay, UserView } from '../../shared/api.ts';
 import { CREW_ROLES, DEFAULT_SETTINGS, type Capacity, type CrewRole, type UserRole } from '../../shared/domain/types.ts';
-import { agentCreate, rangeQuery, settingsPut, shiftsPut, userCreate, userPatch } from '../../shared/schemas.ts';
+import { agentCreate, quayCreate, quayPatch, rangeQuery, settingsPut, shiftsPut, userCreate, userPatch } from '../../shared/schemas.ts';
 import { CAN, requireRole } from '../auth/access.ts';
 import { body, fail, isConstraintError, newId, query } from '../lib/http.ts';
 import { loadCapacity, loadSettings } from '../lib/settings.ts';
@@ -81,9 +82,56 @@ app.patch('/users/:id', requireRole(...CAN.admin), body(userPatch), async c => {
 
 // ---------------------------------------------------------------- kaier, produkter, agenter
 
+type QuayRow = { id: string; name: string; company: string | null; sort: number; lat: number | null; lon: number | null; active: number };
+const toQuay = (r: QuayRow): Quay => ({ ...r, active: !!r.active });
+const QUAY_SELECT = 'SELECT id, name, company, sort, lat, lon, active FROM quays';
+
 app.get('/quays', async c => {
-  const { results } = await c.env.DB.prepare('SELECT id, name, lat, lon FROM quays WHERE active = 1 ORDER BY sort').all();
-  return c.json(results);
+  const all = c.req.query('all') === '1';
+  const { results } = await c.env.DB
+    .prepare(`${QUAY_SELECT} ${all ? '' : 'WHERE active = 1'} ORDER BY company IS NOT NULL, sort, name`)
+    .all<QuayRow>();
+  return c.json(results.map(toQuay));
+});
+
+app.post('/quays', requireRole(...CAN.admin), body(quayCreate), async c => {
+  const q = c.req.valid('json');
+  const db = c.env.DB;
+  const id = newId('q');
+  const sort = q.sort ?? ((await db.prepare('SELECT coalesce(max(sort), 0) + 1 AS n FROM quays').first<{ n: number }>())?.n ?? 1);
+  try {
+    await db.prepare('INSERT INTO quays (id, name, company, sort, lat, lon) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(id, q.name, q.company ?? null, sort, q.lat ?? null, q.lon ?? null).run();
+  } catch (e) {
+    if (isConstraintError(e, 'UNIQUE')) throw fail(409, 'Det finnes allerede en kai med dette navnet hos den bedriften.');
+    throw e;
+  }
+  return c.json(toQuay((await db.prepare(`${QUAY_SELECT} WHERE id = ?`).bind(id).first<QuayRow>())!), 201);
+});
+
+app.patch('/quays/:id', requireRole(...CAN.admin), body(quayPatch), async c => {
+  const input = c.req.valid('json');
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const cols = Object.entries({
+    name: input.name,
+    company: input.company,
+    sort: input.sort,
+    lat: input.lat,
+    lon: input.lon,
+    ...(input.active === undefined ? {} : { active: input.active ? 1 : 0 }),
+  }).filter(([, v]) => v !== undefined);
+  if (!cols.length) throw fail(400, 'Ingen endringer.');
+  try {
+    const r = await db.prepare(`UPDATE quays SET ${cols.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`)
+      .bind(...cols.map(([, v]) => v ?? null), id).run();
+    if (!r.meta.changes) throw fail(404, 'Fant ikke kaia.');
+  } catch (e) {
+    if (e instanceof HTTPException) throw e;
+    if (isConstraintError(e, 'UNIQUE')) throw fail(409, 'Det finnes allerede en kai med dette navnet hos den bedriften.');
+    throw e;
+  }
+  return c.json(toQuay((await db.prepare(`${QUAY_SELECT} WHERE id = ?`).bind(id).first<QuayRow>())!));
 });
 
 app.get('/products', async c => {

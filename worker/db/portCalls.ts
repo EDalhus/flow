@@ -4,6 +4,7 @@ import {
   type CapacityFor, type Collision, type CollisionCall, type Suggestion,
 } from '../../shared/domain/collisions.ts';
 import { effectiveFlag } from '../../shared/domain/flags.ts';
+import { quayLabel } from '../../shared/domain/quay.ts';
 import { deriveStatus, isActive } from '../../shared/domain/status.ts';
 import type { CallType, CrewRole, Direction, Flag, Settings } from '../../shared/domain/types.ts';
 import { addDays, osloTime, serviceDate } from '../../shared/time.ts';
@@ -14,7 +15,7 @@ type CallRow = {
   version: number; arrived_at: string | null; departed_at: string | null; completed_at: string | null; cancelled_at: string | null;
   boat_id: string; boat_name: string; flag_auto: Flag; flag_auto_reason: string | null; flag_override: Flag | null;
   flag_override_reason: string | null; avg_total: number | null; rating_count: number;
-  quay_id: string; quay_name: string;
+  quay_id: string; quay_name: string; quay_company: string | null;
   seller_id: string | null; seller_name: string | null; seller_short: string | null; seller_initials: string | null; seller_phone: string | null;
   resp_id: string | null; resp_name: string | null; resp_short: string | null; resp_initials: string | null;
   has_log: number; message_count: number;
@@ -52,7 +53,7 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
              pc.arrived_at, pc.departed_at, pc.completed_at, pc.cancelled_at,
              b.id AS boat_id, b.name AS boat_name, b.flag_auto, b.flag_auto_reason, b.flag_override, b.flag_override_reason,
              b.avg_total, b.rating_count,
-             q.id AS quay_id, q.name AS quay_name,
+             q.id AS quay_id, q.name AS quay_name, q.company AS quay_company,
              s.id AS seller_id, s.name AS seller_name, s.short_name AS seller_short, s.initials AS seller_initials, s.phone AS seller_phone,
              r.id AS resp_id, r.name AS resp_name, r.short_name AS resp_short, r.initials AS resp_initials,
              EXISTS (SELECT 1 FROM quay_logs ql WHERE ql.port_call_id = pc.id) AS has_log,
@@ -106,7 +107,7 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
         id: r.boat_id, name: r.boat_name, flag, flag_reason: r.flag_override ? r.flag_override_reason : r.flag_auto_reason,
         flag_overridden: !!r.flag_override, avg_total: r.avg_total, rating_count: r.rating_count,
       },
-      quay: { id: r.quay_id, name: r.quay_name },
+      quay: { id: r.quay_id, name: r.quay_name, company: r.quay_company },
       seller: r.seller_id ? { ...ref(r.seller_id, r.seller_name, r.seller_short, r.seller_initials)!, phone: r.seller_phone } : null,
       responsible: ref(r.resp_id, r.resp_name, r.resp_short, r.resp_initials),
       responsible_auto: slots.length === 1,
@@ -129,7 +130,7 @@ export const toCollisionCall = (c: Pick<PortCallView, 'id' | 'boat' | 'quay' | '
 export interface CollisionContext {
   settings: Settings;
   capacityFor: CapacityFor;
-  quays: { id: string; name: string }[];
+  quays: { id: string; name: string; company: string | null }[];
   users: Map<string, string>;
   /** Aktive anløp i perioden (pluss en dag på hver side, for anløp over midnatt). */
   active: CollisionCall[];
@@ -141,7 +142,8 @@ export async function collisionContext(db: D1Database, from: string, to: string,
   const [calls, capacityFor, quays, users] = await Promise.all([
     loadCalls(db, { from: padFrom, to: padTo }, settings),
     loadCapacity(db, settings, padFrom, padTo),
-    db.prepare('SELECT id, name FROM quays WHERE active = 1 ORDER BY sort').all<{ id: string; name: string }>(),
+    db.prepare('SELECT id, name, company FROM quays WHERE active = 1 ORDER BY company IS NOT NULL, sort, name')
+      .all<{ id: string; name: string; company: string | null }>(),
     db.prepare('SELECT id, short_name FROM users').all<{ id: string; short_name: string }>(),
   ]);
   return {
@@ -152,7 +154,10 @@ export async function collisionContext(db: D1Database, from: string, to: string,
 }
 
 function suggestionText(s: Suggestion, ctx: CollisionContext, original?: CollisionCall): string {
-  if (s.kind === 'move_quay') return `Flytt til ${ctx.quays.find(q => q.id === s.quay_id)?.name ?? 'annen kai'}`;
+  if (s.kind === 'move_quay') {
+    const q = ctx.quays.find(x => x.id === s.quay_id);
+    return `Flytt til ${q ? quayLabel(q) : 'annen kai'}`;
+  }
   const sameDay = original && serviceDate(original.eta) === serviceDate(s.eta);
   const day = sameDay ? '' : `${serviceDate(s.eta).slice(8, 10)}.${serviceDate(s.eta).slice(5, 7)} `;
   return `Utsett til ${day}${osloTime(s.eta)}–${osloTime(s.etd)}`;
@@ -169,7 +174,10 @@ export function viewCollision(c: Collision, self: string | null, calls: Collisio
   });
   return {
     ...c,
-    text: describeCollision(c, { quay: id => ctx.quays.find(q => q.id === id)?.name ?? id, user: id => ctx.users.get(id) ?? id }),
+    text: describeCollision(c, {
+      quay: id => { const q = ctx.quays.find(x => x.id === id); return q ? quayLabel(q) : id; },
+      user: id => ctx.users.get(id) ?? id,
+    }),
     with: c.calls.filter(id => id !== self).map(id => ({ id, boat_name: byId.get(id)?.boat_name ?? '' })),
     suggestions,
   };

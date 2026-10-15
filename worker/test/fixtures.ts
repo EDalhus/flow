@@ -20,7 +20,7 @@ export async function loadFixtures(db: D1Database) {
       ...roles.map(r => db.prepare('INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, ?)').bind(`u_${k}`, r)),
       ...skills.map(s => db.prepare('INSERT OR IGNORE INTO crew_skills (user_id, crew_role) VALUES (?, ?)').bind(`u_${k}`, s)),
     ]),
-    db.prepare(`INSERT OR IGNORE INTO quays (id, name, sort) VALUES ('q_kai1', 'Kai 1', 1), ('q_kai2', 'Kai 2', 2)`),
+    db.prepare(`INSERT OR IGNORE INTO quays (id, name, company, sort) VALUES ('q_kai1', 'Kai 1', NULL, 1), ('q_kai2', 'Kai 2', NULL, 2)`),
     db.prepare(`INSERT OR IGNORE INTO boats (id, name) VALUES ('b_a', 'Alfa'), ('b_b', 'Bravo'), ('b_c', 'Charlie'), ('b_d', 'Delta')`),
     db.prepare(`INSERT OR IGNORE INTO products (id, name, sort) VALUES ('p_hav', 'Hav salt', 1), ('p_stein', 'Stein salt', 2)`),
     db.prepare(`INSERT OR IGNORE INTO skus (id, product_id, unit, bags_per_unit, bag_kg, pallet_type, kg_per_unit) VALUES

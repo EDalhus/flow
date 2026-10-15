@@ -3,7 +3,7 @@ import type { PortCallView } from '../../../shared/api.ts';
 import { CATEGORIES, CATEGORY_LABEL, type Category } from '../../../shared/domain/types.ts';
 import { api, errorText } from '../lib/api.ts';
 import { uploadPhoto } from '../lib/images.ts';
-import { fr, timeRange, typeLabel } from '../lib/format.ts';
+import { fr, quayLabel, timeRange, typeLabel } from '../lib/format.ts';
 import { useDeliverQuayLog, type QuayLogResult } from '../lib/queries.ts';
 import { Camera, Check, Close, Star } from './Icons.tsx';
 
@@ -85,7 +85,7 @@ export function KaibokForm({ call, onClose, onDone, fullscreen }: {
           </button>
         </div>
         <h1 style={{ position: 'relative', margin: '34px 0 0', fontSize: 36, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.05 }}>{call.boat.name}</h1>
-        <span className="n" style={{ position: 'relative', fontSize: 14, color: 'rgba(243,245,246,.65)' }}>{typeLabel(call.type)} · {call.quay.name} · {timeRange(call)}</span>
+        <span className="n" style={{ position: 'relative', fontSize: 14, color: 'rgba(243,245,246,.65)' }}>{typeLabel(call.type)} · {quayLabel(call.quay)} · {timeRange(call)}</span>
       </header>
 
       {!result ? (

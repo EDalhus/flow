@@ -5,7 +5,7 @@ import { CATEGORY_LABEL } from '../../../shared/domain/types.ts';
 import { ArrowUpRight, Camera, Star } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
 import { Loading, SearchBox, Segmented, Stars } from '../components/ui.tsx';
-import { ddmm, fr, osloTime, serviceDate } from '../lib/format.ts';
+import { ddmm, fr, osloTime, quayLabel, serviceDate } from '../lib/format.ts';
 import { useQuayLogs } from '../lib/queries.ts';
 import './kaibok.css';
 
@@ -63,7 +63,7 @@ export function KaibokLogPage() {
                 <span className="n" style={{ fontSize: 15 }}>{ddmm(l.delivered_at)}</span>
                 <span style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: 16 }}>{l.boat.name}</span>
-                  <span style={{ fontSize: 12, color: 'var(--fg-55)' }}>{l.quay.name}</span>
+                  <span style={{ fontSize: 12, color: 'var(--fg-55)' }}>{quayLabel(l.quay)}</span>
                 </span>
                 <span className="hide-s" style={{ fontSize: 14, color: 'var(--fg-85)' }}>{l.responsible?.short_name ?? l.delivered_by?.short_name ?? '–'}</span>
                 <span className="hide-s" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -99,7 +99,7 @@ function LogDetail({ log: l }: { log: QuayLogView }) {
     <aside className="glass scroll" aria-labelledby="kb-h" style={{ flex: '1 1 360px', maxWidth: 400, padding: 20, display: 'flex', flexDirection: 'column', gap: 18, maxHeight: 'calc(100vh - 120px)', position: 'sticky', top: 20 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className="n" style={{ fontSize: 13, color: 'var(--fg-62)' }}>
-          {`${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`} · {l.quay.name} · levert av {l.delivered_by?.short_name ?? 'ukjent'} {osloTime(l.delivered_at)}
+          {`${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`} · {quayLabel(l.quay)} · levert av {l.delivered_by?.short_name ?? 'ukjent'} {osloTime(l.delivered_at)}
         </span>
         <h2 id="kb-h" style={{ margin: 0, fontSize: 32, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{l.boat.name}</h2>
         <span style={{ fontSize: 14, color: 'var(--fg-75)' }}>{l.responsible ? `Ansvarlig ${l.responsible.short_name}` : 'Ingen ansvarlig'}{crew ? ` · ${crew}` : ''}</span>

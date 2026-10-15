@@ -64,6 +64,17 @@ export interface BoatSummary {
   rating_count: number;
 }
 
+/** Kai – company er null for egne, ellers nabobedrift. */
+export interface Quay {
+  id: string;
+  name: string;
+  company: string | null;
+  sort: number;
+  lat: number | null;
+  lon: number | null;
+  active: boolean;
+}
+
 export interface PortCallView {
   id: string;
   type: CallType;
@@ -74,7 +85,7 @@ export interface PortCallView {
   notes: string | null;
   version: number;
   boat: BoatSummary;
-  quay: { id: string; name: string };
+  quay: { id: string; name: string; company: string | null };
   seller: (UserRef & { phone: string | null }) | null;
   responsible: UserRef | null;
   /** true når anløpet har én rolle, og ansvarlig derfor er satt automatisk. */
@@ -118,7 +129,7 @@ export interface QuayLogView {
   id: string;
   port_call_id: string;
   boat: { id: string; name: string };
-  quay: { id: string; name: string };
+  quay: { id: string; name: string; company: string | null };
   service_date: string;
   type: CallType;
   eta: string;

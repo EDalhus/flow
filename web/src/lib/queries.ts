@@ -1,15 +1,15 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AisView, BoatDetail, BoatView, CollisionView, Me, MessageView, NotificationView, PortCallView, ProductReport,
-  QualityReport, QuayLogView, UserView, WeeklyReport,
+  QualityReport, Quay, QuayLogView, UserView, WeeklyReport,
 } from '../../../shared/api.ts';
 import type { Settings } from '../../../shared/domain/types.ts';
 import type { CrewPut, PortCallCreateInput, PortCallPatchInput, QuayLogCreateInput } from '../../../shared/schemas.ts';
 import { api } from './api.ts';
 
+export type { Quay };
 export type Product = { id: string; name: string; skus: Sku[] };
 export type Sku = { id: string; product_id: string; unit: 'BB' | 'pall'; bags_per_unit: number | null; bag_kg: number | null; pallet_type: 'europall' | 'srs' | null; kg_per_unit: number };
-export type Quay = { id: string; name: string; lat: number | null; lon: number | null };
 export type Agent = { id: string; name: string; phone: string | null };
 
 // Oppslag som sjelden endres.
@@ -18,6 +18,7 @@ const STATIC = { staleTime: 5 * 60_000 };
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me'), ...STATIC, retry: false });
 export const useUsers = () => useQuery({ queryKey: ['users'], queryFn: () => api<UserView[]>('/users'), ...STATIC });
 export const useQuays = () => useQuery({ queryKey: ['quays'], queryFn: () => api<Quay[]>('/quays'), ...STATIC });
+export const useAllQuays = () => useQuery({ queryKey: ['quays', 'all'], queryFn: () => api<Quay[]>('/quays?all=1') });
 export const useProducts = () => useQuery({ queryKey: ['products'], queryFn: () => api<Product[]>('/products'), ...STATIC });
 export const useAgents = () => useQuery({ queryKey: ['agents'], queryFn: () => api<Agent[]>('/agents'), ...STATIC });
 export const useSettings = () => useQuery({ queryKey: ['settings'], queryFn: () => api<Settings>('/settings'), ...STATIC });
@@ -172,5 +173,14 @@ export function useSaveUser() {
     mutationFn: ({ id, body }: { id?: string; body: Record<string, unknown> }) =>
       id ? api<UserView>(`/users/${id}`, { method: 'PATCH', body }) : api<UserView>('/users', { body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  });
+}
+
+export function useSaveQuay() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id?: string; body: Record<string, unknown> }) =>
+      id ? api<Quay>(`/quays/${id}`, { method: 'PATCH', body }) : api<Quay>('/quays', { body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['quays'] }),
   });
 }

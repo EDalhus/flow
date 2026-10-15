@@ -131,6 +131,16 @@ export const flagOverride = z.object({ flag, reason: text(500).min(3, 'Skriv en 
 
 export const agentCreate = z.object({ name: text(100).min(1), phone: phone.nullable().optional() });
 
+export const quayCreate = z.object({
+  name: text(80).min(1),
+  /** Tom/null = egen kai; ellers nabobedrift vi samarbeider med. */
+  company: optionalText(100),
+  sort: z.int().min(0).max(10_000).optional(),
+  lat: z.number().min(-90).max(90).nullable().optional(),
+  lon: z.number().min(-180).max(180).nullable().optional(),
+});
+export const quayPatch = quayCreate.partial().extend({ active: z.boolean().optional() });
+
 // ---------------------------------------------------------------- folk
 
 export const userCreate = z.object({

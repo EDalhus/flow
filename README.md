@@ -98,7 +98,7 @@ Nye verdier gjelder fra neste forespørsel; ny deploy trengs ikke.
 
 ## 4. Brukere
 
-Gå til **Brukere** i menyen; den vises bare for admin. Legg til alle som skal bruke Flow:
+Gå til **Admin** i menyen; den vises bare for admin. Under **Brukere** legger du til alle som skal bruke Flow:
 
 - **E-post:** med Access må den være den samme som i Access-policyen.
 - **Roller:** se tabellen under.
@@ -111,7 +111,7 @@ Uten Access velger hver person seg selv i lista bak avataren. Med Access logger 
 | Salg | Opprette og endre anløp, sette antall roller, redigere båter |
 | Produksjon | Alt salg kan, pluss sette navn og ansvarlig, overstyre flagg og levere kaibok |
 | Kaiarbeider | Se alt, bruke chatten, levere kaibok med bilder |
-| Admin | Alt, inkludert brukere og innstillinger |
+| Admin | Alt, inkludert brukere, kaier (egne og nabo) og innstillinger |
 
 Eksempeldataene (`SEED_DEMO`) inneholder testbrukere på `@flow.example`. De kan ikke logge inn, men vises i lister og chat. Deaktiver dem under **Brukere** når dere tar systemet i bruk.
 

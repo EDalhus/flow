@@ -9,7 +9,7 @@ import { KaibokForm } from '../components/KaibokForm.tsx';
 import { BellButton, UserBadge } from '../components/Topbar.tsx';
 import { Loading, StatusBadge } from '../components/ui.tsx';
 import { FlowMap } from '../map/FlowMap.tsx';
-import { FLAG_STYLE, addDays, dayHeading, dayShort, fr, goodsParts, osloTime, telHref, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
+import { FLAG_STYLE, addDays, dayHeading, dayShort, fr, goodsParts, osloTime, quayLabel, telHref, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useAis, useBoat, useMe, usePortCalls, useQuays, useSettings, useUsers } from '../lib/queries.ts';
 import { VesselLayer, aisLive } from '../map/Vessels.tsx';
 import { canQuayLog } from '../lib/roles.ts';
@@ -101,7 +101,7 @@ export function MobileApp() {
                 <div role="alert" className="alert-red" style={{ borderRadius: 22, padding: '14px 16px', background: 'rgba(120,42,38,.5)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <span className="n" style={{ width: 22, height: 22, flex: 'none', borderRadius: '50%', background: '#E5484D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, marginTop: 2 }}>!</span>
                   <span style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: 16 }}>{clash.x.kind === 'quay' ? `Kollisjon på ${clash.call.quay.name}` : 'Booket for tett'}</span>
+                    <span style={{ fontSize: 16 }}>{clash.x.kind === 'quay' ? `Kollisjon på ${quayLabel(clash.call.quay)}` : 'Booket for tett'}</span>
                     <span style={{ fontSize: 14, color: 'rgba(243,245,246,.7)' }}>{[clash.call.boat.name, ...clash.x.with.map(w => w.boat_name)].join(' og ')} · {clash.x.text}</span>
                   </span>
                 </div>
@@ -131,12 +131,12 @@ function MobileCard({ call: c, onOpen }: { call: PortCallView; onOpen: () => voi
   const f = FLAG_STYLE[c.boat.flag];
   const boats = [...new Set(c.collisions.flatMap(x => x.with.map(w => w.boat_name)))];
   return (
-    <button type="button" className="card" onClick={onOpen} aria-label={`${c.boat.name}, ${typeLabel(c.type)} ${c.quay.name}, ETA ${osloTime(c.eta)}`}
+    <button type="button" className="card" onClick={onOpen} aria-label={`${c.boat.name}, ${typeLabel(c.type)} ${quayLabel(c.quay)}, ETA ${osloTime(c.eta)}`}
       style={{ borderRadius: 24, gap: 10, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.07)', ...(c.status === 'ferdig' ? { opacity: .6 } : {}) }}>
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%' }}>
         <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span style={{ fontSize: 21, letterSpacing: '-0.01em' }}>{c.boat.name}</span>
-          <span style={{ fontSize: 14, color: 'rgba(243,245,246,.65)' }}>{typeLabel(c.type)} · {c.quay.name}</span>
+          <span style={{ fontSize: 14, color: 'rgba(243,245,246,.65)' }}>{typeLabel(c.type)} · {quayLabel(c.quay)}</span>
         </span>
         <span className="n" style={{ fontSize: 28, fontWeight: 200, letterSpacing: '-0.02em' }}>{osloTime(c.eta)}</span>
       </span>
@@ -176,7 +176,7 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
     <>
       <header style={{ position: 'absolute', top: 14, left: 14, right: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
         <button type="button" className="icon-btn" onClick={onBack} aria-label="Tilbake til anløpslista" style={{ ...pill, width: 48, height: 48 }}><ArrowLeft size={20} /></button>
-        <span style={{ fontSize: 18, fontWeight: 300, textShadow: '0 2px 12px rgba(0,0,0,.6)' }}>{c.quay.name} · {typeLabel(c.type)}</span>
+        <span style={{ fontSize: 18, fontWeight: 300, textShadow: '0 2px 12px rgba(0,0,0,.6)' }}>{quayLabel(c.quay)} · {typeLabel(c.type)}</span>
         <span style={{ width: 48 }} />
       </header>
       <div className="glass" style={{ position: 'absolute', left: 16, top: 168, width: 200, padding: '14px 16px', borderRadius: 22, background: 'rgba(40,46,44,.5)', display: 'flex', flexDirection: 'column', zIndex: 2 }}>

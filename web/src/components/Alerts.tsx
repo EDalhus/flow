@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { CollisionView, PortCallView } from '../../../shared/api.ts';
 import { errorText } from '../lib/api.ts';
-import { FLAG_STYLE, addDays, dayRelative, fr, osloTime, todayOslo } from '../lib/format.ts';
+import { FLAG_STYLE, addDays, dayRelative, fr, osloTime, quayLabel, todayOslo } from '../lib/format.ts';
 import { useMe, useNotifications, usePatchPortCall, usePortCalls, useReadNotifications } from '../lib/queries.ts';
 import { canPlan } from '../lib/roles.ts';
 import { api } from '../lib/api.ts';
@@ -122,7 +122,7 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
           return (
             <div key={id} className={red ? 'alert-red' : 'alert-yellow'} style={{ borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, ...(red ? { background: 'rgba(120,42,38,.3)' } : {}) }}>
               <AlertHead badge="!" badgeStyle={red ? { background: '#E5484D', color: '#fff' } : { background: '#F7B955', color: '#0B0E11' }}
-                title={`${red ? 'Rødt flagg' : 'Gult varsel'}: ${c.boat.name}`} sub={`${dayRelative(c.service_date)} ${osloTime(c.eta)} · ${c.quay.name}`}
+                title={`${red ? 'Rødt flagg' : 'Gult varsel'}: ${c.boat.name}`} sub={`${dayRelative(c.service_date)} ${osloTime(c.eta)} · ${quayLabel(c.quay)}`}
                 open={isOpen} onClick={() => toggle(id)} />
               {isOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 30 }}>
