@@ -96,6 +96,19 @@ export function MobileApp() {
             <BellButton open={alerts} onToggle={() => setAlerts(!alerts)} glass />
           </header>
           <div style={{ position: 'absolute', top: 66, left: 12, right: 12, display: 'flex', justifyContent: 'center', zIndex: 2 }}><BoatTabs /></div>
+          {/* Andre båter (utenfor båtregisteret): vis/skjul og farger/grå, samme valg som på PC. */}
+          <div role="group" aria-label="Andre båter" style={{ position: 'absolute', top: 296, right: 10, zIndex: 2, display: 'flex', gap: 6 }}>
+            <button type="button" className="tab legend-btn" aria-pressed={t.showOthers} onClick={() => t.setShowOthers(!t.showOthers)}
+              style={{ backdropFilter: 'blur(16px)', background: t.showOthers ? undefined : 'rgba(32,42,36,.7)' }}>
+              {t.showOthers ? 'Skjul andre båter' : 'Vis andre båter'}
+            </button>
+            {t.showOthers && (
+              <button type="button" className="tab legend-btn" aria-pressed={!t.colorOthers} onClick={() => t.setColorOthers(!t.colorOthers)}
+                style={{ backdropFilter: 'blur(16px)', background: t.colorOthers ? 'rgba(32,42,36,.7)' : undefined }}>
+                {t.colorOthers ? 'Gjør grå' : 'Farger'}
+              </button>
+            )}
+          </div>
           <div role="group" aria-label="Kartvisning" className="pill seg" style={{ position: 'absolute', top: 336, right: 10, zIndex: 2, backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.7)' }}>
             {BASEMAPS.map(b => (
               <button key={b.value} type="button" className="tab" aria-pressed={basemap === b.value} onClick={() => pickBasemap(b.value)}

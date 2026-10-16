@@ -24,6 +24,27 @@ export function snapToWater(mask: Uint8Array, w: number, h: number, [x0, y0]: Ce
   return null;
 }
 
+/** Beholder bare den største sammenhengende vannflaten (havet) i masken. Endrer masken. */
+export function largestComponent(mask: Uint8Array, w: number, h: number): void {
+  const label = new Int32Array(w * h);
+  const stack = new Int32Array(w * h);
+  let next = 0, best = 0, bestSize = 0;
+  for (let i = 0; i < mask.length; i++) {
+    if (!mask[i] || label[i]) continue;
+    next++;
+    let size = 0, top = 0;
+    stack[top++] = i; label[i] = next;
+    while (top) {
+      const j = stack[--top]; size++;
+      const x = j % w;
+      const nb = [x > 0 ? j - 1 : -1, x < w - 1 ? j + 1 : -1, j - w, j + w];
+      for (const k of nb) if (k >= 0 && k < mask.length && mask[k] && !label[k]) { label[k] = next; stack[top++] = k; }
+    }
+    if (size > bestSize) { bestSize = size; best = next; }
+  }
+  for (let i = 0; i < mask.length; i++) mask[i] = label[i] === best ? 1 : 0;
+}
+
 /** A* med 8 naboer. Returnerer rutene fra start til mål, eller null hvis det ikke finnes vei. */
 export function findPath(mask: Uint8Array, w: number, h: number, start: Cell, goal: Cell): Cell[] | null {
   const n = w * h;

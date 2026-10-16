@@ -1,7 +1,7 @@
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { distanceM } from '../../../shared/domain/geo.ts';
-import { findPath, smoothPath, snapToWater, type Cell } from '../../../shared/domain/searoute.ts';
+import { findPath, largestComponent, smoothPath, snapToWater, type Cell } from '../../../shared/domain/searoute.ts';
 
 // Seilingsrute til kaia: vannflatene fra de samme vektorflisene som kartet bruker (OpenFreeMap)
 // tegnes inn i et rutenett, og korteste vei over vann finnes med A*. Gir distanse og linje til kartet.
@@ -72,6 +72,8 @@ export async function seaRoute(from: { lat: number; lon: number }, to: { lat: nu
   const mask = new Uint8Array(w * h);
   for (let i = 0; i < mask.length; i++) mask[i] = px[i * 4 + 3] > 127 ? 1 : 0;
 
+  // Bare havet: innsjøer og dammer er egne, mindre vannflater og tas bort.
+  largestComponent(mask, w, h);
   const toCell = (p: { lat: number; lon: number }): Cell => [Math.floor((mercX(p.lon) - x0) / cell), Math.floor((mercY(p.lat) - y0) / cell)];
   const snapR = Math.ceil(1500 / (cell * mPerMerc));
   const a = snapToWater(mask, w, h, toCell(from), snapR);

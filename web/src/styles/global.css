@@ -308,3 +308,7 @@ input::placeholder, textarea::placeholder { color: rgba(var(--tint), .45); }
   .page-title { font-size: 40px; }
   .page > .topbar { padding: 14px 14px 0 !important; }
 }
+
+/* Kartknapper og båtnavn (kart og mobil). */
+.legend-btn { min-height: 28px !important; padding: 0 11px !important; font-size: 12px !important; }
+.ship-name { font-size: 12.5px; font-weight: 700; color: #F2F5F3; text-shadow: 0 0 3px #07122A, 0 0 3px #07122A, 0 0 2px #07122A; white-space: nowrap; }

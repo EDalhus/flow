@@ -11,9 +11,9 @@
   background: rgba(20, 27, 23, .62); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
 }
 .kart-zoom { right: 40px; bottom: 112px; display: flex; align-items: center; gap: 8px; }
-.kart.tl-open .kart-zoom { bottom: 236px; }
+.kart.tl-open .kart-zoom { bottom: 274px; }
 .kart.has-sel .kart-zoom { right: calc(32px + var(--col) + 24px); }
-.kart.has-sel.tl-open .kart-zoom { bottom: 290px; }
+.kart.has-sel.tl-open .kart-zoom { bottom: 274px; }
 
 .kart-tl { left: var(--edge); right: 32px; bottom: 24px; padding: 12px 14px 12px 24px; display: flex; flex-direction: column; gap: 14px; }
 .kart .kart-tl.kart-tl-open { border-radius: 28px; padding-top: 18px; background: rgba(20, 27, 23, .82); }
@@ -55,6 +55,4 @@
   position: absolute; left: var(--edge); bottom: 100px; max-width: 460px; display: flex; flex-direction: column; gap: 8px;
   font-size: 11.5px; color: var(--fg-75); padding: 10px 12px; border-radius: 16px; background: rgba(20, 24, 28, .66); backdrop-filter: blur(12px);
 }
-.legend-btn { min-height: 28px !important; padding: 0 11px !important; font-size: 12px !important; }
-.tl-open .kart-legend { bottom: 300px; }
-.ship-name { font-size: 12.5px; font-weight: 700; color: #F2F5F3; text-shadow: 0 0 3px #07122A, 0 0 3px #07122A, 0 0 2px #07122A; white-space: nowrap; }
+.tl-open .kart-legend { bottom: 274px; }

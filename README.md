@@ -145,16 +145,16 @@ Eksempeldataene (`SEED_DEMO`) inneholder testbrukere på `@flow.example`. De kan
 Cron-jobben kjører hvert minutt:
 
 - **Henting:** Den henter siste posisjon for båtene i kaiboka og lagrer posisjon og spor for de siste 6 timene.
-- **Trafikkbildet:** Den henter også alle fartøy i et område på ca. 60 × 60 km rundt kaia, og bygger opp spor for de siste 12 minuttene (tabellen `ais_area`, én rad).
+- **Trafikkbildet:** Den henter også alle fartøy i et område på ca. 150 × 150 km rundt kaia, og bygger opp spor for de siste 12 minuttene (tabellen `ais_area`, én rad).
 - **Ved kai:** Båten er innenfor geofencen (300 m rundt Flatholmen havn 81B) med fart under 3 knop, og har et anløp med ETA innenfor ±12 timer. Anløp uten klokkeslett regnes med ETA midt på dagen.
 - **Kaibok mangler:** Båten har forlatt geofencen uten at kaiboka er levert.
 - **Uten AIS-posisjon:** Status anslås ut fra ETA og ETD, og merket viser at det er et anslag. Anløp uten klokkeslett står som planlagt til AIS melder båten.
 
 På kartet vises trafikken som i Kystverkets kart:
 
-- Skipene er farget etter type (fiske, last, tank, passasjer osv.). Våre båter er turkise, og båter med anløp hos oss har egne merker med navn og status.
+- Skipene er farget etter type (fiske, last, tank, passasjer osv.). Våre båter er turkise med navnet i fet skrift; klikk på en båt med anløp hos oss åpner anløpet. Andre båter kan skjules eller gjøres grå med knappene i fargeforklaringen.
 - Stiplet linje er sporet de siste 12 minuttene. Hvit linje viser hvor fartøyet er om 6 minutter med farten og kursen det holder nå.
-- Klikk på et skip for stevning, kurs, fart, destinasjon, posisjon og når det sist meldte seg. Kortet viser også luftlinje og omtrentlig tid til vår kai, og ringer for hvor langt skipet kommer på 6, 12, 24, 36, 48 og 60 minutter og 3 timer.
+- Klikk på et skip for stevning, kurs, fart, destinasjon, posisjon og når det sist meldte seg. Kortet viser også distanse og omtrentlig tid til vår kai langs sjøveien (korteste vei over vann, beregnet i nettleseren fra kartdataene; luftlinje hvis ingen vei finnes), og ringer for hvor langt skipet kommer på 6, 12, 24, 36, 48 og 60 minutter og 3 timer.
 - Sporet for det siste døgnet hentes fra BarentsWatch sitt historikk-API når et skip velges. Det bruker samme nøkler.
 
 AIS-status vises ikke på kartet. Hvis AIS ikke er satt opp, eller siste henting fra BarentsWatch feilet, kommer det et varsel i bjella. Admin kan åpne varselet og kjøre AIS-sjekken derfra.

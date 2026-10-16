@@ -1,3 +1,4 @@
+import { findPath, largestComponent, smoothPath, snapToWater } from '../../shared/domain/searoute.ts';
 import { describe, expect, it } from 'vitest';
 import { findCollisions, suggest, type CollisionCall } from '../../shared/domain/collisions.ts';
 import { autoFlag } from '../../shared/domain/flags.ts';
@@ -194,5 +195,24 @@ describe('prognose', () => {
     expect(r.weeks_in_year).toBe(53);
     expect(r.weeks[51]).toMatchObject({ week: 52, tonnes_prev: 80 });
     expect(r.weeks[52]).toMatchObject({ week: 53, tonnes_prev: 80, forecast_tonnes: 80 });
+  });
+});
+
+describe('sjøvei', () => {
+  // 7 × 5 ruter: land (#) i midten med en åpning nederst, og en innsjø (L) som ikke henger sammen med havet.
+  const rows = ['.......', '..###..', '..#L#..', '..###..', '.......'];
+  const w = 7, h = 5;
+  const grid = () => new Uint8Array(rows.join('').split('').map(c => (c === '#' ? 0 : 1)));
+
+  it('går rundt land og ser bort fra innsjøer', () => {
+    const mask = grid();
+    largestComponent(mask, w, h);
+    expect(mask[2 * w + 3]).toBe(0);
+    const path = findPath(mask, w, h, [0, 2], [6, 2])!;
+    expect(path[0]).toEqual([0, 2]);
+    expect(path.at(-1)).toEqual([6, 2]);
+    expect(path.every(([x, y]) => mask[y * w + x])).toBe(true);
+    expect(smoothPath(mask, w, path).length).toBeLessThan(path.length);
+    expect(snapToWater(mask, w, h, [3, 2], 3)).not.toBeNull();
   });
 });
