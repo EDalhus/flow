@@ -6,20 +6,20 @@ Internt logistikksystem for kaia på Flatholmen i Ålesund. Menyen har fire hove
 |---|---|
 | **Båter** | Kart med AIS, anløp, kaibok og båtregister (underfaner øverst). Kartet kan vises som mørkt, lyst, satellitt eller hybrid; valget huskes per nettleser. |
 | **Biler** | Kundebiler som henter pall og BB, sortert på forventet dag (ikke klokkeslett). Markeres «Hentet» når de har vært her. |
-| **Bulkbil** | Egne biler som henter salt i bulk. Sjåføren bestiller kvalitet (havsalt, steinsalt, blandet salt, veisalt) i opptil fire steg, f.eks. 16 t blandet på henger og så 12 t havsalt på bil, med pause (min:sek) mellom stegene. |
-| **Produksjon** | To pakkelinjer med 30 t silo hver. Viser hva som pakkes, beregnet nivå i siloen og når hjullasteren skal fylle eller stoppe før kvalitetsbytte. |
+| **Bulkbil** | Egne biler som henter salt i bulk. Sjåføren bestiller kvalitet (havsalt, steinsalt, blandet salt, veisalt) og tonn på bilen, og kan legge til henger som et ekstra steg med pause (min:sek) imellom. Kontoret ser køen og kan fjerne en bestilling som ble feil eller ikke hentes; lastingen startes ikke fra Flow. |
+| **Produksjon** | To pakkelinjer med 30 t silo hver. Viser hva som pakkes i bigbags nå, hva som er neste inn i siloen (med varsel ved kvalitetsbytte), beregnet nivå i siloen og når hjullasteren skal fylle eller stoppe. |
 
 **Søk øverst på alle sider** finner sider, båter, anløp, biler, bulkbiler og folk i Flow. Med BarentsWatch-nøklene på plass søker det også i AIS (Kystverkets data) på navn, MMSI, IMO eller kallesignal – også båter som ikke er i båtregisteret. Fra treffet kan båten legges til i båtregisteret, og «Vis i kartet» viser hvor den er nå. BarentsWatch kan ikke søke på navn, så Flow henter alle fartøy de har sett siste 24 timer i norske farvann og filtrerer selv (listen holdes i minnet i tre minutter). Båter som ikke har vært i området det siste døgnet, blir ikke funnet.
 
 Mannskap på anløp er valgfritt. Det ligger sammenfoldet på anløpet, og roller og personer kan legges til eller fjernes ved behov.
 
-Rapporter og administrasjon ligger nederst i menyen. `/hjullaster` er en fullskjermvisning for nettbrettet i hjullasteren: behov i traktene for bulkbilene, begge siloene og store knapper for å registrere påfylling.
+Rapporter og administrasjon ligger nederst i menyen. `/hjullaster` er en fullskjermvisning for nettbrettet i hjullasteren: behov i traktene, hvilke biler som har bestilt (sjåfør og tonn per kvalitet) og begge siloene. Skjermen er bare til visning. Knappen «Demo: påfylling av silo» viser hvordan siloene tømmes og fylles i produksjon, uten å lagre noe.
 
 **Klokkeslett på anløp er valgfritt.** Tidene er sjelden kjent før ca. en time før båten kommer, så et anløp kan legges inn med bare dag. Tiden settes på anløpet («Sett tid») når den er kjent. Anløp uten tid er utenfor kollisjonssjekken og kaibelegget til tiden er satt.
 
 **Kartbakgrunn:** Mørk og lys er flate sjøkart i Kystverket-stil (hav, land, veier og navn – uten terreng), laget av vektorfliser fra OpenFreeMap (OpenStreetMap-data, ingen nøkkel). Satellitt og hybrid bruker Esri World Imagery. Esris vilkår kan kreve en ArcGIS-konto ved kommersiell bruk; flyfoto fra Norge i bilder kan brukes i stedet hvis dere har tilgang.
 
-**MVP:** Silonivået beregnes fra registrert påfylling og pakkehastigheten (standard 10 t/t per linje). Når sensorene på siloene kobles på, erstattes det beregnede nivået med målt verdi. Bulkbil viser og teller ned; styring av traktene kan kobles på senere.
+**MVP:** Silonivået beregnes fra registrert påfylling (API-et `POST /api/production/fills`; knappene for påfylling er fjernet fra skjermene) og pakkehastigheten (standard 10 t/t per linje). Når sensorene på siloene kobles på, erstattes det beregnede nivået med målt verdi. Bulkbil viser og teller ned; styring av traktene kan kobles på senere.
 
 Alt kjører i én Cloudflare Worker:
 

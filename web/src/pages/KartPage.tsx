@@ -11,7 +11,7 @@ import { QuayMark } from '../components/ui.tsx';
 import { BASEMAPS, FlowMap, attribution, type MapHandle, type Project } from '../map/FlowMap.tsx';
 import { ShipCard, TrafficLegend, approachLabel, approachText } from '../map/ShipCard.tsx';
 import { useBasemap, useTraffic } from '../map/useTraffic.ts';
-import { STATUS_STYLE, addDays, dayShort, nb, isOwnQuay, osloTime, quayTitle, timeRange, todayOslo } from '../lib/format.ts';
+import { STATUS_STYLE, addDays, dayShort, nb, isOwnQuay, osloTime, timeRange, todayOslo } from '../lib/format.ts';
 import { useMe, usePortCalls, useSavePrefs, useQuays, useSettings, useSummary } from '../lib/queries.ts';
 import { VesselLayer } from '../map/Vessels.tsx';
 import { useNow } from '../lib/useNow.ts';
@@ -105,12 +105,8 @@ export function KartPage() {
     return (
       <>
         {quayPt && (
-          <span style={{ position: 'absolute', left: quayPt[0], top: quayPt[1], transform: 'translate(-50%, -150%)', display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(242,245,243,.95)', color: '#1A231E', borderRadius: 999, padding: '4px 10px 4px 6px', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#1A231E', color: 'var(--fg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Anchor size={11} /></span>
-            Vår kai · {(() => {
-              const own = (quays.data ?? []).filter(x => !x.company);
-              return own.length ? own.map(x => quayTitle(x)).join(' · ') : 'Flatholmen';
-            })()}
+          <span title="Vår kai" aria-label="Vår kai" style={{ position: 'absolute', left: quayPt[0], top: quayPt[1], transform: 'translate(-50%, -50%)', width: 26, height: 26, borderRadius: '50%', background: '#1A231E', color: 'var(--fg)', border: '2px solid rgba(242,245,243,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <Anchor size={13} />
           </span>
         )}
         <VesselLayer project={project} vessels={vessels} calls={list} selectedId={selected?.id} onSelect={id => select(id)} quayPos={quayPos} />

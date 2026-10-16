@@ -4,7 +4,7 @@ import type { PortCallView } from '../../../shared/api.ts';
 import { CREW_ROLE_LABEL } from '../../../shared/domain/types.ts';
 import { AlertsPanel } from '../components/Alerts.tsx';
 import { Chat } from '../components/Chat.tsx';
-import { ArrowLeft, Check, Phone } from '../components/Icons.tsx';
+import { Anchor, ArrowLeft, Check, Phone } from '../components/Icons.tsx';
 import { KaibokForm } from '../components/KaibokForm.tsx';
 import { GlobalSearch } from '../components/GlobalSearch.tsx';
 import { BellButton, BoatTabs, Sidebar, UserBadge } from '../components/Topbar.tsx';
@@ -78,7 +78,7 @@ export function MobileApp() {
               const q = project(fence.lon, fence.lat);
               return (
                 <>
-                  {q && <span style={{ position: 'absolute', left: q[0], top: q[1], transform: 'translate(-50%, -140%)', background: 'rgba(242,245,243,.95)', color: '#1A231E', borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', pointerEvents: 'none' }}>Vår kai</span>}
+                  {q && <span aria-label="Vår kai" style={{ position: 'absolute', left: q[0], top: q[1], transform: 'translate(-50%, -50%)', width: 24, height: 24, borderRadius: '50%', background: '#1A231E', color: 'var(--fg)', border: '2px solid rgba(242,245,243,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}><Anchor size={12} /></span>}
                   <VesselLayer project={project} vessels={vessels} calls={list} selectedId={sel?.id} onSelect={id => go(id)} quayPos={quayPos} />
                 </>
               );

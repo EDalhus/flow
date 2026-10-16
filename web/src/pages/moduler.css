@@ -25,6 +25,17 @@
 /* Silo: stående måler. */
 .silo { position: relative; width: 84px; height: 180px; border-radius: 18px 18px 30px 30px; border: 2px solid rgba(var(--tint), .25); overflow: hidden; background: rgba(var(--tint), .04); flex: none; }
 .silo-fill { position: absolute; left: 0; right: 0; bottom: 0; transition: height .6s ease; }
+.silo-live { transition: height .12s linear; }
+.silo-filling { box-shadow: 0 -2px 0 rgba(255,255,255,.55) inset; }
+/* Demo: salt som renner inn ovenfra. */
+.silo-pour {
+  position: absolute; top: 0; left: 50%; width: 30%; transform: translateX(-50%); z-index: 1;
+  background: repeating-linear-gradient(180deg, rgba(240,246,244,.95) 0 3px, transparent 3px 7px, rgba(240,246,244,.6) 7px 9px, transparent 9px 14px);
+  background-size: 100% 28px; animation: silo-pour .35s linear infinite; border-radius: 0 0 6px 6px;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent); mask: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+}
+@keyframes silo-pour { to { background-position: 0 28px; } }
+@media (prefers-reduced-motion: reduce) { .silo-pour { animation: none; } }
 .silo-mark { position: absolute; left: 0; right: 0; border-top: 1px dashed rgba(var(--tint), .35); }
 
 .advice { border-radius: 16px; padding: 10px 14px; font-size: 15px; display: flex; align-items: center; gap: 10px; }
@@ -33,6 +44,12 @@
 .advice-ok { background: rgba(91, 214, 138, .12); color: var(--ok-fg); }
 .advice-stopp { background: rgba(128, 239, 222, .14); color: var(--aqua); }
 .advice-ingen { background: rgba(var(--tint), .06); color: var(--fg-62); }
+
+/* Produksjon: framdrift og neste ordre. */
+.po-bar { height: 8px; border-radius: 99px; background: rgba(var(--tint), .1); overflow: hidden; }
+.po-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--aqua); }
+.po-next { border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; background: rgba(var(--tint), .05); border: 1px solid var(--line); }
+.po-change { border-color: rgba(247, 185, 85, .45); background: rgba(247, 185, 85, .07); }
 
 /* ---------------------------------------------------------------- hjullasterskjermen (nettbrett) */
 .hl { min-height: 100vh; background: var(--bg); color: var(--fg); padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }

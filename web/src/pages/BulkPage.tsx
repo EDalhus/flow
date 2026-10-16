@@ -4,7 +4,7 @@ import type { BulkOrderView, BulkQuality } from '../../../shared/api.ts';
 import { bulkDemand, bulkPhase, formatMinSec, parseMinSec } from '../../../shared/domain/bulk.ts';
 import { ArrowUpRight, Close, Plus } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
-import { Loading, Segmented } from '../components/ui.tsx';
+import { Loading } from '../components/ui.tsx';
 import { errorText } from '../lib/api.ts';
 import { fr, osloTime } from '../lib/format.ts';
 import { useBulkAction, useBulkOrders, useBulkQualities, useCreateBulkOrder } from '../lib/queries.ts';
@@ -58,7 +58,7 @@ export function BulkPage() {
                 <div key={o.id} className="mrow" style={{ gridTemplateColumns: '1fr 2fr auto' }}>
                   <span>{o.truck}<span style={{ display: 'block', fontSize: 13, color: 'var(--fg-55)' }}>{o.destination ?? o.driver?.short_name ?? ''}</span></span>
                   <span style={{ fontSize: 14 }}>{o.steps.map(s => `${fr(s.tonnes)} t ${s.quality_name}`).join(' + ')}</span>
-                  <span className="n" style={{ fontSize: 14, color: 'var(--fg-62)' }}>{o.status === 'avlyst' ? 'Avlyst' : `Ferdig ${o.finished_at ? osloTime(o.finished_at) : ''}`}</span>
+                  <span className="n" style={{ fontSize: 14, color: 'var(--fg-62)' }}>{o.status === 'avlyst' ? 'Fjernet' : `Ferdig ${o.finished_at ? osloTime(o.finished_at) : ''}`}</span>
                 </div>
               ))}
             </div>
@@ -71,69 +71,62 @@ export function BulkPage() {
   );
 }
 
-/** Én bestilling med steg, fase og knapper. Brukes også på hjullasterskjermen (large). */
-export function BulkCard({ order: o, now, large }: { order: BulkOrderView; now: number; large?: boolean }) {
+/** Én bestilling med steg og fase. Lastingen styres ikke herfra; kontoret kan bare fjerne en bestilling. */
+function BulkCard({ order: o, now }: { order: BulkOrderView; now: number }) {
   const act = useBulkAction();
   const phase = bulkPhase(o.status, o.steps, now);
   const current = phase.kind === 'laster' ? phase.step : phase.kind === 'pause' ? phase.next : null;
   const last = o.steps[o.steps.length - 1]?.seq;
   return (
-    <article className="glass" style={{ padding: large ? 20 : 16, display: 'flex', flexDirection: 'column', gap: 12, borderRadius: 24,
+    <article className="glass" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, borderRadius: 24,
       ...(phase.kind !== 'venter' ? { borderColor: 'rgba(128,239,222,.45)' } : {}) }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: large ? 26 : 19 }}>{o.truck}
+        <span style={{ fontSize: 19 }}>{o.truck}
           <span className="muted" style={{ fontSize: 14, marginLeft: 10 }}>{[o.destination, o.driver?.short_name].filter(Boolean).join(' · ')}</span>
         </span>
-        <span className="n" style={{ fontSize: large ? 22 : 16 }}>
+        <span className="n" style={{ fontSize: 16 }}>
           {phase.kind === 'venter' && <span className="muted">Venter · bestilt {osloTime(o.created_at)}</span>}
           {phase.kind === 'laster' && <span style={{ color: 'var(--aqua)' }}>● Laster steg {phase.step}</span>}
           {phase.kind === 'pause' && <span style={{ color: 'var(--warn-fg)' }}>Pause · steg {phase.next} om {formatMinSec((phase.untilMs - now) / 1000)}</span>}
         </span>
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {o.steps.map(s => (
-          <span key={s.id} style={{ ['--q' as string]: s.color, display: 'flex', alignItems: 'center', gap: 8, borderRadius: 16, padding: large ? '12px 16px' : '8px 12px',
-            fontSize: large ? 20 : 14, opacity: s.finished_at ? .45 : 1,
+          <span key={s.id} style={{ ['--q' as string]: s.color, display: 'flex', alignItems: 'center', gap: 8, borderRadius: 16, padding: '8px 12px',
+            fontSize: 14, opacity: s.finished_at ? .45 : 1,
             border: `2px solid ${s.seq === current ? s.color : 'var(--line)'}`, background: s.seq === current ? `color-mix(in srgb, ${s.color} 16%, transparent)` : 'rgba(var(--tint), .04)' }}>
             <span className="qdot" />
-            <span className="n">{s.seq}. {fr(s.tonnes)} t</span> {s.quality_name}
-            {s.target && <span className="muted" style={{ fontSize: '.8em' }}>· {s.target}</span>}
+            {s.target && <span style={{ textTransform: 'capitalize' }}>{s.target}:</span>}
+            <span className="n">{fr(s.tonnes)} t</span> {s.quality_name}
             {s.pause_after_sec > 0 && s.seq !== last && <span className="muted n" style={{ fontSize: '.8em' }}>· pause {formatMinSec(s.pause_after_sec)}</span>}
             {s.finished_at && <span className="muted" style={{ fontSize: '.8em' }}>✓</span>}
           </span>
         ))}
-      </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {phase.kind === 'venter' && (
-          <button type="button" className={`btn btn-w${large ? ' hl-btn' : ''}`} disabled={act.isPending} onClick={() => act.mutate({ id: o.id, action: 'start' })}>Start lasting</button>
-        )}
-        {(phase.kind === 'laster' || phase.kind === 'pause') && (
-          <button type="button" className={`btn btn-w${large ? ' hl-btn' : ''}`} disabled={act.isPending} onClick={() => act.mutate({ id: o.id, action: 'next' })}>
-            {phase.kind === 'pause' ? `Start steg ${phase.next} nå` : phase.step === last ? 'Ferdig lastet' : `Steg ${phase.step} ferdig`}
-          </button>
-        )}
-        {!large && (
-          <button type="button" className="btn" disabled={act.isPending} onClick={() => confirm(`Avlyse ${o.truck}?`) && act.mutate({ id: o.id, action: 'cancel' })}>Avlys</button>
-        )}
+        <button type="button" className="btn" disabled={act.isPending} style={{ marginLeft: 'auto', minHeight: 38, fontSize: 14 }}
+          onClick={() => confirm(`Fjerne bestillingen for ${o.truck}? Bruk dette hvis den ble feil eller ikke blir hentet i dag.`) && act.mutate({ id: o.id, action: 'cancel' })}>
+          Fjern ordre
+        </button>
       </div>
       {act.isError && <div className="error-box">{errorText(act.error)}</div>}
     </article>
   );
 }
 
-type Step = { quality_id: string; tonnes: string; target: 'henger' | 'bil' | ''; pause: string };
+type Step = { quality_id: string; tonnes: string; target: 'bil' | 'henger'; pause: string };
 const TRUCK_KEY = 'flow-bulkbil';
+const BIL: Step = { quality_id: '', tonnes: '16', target: 'bil', pause: '2:00' };
+const HENGER: Step = { quality_id: '', tonnes: '12', target: 'henger', pause: '0:00' };
 
-/** Sjåførens bestilling: velg kvalitet og tonn per steg, og pause mellom stegene. */
+/** Sjåførens bestilling: bilen er alltid med, hengeren legges til som et ekstra steg. */
 function OrderForm({ qualities }: { qualities: BulkQuality[] }) {
   const create = useCreateBulkOrder();
   const [truck, setTruck] = useState(() => { try { return localStorage.getItem(TRUCK_KEY) ?? ''; } catch { return ''; } });
   const [destination, setDestination] = useState('');
-  const [steps, setSteps] = useState<Step[]>([{ quality_id: '', tonnes: '16', target: 'henger', pause: '2:00' }, { quality_id: '', tonnes: '12', target: 'bil', pause: '0:00' }]);
+  const [steps, setSteps] = useState<Step[]>([BIL]);
   const set = (i: number, p: Partial<Step>) => setSteps(steps.map((s, j) => (j === i ? { ...s, ...p } : s)));
 
   const parsed = steps.map((s, i) => ({
-    quality_id: s.quality_id, tonnes: Number(s.tonnes.replace(',', '.')), target: s.target || null,
+    quality_id: s.quality_id, tonnes: Number(s.tonnes.replace(',', '.')), target: s.target,
     pause_after_sec: i === steps.length - 1 ? 0 : parseMinSec(s.pause),
   }));
   const valid = truck.trim() && parsed.every(s => s.quality_id && s.tonnes > 0 && s.tonnes <= 60 && s.pause_after_sec != null);
@@ -155,39 +148,35 @@ function OrderForm({ qualities }: { qualities: BulkQuality[] }) {
         <label className="field"><span>Til (valgfritt)</span><input className="inp" value={destination} onChange={e => setDestination(e.target.value)} /></label>
       </div>
       {steps.map((s, i) => (
-        <div key={i} className="step-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="eyebrow">Steg {i + 1}</span>
-            {steps.length > 1 && (
-              <button type="button" className="icon-btn" aria-label={`Fjern steg ${i + 1}`} style={{ width: 32, height: 32 }} onClick={() => setSteps(steps.filter((_, j) => j !== i))}><Close size={14} /></button>
+        <div key={s.target} className="step-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 32 }}>
+            <span className="eyebrow">{s.target === 'bil' ? 'Bil' : 'Henger'}</span>
+            {s.target === 'henger' && (
+              <button type="button" className="icon-btn" aria-label="Fjern henger" style={{ width: 32, height: 32 }} onClick={() => setSteps(steps.filter((_, j) => j !== i))}><Close size={14} /></button>
             )}
           </div>
-          <div role="group" aria-label={`Kvalitet steg ${i + 1}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div role="group" aria-label={`Kvalitet ${s.target}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {qualities.map(q => (
               <button key={q.id} type="button" className="qbtn" aria-pressed={s.quality_id === q.id} style={{ ['--q' as string]: q.color }} onClick={() => set(i, { quality_id: q.id })}>
                 <span className="qdot" />{q.name}
               </button>
             ))}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 10, alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: i < steps.length - 1 ? '90px 1fr' : '90px', gap: 10, alignItems: 'end' }}>
             <label className="field"><span>Tonn</span><input className="inp n" inputMode="decimal" value={s.tonnes} onChange={e => set(i, { tonnes: e.target.value })} /></label>
-            <div className="field"><span>Til</span>
-              <Segmented<Step['target']> label="Lastes på" value={s.target} onChange={v => set(i, { target: v })} stretch
-                options={[{ value: 'henger', label: 'Henger' }, { value: 'bil', label: 'Bil' }, { value: '', label: '–' }]} />
-            </div>
+            {i < steps.length - 1 && (
+              <label className="field"><span>Pause før henger (min:sek)</span>
+                <input className="inp n" inputMode="numeric" value={s.pause} onChange={e => set(i, { pause: e.target.value })} placeholder="2:30"
+                  aria-invalid={parseMinSec(s.pause) == null} style={parseMinSec(s.pause) == null ? { borderColor: 'var(--bad-fg)' } : undefined} />
+              </label>
+            )}
           </div>
-          {i < steps.length - 1 && (
-            <label className="field"><span>Pause før neste steg (min:sek)</span>
-              <input className="inp n" inputMode="numeric" value={s.pause} onChange={e => set(i, { pause: e.target.value })} placeholder="2:30"
-                aria-invalid={parseMinSec(s.pause) == null} style={parseMinSec(s.pause) == null ? { borderColor: 'var(--bad-fg)' } : undefined} />
-            </label>
-          )}
         </div>
       ))}
-      {steps.length < 4 && (
-        <button type="button" className="btn" onClick={() => setSteps([...steps, { quality_id: '', tonnes: '10', target: '', pause: '0:00' }])}
+      {steps.length === 1 && (
+        <button type="button" className="btn" onClick={() => setSteps([...steps, HENGER])}
           style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 38, fontSize: 13 }}>
-          <Plus size={14} /> Legg til steg
+          <Plus size={14} /> Legg til henger
         </button>
       )}
       {create.isError && <div className="error-box">{errorText(create.error)}</div>}
