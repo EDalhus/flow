@@ -1,4 +1,4 @@
-import type { PhotoUpload } from '../../../shared/api.ts';
+import type { BoatDetail, BoatPhotoCategory, PhotoUpload } from '../../../shared/api.ts';
 import { ApiError, chosenHeaders } from './api.ts';
 
 // Bilder skaleres ned og kodes på telefonen før opplasting: et mobilbilde på 4–8 MB blir
@@ -49,4 +49,21 @@ export async function uploadPhoto(callId: string, file: File): Promise<PhotoUplo
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, data);
   return data as PhotoUpload;
+}
+
+/** Bilde av båten (rampe, sideport, heis …) til båtregisteret. Svarer med oppdatert båt. */
+export async function uploadBoatPhoto(boatId: string, file: File, category: BoatPhotoCategory, caption: string): Promise<BoatDetail> {
+  const { image, thumb } = await compress(file);
+  const ext = (b: Blob) => (b.type === 'image/webp' ? 'webp' : 'jpg');
+  const form = new FormData();
+  form.set('image', image.blob, `bilde.${ext(image.blob)}`);
+  form.set('thumb', thumb.blob, `miniatyr.${ext(thumb.blob)}`);
+  form.set('width', String(image.width));
+  form.set('height', String(image.height));
+  form.set('category', category);
+  if (caption.trim()) form.set('caption', caption.trim());
+  const res = await fetch(`/api/boats/${boatId}/photos`, { method: 'POST', body: form, credentials: 'same-origin', headers: chosenHeaders() });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, data);
+  return data as BoatDetail;
 }

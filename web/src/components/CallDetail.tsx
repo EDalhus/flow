@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { BoatPhotos } from './BoatPhotos.tsx';
 import type { CollisionView, PortCallView, UserView } from '../../../shared/api.ts';
 import { CREW_ROLE_LABEL, CREW_ROLES, type CrewRole } from '../../../shared/domain/types.ts';
 import { errorText } from '../lib/api.ts';
@@ -112,6 +113,7 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
             </div>
           )}
           {call.boat.flag_reason && <p style={{ margin: '0 6px', fontSize: 14, color: 'var(--fg-75)' }}>{call.boat.flag_reason}</p>}
+          {boat.data && <div style={{ padding: '0 6px' }}><BoatPhotos boat={boat.data} /></div>}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ margin: '0 6px 4px', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>Siste kaibøker</h3>
             {(boat.data?.recent_logs ?? []).slice(0, 5).map(l => (

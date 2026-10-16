@@ -6,13 +6,13 @@ import type { AppEnv } from '../types.ts';
 // Avviksbilder. Nettleseren skalerer ned og koder til WebP (eller JPEG) før opplasting,
 // så Workeren bare validerer og lagrer i R2. Bildene serveres gjennom Workeren (bak Access).
 
-const MAX_IMAGE = 4 * 1024 * 1024;
-const MAX_THUMB = 400 * 1024;
+export const MAX_IMAGE = 4 * 1024 * 1024;
+export const MAX_THUMB = 400 * 1024;
 const MAX_PENDING = 20;
-const TYPES: Record<string, string> = { 'image/webp': 'webp', 'image/jpeg': 'jpg' };
+export const TYPES: Record<string, string> = { 'image/webp': 'webp', 'image/jpeg': 'jpg' };
 
 /** Sjekker filsignaturen, ikke bare Content-Type. */
-async function sniff(file: File): Promise<string | null> {
+export async function sniff(file: File): Promise<string | null> {
   const b = new Uint8Array(await file.slice(0, 12).arrayBuffer());
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
   const ascii = (from: number, to: number) => String.fromCharCode(...b.slice(from, to));

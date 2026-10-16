@@ -31,7 +31,9 @@ export function AnlopPage() {
 
   const list = calls.data?.calls ?? [];
   const needle = q.trim().toLowerCase();
-  const visible = list.filter(c =>
+  // Ferdige anløp (kaibok levert) ligger i Kaibok, ikke her.
+  const done = list.filter(c => c.status === 'ferdig').length;
+  const visible = list.filter(c => c.status !== 'ferdig' &&
     (!needle || c.boat.name.toLowerCase().includes(needle)) &&
     (filter === 'uke' || (filter === 'idag' && c.service_date === today) || (filter === 'kollisjon' && c.collisions.length > 0)));
   const days = [...new Set(visible.map(c => c.service_date))].sort();
@@ -77,7 +79,10 @@ export function AnlopPage() {
             </section>
           );
         })}
-        {calls.isSuccess && !days.length && <p className="empty">Ingen anløp matcher søket.</p>}
+        {calls.isSuccess && !days.length && <p className="empty">{needle ? 'Ingen anløp matcher søket.' : 'Ingen kommende anløp.'}</p>}
+        {done > 0 && (
+          <Link to="/kaibok" className="muted" style={{ fontSize: 13 }}>{done} ferdige anløp i perioden ligger i Kaibok →</Link>
+        )}
       </div>
 
       {showNew && (

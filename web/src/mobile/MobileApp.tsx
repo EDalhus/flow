@@ -8,11 +8,11 @@ import { ArrowLeft, Check, Phone } from '../components/Icons.tsx';
 import { KaibokForm } from '../components/KaibokForm.tsx';
 import { GlobalSearch } from '../components/GlobalSearch.tsx';
 import { BellButton, BoatTabs, Sidebar, UserBadge } from '../components/Topbar.tsx';
-import { Loading, QuayMark, StatusBadge } from '../components/ui.tsx';
+import { QuayMark, StatusBadge } from '../components/ui.tsx';
 import { BASEMAPS, FlowMap, attribution, type MapHandle } from '../map/FlowMap.tsx';
 import { ShipCard } from '../map/ShipCard.tsx';
 import { useBasemap, useTraffic } from '../map/useTraffic.ts';
-import { FLAG_STYLE, addDays, dayHeading, dayShort, fr, goodsParts, osloTime, quayLabel, telHref, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
+import { FLAG_STYLE, addDays, dayShort, fr, goodsParts, osloTime, telHref, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useBoat, useMe, usePortCalls, useQuays, useSettings, useUsers } from '../lib/queries.ts';
 import { VesselLayer } from '../map/Vessels.tsx';
 import { canQuayLog } from '../lib/roles.ts';
@@ -66,12 +66,11 @@ export function MobileApp() {
     );
   }
 
-  const left = list.filter(c => c.service_date === today && c.status !== 'ferdig').length;
-  const clash = list.flatMap(c => c.collisions.map(x => ({ call: c, x }))).find(Boolean);
 
   return (
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: 'var(--bg)', fontSize: 16 }}>
-      <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: screen === 'list' ? 420 : 360, transition: 'height .4s ease' }}>
+      {/* Forsiden er kartet, som på PC. Anløpslisten ligger under fanen Anløp. */}
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: screen === 'list' ? 'calc(100% - var(--bottomnav, 0px))' : 360, transition: 'height .4s ease' }}>
         {settings.isSuccess && (
           <FlowMap ref={mapRef} center={focus ? [focus.lon, focus.lat] : [fence.lon - 0.01, fence.lat]} zoom={12.4} geofence={fence} interactive={screen === 'list'} basemap={basemap}
             traffic={layers} onShipClick={screen === 'list' ? (mmsi, callId) => (callId ? go(callId) : setShipSel(mmsi)) : undefined} onZoomNames={setZoomNames}
@@ -97,7 +96,7 @@ export function MobileApp() {
           </header>
           <div style={{ position: 'absolute', top: 66, left: 12, right: 12, display: 'flex', justifyContent: 'center', zIndex: 2 }}><BoatTabs /></div>
           {/* Andre båter (utenfor båtregisteret): vis/skjul og farger/grå, samme valg som på PC. */}
-          <div role="group" aria-label="Andre båter" style={{ position: 'absolute', top: 296, right: 10, zIndex: 2, display: 'flex', gap: 6 }}>
+          <div role="group" aria-label="Andre båter" style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 66px)', right: 10, zIndex: 2, display: 'flex', gap: 6 }}>
             <button type="button" className="tab legend-btn" aria-pressed={t.showOthers} onClick={() => t.setShowOthers(!t.showOthers)}
               style={{ backdropFilter: 'blur(16px)', background: t.showOthers ? undefined : 'rgba(32,42,36,.7)' }}>
               {t.showOthers ? 'Skjul andre båter' : 'Vis andre båter'}
@@ -109,79 +108,25 @@ export function MobileApp() {
               </button>
             )}
           </div>
-          <div role="group" aria-label="Kartvisning" className="pill seg" style={{ position: 'absolute', top: 336, right: 10, zIndex: 2, backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.7)' }}>
+          <div role="group" aria-label="Kartvisning" className="pill seg" style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 24px)', right: 10, zIndex: 2, backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.7)' }}>
             {BASEMAPS.map(b => (
               <button key={b.value} type="button" className="tab" aria-pressed={basemap === b.value} onClick={() => pickBasemap(b.value)}
                 style={{ minHeight: 30, padding: '0 9px', fontSize: 12 }}>{b.label}</button>
             ))}
           </div>
-          <span style={{ position: 'absolute', top: 372, left: 12, right: 12, fontSize: 9.5, color: 'var(--fg-45)', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{attribution(basemap)}</span>
+          <span style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 6px)', left: 12, right: 12, fontSize: 9.5, color: 'var(--fg-45)', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{attribution(basemap)}</span>
           {shipSel && selShip && (
             <ShipCard v={selShip} now={now.getTime()} approach={t.approach} trackError={trackError} onClose={() => setShipSel(null)}
               docked={{ position: 'absolute', top: 116, left: 10, right: 10, width: 'auto', zIndex: 30, maxHeight: 'calc(100% - 116px - var(--bottomnav, 62px) - 10px)', overflowY: 'auto' }} />
           )}
           {alerts && <div style={{ position: 'absolute', top: 70, left: 10, right: 10, zIndex: 40 }}><AlertsPanel onClose={() => setAlerts(false)} style={{ width: '100%' }} /></div>}
 
-          <section aria-labelledby="m-list-h" style={{ ...sheet, top: 388, bottom: 'var(--bottomnav, 0px)' }}>
-            <Grabber />
-            <div style={{ padding: '10px 20px 8px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flex: 'none' }}>
-              <h2 id="m-list-h" style={{ margin: 0, fontSize: 22, fontWeight: 400 }}>Anløp</h2>
-              <span style={{ fontSize: 14, color: 'var(--fg-62)' }}>{left} igjen i dag</span>
-            </div>
-            <div className="scroll-none" style={{ flex: 1, padding: '4px 14px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {calls.isPending && <Loading />}
-              {clash && (
-                <div role="alert" className="alert-red" style={{ borderRadius: 22, padding: '14px 16px', background: 'rgba(120,42,38,.5)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <span className="n" style={{ width: 22, height: 22, flex: 'none', borderRadius: '50%', background: '#E5484D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, marginTop: 2 }}>!</span>
-                  <span style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: 16 }}>{clash.x.kind === 'quay' ? `Kollisjon på ${quayLabel(clash.call.quay)}` : 'Booket for tett'}</span>
-                    <span style={{ fontSize: 14, color: 'rgba(var(--tint), .7)' }}>{[clash.call.boat.name, ...clash.x.with.map(w => w.boat_name)].join(' og ')} · {clash.x.text}</span>
-                  </span>
-                </div>
-              )}
-              {[today, addDays(today, 1)].map(d => {
-                const items = list.filter(c => c.service_date === d);
-                if (!items.length) return null;
-                return (
-                  <div key={d} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <h3 style={{ margin: '6px 6px 0', fontSize: 14, fontWeight: 400, color: 'var(--fg-62)' }}>{d === today ? 'I dag' : dayHeading(d, today)}</h3>
-                    {items.map(c => <MobileCard key={c.id} call={c} onOpen={() => go(c.id)} />)}
-                  </div>
-                );
-              })}
-              {calls.isSuccess && !list.length && <p className="empty">Ingen anløp i dag eller i morgen.</p>}
-            </div>
-          </section>
           <Sidebar />
         </>
       ) : sel && (
         <Detail call={sel} now={now} today={today} onBack={() => go(null)} onKaibok={() => go(sel.id, true)} canLog={canQuayLog(me.data)} />
       )}
     </div>
-  );
-}
-
-function MobileCard({ call: c, onOpen }: { call: PortCallView; onOpen: () => void }) {
-  const f = FLAG_STYLE[c.boat.flag];
-  const boats = [...new Set(c.collisions.flatMap(x => x.with.map(w => w.boat_name)))];
-  return (
-    <button type="button" className="card" onClick={onOpen} aria-label={`${c.boat.name}, ${typeLabel(c.type)} ${quayLabel(c.quay)}, ${c.time_known ? `ETA ${osloTime(c.eta)}` : 'tid ikke satt'}`}
-      style={{ borderRadius: 24, gap: 10, background: 'rgba(var(--tint), .05)', border: '1px solid rgba(var(--tint), .07)', ...(c.status === 'ferdig' ? { opacity: .6 } : {}) }}>
-      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%' }}>
-        <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <span style={{ fontSize: 21, letterSpacing: '-0.01em' }}>{c.boat.name}</span>
-          <span style={{ fontSize: 14, color: 'rgba(var(--tint), .65)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {typeLabel(c.type)} · <QuayMark quay={c.quay} compact />
-          </span>
-        </span>
-        <span className="n" style={{ fontSize: c.time_known ? 28 : 15, fontWeight: 200, letterSpacing: '-0.02em' }}>{c.time_known ? osloTime(c.eta) : 'Tid ikke satt'}</span>
-      </span>
-      <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-        <StatusBadge status={c.status} basis={c.status_basis} size="lg" />
-        <span className="badge" style={{ padding: '6px 11px', fontSize: 13, background: f.bg, color: f.c }}>{f.label} · {c.boat.rating_count ? fr(c.boat.avg_total) : '–'}</span>
-      </span>
-      {c.collisions.length > 0 && <span style={{ fontSize: 14, color: 'var(--bad-fg)' }}>{boats.length ? `Kolliderer med ${boats.join(', ')}` : c.collisions[0].text}</span>}
-    </button>
   );
 }
 

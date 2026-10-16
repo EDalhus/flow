@@ -14,6 +14,27 @@ export interface Me extends UserRef {
   roles: UserRole[];
   /** Appen kjører uten Cloudflare Access; brukeren velges i appen. */
   open: boolean;
+  prefs: UserPrefs;
+}
+
+/** Valg hver bruker gjør selv. */
+export interface UserPrefs {
+  /** Periode på kaiplanen i kartet: 1, 3, 7 eller 14 dager. Standard 7. */
+  timeline_days?: 1 | 3 | 7 | 14;
+}
+
+export type BoatPhotoCategory = 'rampe' | 'sideport' | 'heis' | 'lasterom' | 'dekk' | 'kran' | 'annet';
+
+export interface BoatPhoto {
+  id: string;
+  url: string;
+  thumb_url: string | null;
+  category: BoatPhotoCategory;
+  caption: string | null;
+  width: number | null;
+  height: number | null;
+  uploaded_by: string | null;
+  created_at: string;
 }
 
 export interface UserView extends UserRef {
@@ -176,6 +197,7 @@ export interface BoatView extends BoatSummary {
 
 export interface BoatDetail extends BoatView {
   recent_logs: QuayLogView[];
+  photos: BoatPhoto[];
 }
 
 export interface WeeklyReport {

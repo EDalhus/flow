@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { PortCallView } from '../../../shared/api.ts';
+import { osloToUtc } from '../../../shared/time.ts';
 import { AlertsPanel } from '../components/Alerts.tsx';
 import { CallDetail, type DetailTab } from '../components/CallDetail.tsx';
 import { Anchor, Minus, Plus, Target, TrendUp } from '../components/Icons.tsx';
@@ -10,8 +11,8 @@ import { QuayMark } from '../components/ui.tsx';
 import { BASEMAPS, FlowMap, attribution, type MapHandle, type Project } from '../map/FlowMap.tsx';
 import { ShipCard, TrafficLegend, approachLabel, approachText } from '../map/ShipCard.tsx';
 import { useBasemap, useTraffic } from '../map/useTraffic.ts';
-import { STATUS_STYLE, addDays, nb, isOwnQuay, osloTime, quayTitle, timeRange, todayOslo } from '../lib/format.ts';
-import { usePortCalls, useQuays, useSettings, useSummary } from '../lib/queries.ts';
+import { STATUS_STYLE, addDays, dayShort, nb, isOwnQuay, osloTime, quayTitle, timeRange, todayOslo } from '../lib/format.ts';
+import { useMe, usePortCalls, useSavePrefs, useQuays, useSettings, useSummary } from '../lib/queries.ts';
 import { VesselLayer } from '../map/Vessels.tsx';
 import { useNow } from '../lib/useNow.ts';
 import './kart.css';
@@ -57,7 +58,6 @@ export function KartPage() {
     return qy?.lat != null && qy.lon != null ? { lat: qy.lat, lon: qy.lon } : fence;
   };
 
-  const todays = list.filter(c => c.service_date === today);
 
   // Båt med anløp hos oss: åpne anløpet i sidepanelet. Andre båter: skipskortet.
   const pickShip = (mmsi: string | null, callId?: string) => {
@@ -163,7 +163,7 @@ export function KartPage() {
 
       <TrafficLegend showOthers={t.showOthers} setShowOthers={t.setShowOthers} colorOthers={t.colorOthers} setColorOthers={t.setColorOthers} />
 
-      <Timeline calls={todays.filter(c => c.time_known)} untimed={todays.filter(c => !c.time_known && c.status !== 'ferdig').length} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} open={tlOpen} onToggle={toggleTl} />
+      <Timeline today={today} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} open={tlOpen} onToggle={toggleTl} />
 
       {alertsOpen && <div className="ov kart-alerts"><AlertsPanel onClose={() => setAlertsOpen(false)} /></div>}
 
@@ -234,19 +234,39 @@ function MainStats() {
   );
 }
 
+const PERIODS_TL = [{ days: 1, label: '24 t' }, { days: 3, label: '3 d' }, { days: 7, label: '7 d' }, { days: 14, label: '14 d' }] as const;
+type TlDays = (typeof PERIODS_TL)[number]['days'];
+const DAY_MS = 86_400_000;
+
 /**
- * Dagens kaiplan: én bane per kai, kollisjoner skravert, strek for nå.
+ * Kaiplan: én bane per kai for valgt periode (24 t, 3, 7 eller 14 dager – 7 er standard, og hver bruker velger selv).
+ * Kollisjoner skravert, strek for nå. Anløp uten klokkeslett vises som stiplet heldagsfelt.
  * Sammenlagt er den en smal stripe; åpen vokser den oppover. Vis/Skjul-knappen står på samme sted i begge.
  */
-function Timeline({ calls, untimed, selected, onSelect, now, quays, open, onToggle }: {
-  calls: PortCallView[]; untimed: number; selected?: string; onSelect: (id: string) => void; now: Date;
+function Timeline({ today, selected, onSelect, now, quays, open, onToggle }: {
+  today: string; selected?: string; onSelect: (id: string) => void; now: Date;
   quays: { id: string; name: string; nickname: string | null; company: string | null }[];
   open: boolean; onToggle: () => void;
 }) {
-  const hour = (iso: string) => { const [h, m] = osloTime(iso).split(':').map(Number); return h + m / 60; };
-  const t0 = Math.min(5, ...calls.map(c => Math.floor(hour(c.eta))));
-  const t1 = Math.max(20, ...calls.map(c => Math.min(24, Math.ceil(hour(c.etd) < hour(c.eta) ? 24 : hour(c.etd)))));
-  const pct = (h: number) => ((h - t0) / (t1 - t0)) * 100;
+  const me = useMe();
+  const savePrefs = useSavePrefs();
+  const days: TlDays = me.data?.prefs?.timeline_days ?? 7;
+  const range = usePortCalls(today, addDays(today, days - 1));
+  const all = (range.data?.calls ?? []).filter(c => c.status !== 'avlyst');
+  const calls = days === 1 ? all.filter(c => c.time_known) : all;
+  const untimed = all.filter(c => !c.time_known && c.status !== 'ferdig').length;
+
+  const ms = (iso: string) => Date.parse(iso);
+  const start = ms(osloToUtc(today, 0));
+  let t0 = start, t1 = ms(osloToUtc(addDays(today, days), 0));
+  if (days === 1) {
+    // I dag: tett rundt dagens anløp, minst 05–20.
+    const h = 3_600_000;
+    t0 = Math.min(start + 5 * h, ...calls.map(c => Math.floor(ms(c.eta) / h) * h));
+    t1 = Math.min(start + DAY_MS, Math.max(start + 20 * h, ...calls.map(c => Math.ceil(ms(c.etd) / h) * h)));
+  }
+  const pct = (t: number) => Math.min(100, Math.max(0, ((t - t0) / (t1 - t0)) * 100));
+  const span = (c: PortCallView) => { const a = ms(c.eta); return [a, Math.max(a + 15 * 60_000, ms(c.etd))]; };
   const remaining = calls.filter(c => c.status !== 'ferdig').length;
   const zones = useMemo(() => {
     const seen = new Set<string>();
@@ -254,54 +274,79 @@ function Timeline({ calls, untimed, selected, onSelect, now, quays, open, onTogg
       const k = `${z.calls.join()}`; if (seen.has(k)) return false; seen.add(k); return true;
     });
   }, [calls]);
-  const ticks: number[] = [];
-  for (let h = Math.ceil(t0 / 2) * 2; h <= t1; h += 2) ticks.push(h);
-  const nowH = hour(now.toISOString());
-  const span = (c: PortCallView) => { const a = hour(c.eta); return [a, Math.max(a + 0.25, hour(c.etd) < a ? 24 : hour(c.etd))]; };
+  // Akse: timer for i dag, dager (og midt på dagen for 3 d) ellers.
+  const ticks: { t: number; label: string; day?: boolean }[] = [];
+  if (days === 1) {
+    for (let t = Math.ceil(t0 / 7_200_000) * 7_200_000; t <= t1; t += 7_200_000) ticks.push({ t, label: osloTime(new Date(t).toISOString()).slice(0, 2) });
+  } else {
+    for (let d = 0; d < days; d++) {
+      const date = addDays(today, d);
+      ticks.push({ t: ms(osloToUtc(date, 0)), label: days === 14 ? dayShort(date).replace(/ \S+$/, '') : dayShort(date), day: true });
+      if (days === 3) ticks.push({ t: ms(osloToUtc(date, 12 * 60)), label: '12' });
+    }
+  }
+  const nowT = now.getTime();
   const ownQuays = quays.filter(q => isOwnQuay(q) || calls.some(c => c.quay.id === q.id));
+  const bar = (c: PortCallView) => c.time_known ? span(c) : [ms(osloToUtc(c.service_date, 0)), ms(osloToUtc(addDays(c.service_date, 1), 0))];
+  const periodLabel = days === 1 ? 'i dag' : `neste ${days} dager`;
+
+  const picker = (
+    <div role="group" aria-label="Periode" className="pill seg" style={{ flex: 'none' }}>
+      {PERIODS_TL.map(p => (
+        <button key={p.days} type="button" className="tab" aria-pressed={days === p.days} onClick={() => savePrefs.mutate({ timeline_days: p.days })}
+          style={{ minHeight: 30, padding: '0 10px', fontSize: 12 }}>{p.label}</button>
+      ))}
+    </div>
+  );
 
   return (
     <section className={`ov glass kart-tl${open ? ' kart-tl-open' : ' kart-tl-mini'}`} aria-labelledby="tl-h">
       {open && (
         <div style={{ overflowX: 'auto' }}>
-          <div style={{ minWidth: 520, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ minWidth: days === 14 ? 900 : 560, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {quays.map(qy => (
               <div key={qy.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 118, flex: 'none', paddingRight: 4 }}><QuayMark quay={qy} compact /></div>
                 <div style={{ position: 'relative', flex: 1, height: 36, borderRadius: 12,
                   background: isOwnQuay(qy) ? 'rgba(var(--tint), .05)' : 'rgba(232,176,110,.07)', outline: isOwnQuay(qy) ? undefined : '1px solid rgba(232,176,110,.16)' }}>
+                  {days > 1 && ticks.filter(x => x.day && x.t > t0).map(x => (
+                    <span key={x.t} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, width: 1, background: 'rgba(var(--tint), .1)', left: `${pct(x.t)}%` }} />
+                  ))}
                   {calls.filter(c => c.quay.id === qy.id).map(c => {
                     const st = STATUS_STYLE[c.status];
-                    const [a, b] = span(c);
+                    const [a, b] = bar(c);
                     return (
-                      <button key={c.id} type="button" onClick={() => onSelect(c.id)} aria-label={`${c.boat.name}, ${timeRange(c)}, ${st.label}`}
-                        style={{ position: 'absolute', top: 4, bottom: 4, left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, borderRadius: 9, padding: '0 10px', fontSize: 12, cursor: 'pointer', textAlign: 'left', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: 'var(--fg)',
-                          background: `color-mix(in srgb, ${st.c} 26%, rgba(20,27,23,.6))`, opacity: c.status === 'ferdig' ? .55 : 1,
-                          border: `1.5px solid ${selected === c.id ? 'var(--aqua)' : `color-mix(in srgb, ${st.c} 65%, transparent)`}` }}>
-                        {c.boat.name}
+                      <button key={c.id} type="button" onClick={() => onSelect(c.id)} title={`${c.boat.name} · ${dayShort(c.service_date)} ${timeRange(c)}`}
+                        aria-label={`${c.boat.name}, ${dayShort(c.service_date)} ${timeRange(c)}, ${st.label}`}
+                        style={{ position: 'absolute', top: 4, bottom: 4, left: `${pct(a)}%`, width: `max(6px, ${pct(b) - pct(a)}%)`, borderRadius: 9, padding: '0 8px', fontSize: 12, cursor: 'pointer', textAlign: 'left', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: 'var(--fg)',
+                          background: c.time_known ? `color-mix(in srgb, ${st.c} 26%, rgba(20,27,23,.6))` : 'rgba(var(--tint), .04)', opacity: c.status === 'ferdig' ? .55 : 1,
+                          border: `1.5px ${c.time_known ? 'solid' : 'dashed'} ${selected === c.id ? 'var(--aqua)' : `color-mix(in srgb, ${st.c} 65%, transparent)`}` }}>
+                        {c.boat.name}{!c.time_known && <span style={{ color: 'var(--fg-45)' }}> · tid ikke satt</span>}
                       </button>
                     );
                   })}
                   {zones.filter(z => z.kind === 'quay' && z.quay_id === qy.id).map(z => (
-                    <div key={z.calls.join()} className="hatch" style={{ position: 'absolute', top: 1, bottom: 1, left: `${pct(hour(z.from))}%`, width: `${pct(hour(z.to)) - pct(hour(z.from))}%`, border: '1px dashed #FF6B5E', borderRadius: 10, pointerEvents: 'none' }} />
+                    <div key={z.calls.join()} className="hatch" style={{ position: 'absolute', top: 1, bottom: 1, left: `${pct(ms(z.from))}%`, width: `${pct(ms(z.to)) - pct(ms(z.from))}%`, border: '1px dashed #FF6B5E', borderRadius: 10, pointerEvents: 'none' }} />
                   ))}
-                  {nowH >= t0 && nowH <= t1 && <div style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--aqua)', pointerEvents: 'none', left: `${pct(nowH)}%` }} />}
+                  {nowT >= t0 && nowT <= t1 && <div style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--aqua)', pointerEvents: 'none', left: `${pct(nowT)}%` }} />}
                 </div>
               </div>
             ))}
             <div style={{ display: 'flex' }}>
               <div style={{ width: 118, flex: 'none' }} />
               <div style={{ position: 'relative', flex: 1, height: 16 }}>
-                {ticks.map(h => <span key={h} className="n" style={{ position: 'absolute', top: 0, transform: 'translateX(-50%)', fontSize: 11, color: 'var(--fg-55)', left: `${pct(h)}%` }}>{String(h % 24).padStart(2, '0')}</span>)}
+                {ticks.map(x => (
+                  <span key={x.t} className="n" style={{ position: 'absolute', top: 0, transform: x.day ? 'translateX(6px)' : 'translateX(-50%)', fontSize: 11, whiteSpace: 'nowrap', color: x.day ? 'var(--fg-75)' : 'var(--fg-55)', left: `${pct(x.t)}%` }}>{x.label}</span>
+                ))}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 150 }}>
-          <span id="tl-h" style={{ fontSize: 15 }}>Dagens kaiplan</span>
+          <span id="tl-h" style={{ fontSize: 15 }}>Kaiplan <span style={{ color: 'var(--fg-62)' }}>· {periodLabel}</span></span>
           <span style={{ fontSize: 12, color: 'var(--fg-62)' }}>
             {remaining} gjenstår{untimed ? ` · ${untimed} uten tid` : ''}{zones.length ? <> · <span style={{ color: 'var(--bad-fg)' }}>{zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span></> : ''}
           </span>
@@ -312,21 +357,22 @@ function Timeline({ calls, untimed, selected, onSelect, now, quays, open, onTogg
               <span key={st} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 8, height: 8, background: STATUS_STYLE[st].c }} />{STATUS_STYLE[st].label}</span>
             ))}
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="hatch" style={{ width: 12, height: 8, borderRadius: 2, border: '1px dashed #FF6B5E' }} />Kollisjon</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 7, height: 7, background: '#B1C2B7' }} />Ferdig</span>
+            {days > 1 && <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 8, borderRadius: 2, border: '1px dashed var(--fg-45)' }} />Uten tid</span>}
           </div>
         ) : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }} aria-hidden="true">
             {ownQuays.map(qy => (
               <div key={qy.id} style={{ position: 'relative', height: 7, borderRadius: 4, background: 'rgba(var(--tint), .08)' }}>
                 {calls.filter(c => c.quay.id === qy.id).map(c => {
-                  const [a, b] = span(c);
-                  return <span key={c.id} style={{ position: 'absolute', top: 0, bottom: 0, left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, borderRadius: 4, background: c.collisions.length ? 'var(--red-soft)' : STATUS_STYLE[c.status].c, opacity: c.status === 'ferdig' ? .4 : .85 }} />;
+                  const [a, b] = bar(c);
+                  return <span key={c.id} style={{ position: 'absolute', top: 0, bottom: 0, left: `${pct(a)}%`, width: `max(3px, ${pct(b) - pct(a)}%)`, borderRadius: 4, background: c.collisions.length ? 'var(--red-soft)' : STATUS_STYLE[c.status].c, opacity: c.status === 'ferdig' ? .4 : c.time_known ? .85 : .3 }} />;
                 })}
-                {nowH >= t0 && nowH <= t1 && <span style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--fg)', left: `${pct(nowH)}%` }} />}
+                {nowT >= t0 && nowT <= t1 && <span style={{ position: 'absolute', top: -3, bottom: -3, width: 2, background: 'var(--fg)', left: `${pct(nowT)}%` }} />}
               </div>
             ))}
           </div>
         )}
+        {picker}
         <button type="button" className="btn" onClick={onToggle} aria-expanded={open} aria-controls="tl-h" style={{ minHeight: 36, fontSize: 13, padding: '0 14px', width: 64, flex: 'none' }}>
           {open ? 'Skjul' : 'Vis'}
         </button>

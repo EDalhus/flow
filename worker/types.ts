@@ -1,3 +1,4 @@
+import type { UserPrefs } from '../shared/api.ts';
 import type { UserRole } from '../shared/domain/types.ts';
 
 export interface AuthUser {
@@ -9,6 +10,8 @@ export interface AuthUser {
   roles: UserRole[];
   /** true når appen kjører uten Cloudflare Access. */
   open: boolean;
+  /** Brukerens egne valg. */
+  prefs: UserPrefs;
 }
 
 export type AppEnv = { Bindings: Env; Variables: { user: AuthUser } };

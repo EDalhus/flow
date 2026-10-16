@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AisView, BoatDetail, BoatView, BulkOrderView, BulkQuality, CollisionView, Me, MessageView, NotificationView, PackingLineView,
-  PortCallView, ProductReport, QualityReport, Quay, QuayLogView, TruckOrderView, UserView, WeeklyReport,
+  PortCallView, ProductReport, QualityReport, Quay, QuayLogView, TruckOrderView, UserPrefs, UserView, WeeklyReport,
 } from '../../../shared/api.ts';
 import type { Settings } from '../../../shared/domain/types.ts';
 import type { BulkOrderCreateInput, CrewPut, PortCallCreateInput, PortCallPatchInput, QuayLogCreateInput, TruckOrderCreateInput } from '../../../shared/schemas.ts';
@@ -234,3 +234,13 @@ export const useProductionAction = () =>
   useProductionMutation(({ id, action }: { id: string; action: 'start' | 'finish' | 'cancel' }) => api(`/production/orders/${id}/${action}`, { body: {} }));
 export const useSiloFill = () =>
   useProductionMutation((body: { line_id: string; tonnes: number }) => api('/production/fills', { body }));
+
+/** Lagre egne valg (f.eks. periode på kaiplanen). Oppdaterer «meg» med en gang. */
+export function useSavePrefs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (prefs: UserPrefs) => api<Me>('/me/prefs', { method: 'PUT', body: prefs }),
+    onMutate: prefs => qc.setQueryData<Me>(['me'], m => (m ? { ...m, prefs: { ...m.prefs, ...prefs } } : m)),
+    onSuccess: me => qc.setQueryData(['me'], me),
+  });
+}

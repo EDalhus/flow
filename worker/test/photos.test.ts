@@ -72,3 +72,49 @@ describe('avviksbilder', () => {
     expect((await api(`/photos/${b.json.id}`)).status).toBe(404);
   });
 });
+
+describe('bilder av båten', () => {
+  async function boatUpload(boatId: string, form: FormData, as = 'ola') {
+    const res = await exports.default.fetch(new Request(`http://flow.test/api/boats/${boatId}/photos`, {
+      method: 'POST', body: form, headers: { 'X-Dev-User': `${as}@flow.example` },
+    }));
+    return { status: res.status, json: (await res.json()) as any };
+  }
+
+  it('laster opp med type og tekst, viser i båten og kan slettes', async () => {
+    const form = new FormData();
+    form.set('image', webp('rampe'));
+    form.set('thumb', webp('liten'));
+    form.set('category', 'rampe');
+    form.set('caption', 'Rampen akterut, 4 m bred');
+    const up = await boatUpload('b_b', form);
+    expect(up.status).toBe(201);
+    const photo = up.json.photos[0];
+    expect(photo).toMatchObject({ category: 'rampe', caption: 'Rampen akterut, 4 m bred', uploaded_by: 'Ola N.' });
+
+    const img = await exports.default.fetch(new Request(`http://flow.test${photo.url}`, { headers: { 'X-Dev-User': 'kari@flow.example' } }));
+    expect(await img.text()).toContain('rampe');
+    expect((await api('/boats/b_b')).json.photos).toHaveLength(1);
+
+    const bad = new FormData();
+    bad.set('image', webp());
+    bad.set('category', 'svømmebasseng');
+    expect((await boatUpload('b_b', bad)).status).toBe(400);
+
+    // Andre kaiarbeidere kan ikke slette Olas bilde; salg kan.
+    expect((await api(`/boats/b_b/photos/${photo.id}`, { method: 'DELETE', as: 'per' })).status).toBe(403);
+    const del = await api(`/boats/b_b/photos/${photo.id}`, { method: 'DELETE', as: 'kari' });
+    expect(del.json.photos).toEqual([]);
+  });
+});
+
+describe('brukervalg', () => {
+  it('lagrer periode for kaiplanen per bruker', async () => {
+    expect((await api('/me', { as: 'kari' })).json.prefs).toEqual({});
+    const put = await api('/me/prefs', { method: 'PUT', as: 'kari', body: { timeline_days: 3 } });
+    expect(put.json.prefs).toEqual({ timeline_days: 3 });
+    expect((await api('/me', { as: 'kari' })).json.prefs).toEqual({ timeline_days: 3 });
+    expect((await api('/me', { as: 'ola' })).json.prefs).toEqual({});
+    expect((await api('/me/prefs', { method: 'PUT', as: 'kari', body: { timeline_days: 5 } })).status).toBe(400);
+  });
+});

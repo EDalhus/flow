@@ -524,7 +524,7 @@ PROD.forEach(([line, product, tonnes, status, start, fills], i) => {
 const CLEAR = [
   // Kvaliteter (bulk_qualities) og pakkelinjer (packing_lines) er faste rader fra migrasjonen og beholdes.
   'bulk_order_steps', 'bulk_orders', 'silo_fills', 'production_orders', 'truck_order_goods', 'truck_orders',
-  'audit_log', 'ais_track', 'ais_positions', 'quay_log_photos', 'quay_log_categories', 'quay_logs', 'notifications',
+  'boat_photos', 'ais_area', 'audit_log', 'ais_track', 'ais_positions', 'quay_log_photos', 'quay_log_categories', 'quay_logs', 'notifications',
   'message_mentions', 'messages', 'crew_slots', 'port_call_goods', 'port_calls', 'quays', 'skus', 'products', 'boats',
   'agents', 'settings', 'shifts', 'crew_skills', 'user_roles', 'users',
 ];

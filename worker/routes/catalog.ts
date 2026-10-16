@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Quay, UserView } from '../../shared/api.ts';
 import { CREW_ROLES, DEFAULT_SETTINGS, type Capacity, type CrewRole, type UserRole } from '../../shared/domain/types.ts';
-import { agentCreate, quayCreate, quayPatch, rangeQuery, settingsPut, shiftsPut, userCreate, userPatch } from '../../shared/schemas.ts';
+import { agentCreate, prefsPut, quayCreate, quayPatch, rangeQuery, settingsPut, shiftsPut, userCreate, userPatch } from '../../shared/schemas.ts';
 import { CAN, requireRole } from '../auth/access.ts';
 import { body, fail, isConstraintError, newId, query } from '../lib/http.ts';
 import { loadCapacity, loadSettings } from '../lib/settings.ts';
@@ -12,6 +12,14 @@ import type { AppEnv } from '../types.ts';
 const app = new Hono<AppEnv>();
 
 app.get('/me', c => c.json(c.get('user')));
+
+/** Egne valg: slås sammen med det som er lagret fra før. */
+app.put('/me/prefs', body(prefsPut), async c => {
+  const user = c.get('user');
+  const prefs = { ...user.prefs, ...c.req.valid('json') };
+  await c.env.DB.prepare('UPDATE users SET prefs = ? WHERE id = ?').bind(JSON.stringify(prefs), user.id).run();
+  return c.json({ ...user, prefs });
+});
 
 // ---------------------------------------------------------------- brukere
 

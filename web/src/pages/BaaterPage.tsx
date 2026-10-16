@@ -10,6 +10,7 @@ import { FLAG_STYLE, ddmm, dayRelative, fr, osloTime, serviceDate, telHref } fro
 import { useBoat, useBoats, useFlagOverride, useMe } from '../lib/queries.ts';
 import { canFlag, canPlan } from '../lib/roles.ts';
 import { BoatForm } from '../components/BoatForm.tsx';
+import { BoatPhotos } from '../components/BoatPhotos.tsx';
 
 type Filter = 'alle' | 'red' | 'yellow' | 'green';
 
@@ -117,6 +118,8 @@ function BoatProfile({ id, onEdit }: { id: string; onEdit?: () => void }) {
       </div>
 
       {canFlag(me.data) && <FlagOverride boat={b} />}
+
+      <BoatPhotos boat={b} />
 
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
         <BigNumber value={b.rating_count ? b.avg_total : null} size={64} />

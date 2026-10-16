@@ -42,11 +42,11 @@ async function identify(env: Env, token: string | undefined, devUser: string | u
   }
 }
 
-type UserRow = { id: string; email: string; name: string; short_name: string; initials: string; active: number; roles: string | null };
+type UserRow = { id: string; email: string; name: string; short_name: string; initials: string; active: number; roles: string | null; prefs: string | null };
 
 async function loadUser(db: D1Database, email: string) {
   return db
-    .prepare(`SELECT u.id, u.email, u.name, u.short_name, u.initials, u.active,
+    .prepare(`SELECT u.id, u.email, u.name, u.short_name, u.initials, u.active, u.prefs,
                 (SELECT group_concat(role) FROM user_roles r WHERE r.user_id = u.id) AS roles
               FROM users u WHERE u.email = ?`)
     .bind(email)
@@ -65,6 +65,10 @@ async function provisionAdmin(db: D1Database, email: string) {
     db.prepare('INSERT INTO users (id, email, name, short_name, initials) VALUES (?, ?, ?, ?, ?)').bind(id, email, name, short, initials),
     db.prepare("INSERT INTO user_roles (user_id, role) VALUES (?, 'admin')").bind(id),
   ]);
+}
+
+function parsePrefs(raw: string | null) {
+  try { const p = JSON.parse(raw ?? '{}'); return p && typeof p === 'object' ? p : {}; } catch { return {}; }
 }
 
 export async function authenticate(env: Env, request: {
@@ -94,6 +98,7 @@ export async function authenticate(env: Env, request: {
     id: row.id, email: row.email, name: row.name, short_name: row.short_name, initials: row.initials,
     roles: (row.roles ? row.roles.split(',') : []) as UserRole[],
     open: who.open,
+    prefs: parsePrefs(row.prefs),
   };
 }
 

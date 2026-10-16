@@ -157,6 +157,10 @@ På kartet vises trafikken som i Kystverkets kart:
 - Klikk på et skip for stevning, kurs, fart, destinasjon, posisjon og når det sist meldte seg. Kortet viser også distanse og omtrentlig tid til vår kai langs sjøveien (korteste vei over vann, beregnet i nettleseren fra kartdataene; luftlinje hvis ingen vei finnes), og ringer for hvor langt skipet kommer på 6, 12, 24, 36, 48 og 60 minutter og 3 timer.
 - Sporet for det siste døgnet hentes fra BarentsWatch sitt historikk-API når et skip velges. Det bruker samme nøkler.
 
+**Kaiplanen** nederst på kartet viser 24 timer, 3, 7 eller 14 dager. 7 dager er standard, og hver bruker velger selv (lagres på brukeren). Anløp uten klokkeslett vises som stiplet heldagsfelt. Ferdige anløp vises ikke under Anløp; de ligger i Kaibok.
+
+**Bilder av båten:** I båtregisteret (og under Båtprofil på anløpet) kan salg, produksjon og kaiarbeidere laste opp bilder av rampe, sideport, heis, lasterom, dekk og kran, med en kort beskrivelse. Bildene skaleres ned på telefonen og lagres i R2 (`flow-photos`). Den som lastet opp, eller salg/produksjon, kan slette.
+
 AIS-status vises ikke på kartet. Hvis AIS ikke er satt opp, eller siste henting fra BarentsWatch feilet, kommer det et varsel i bjella. Admin kan åpne varselet og kjøre AIS-sjekken derfra.
 
 BarentsWatch sine data utelater fiskefartøy under 15 m og fritidsbåter under 45 m, og dekker norsk økonomisk sone.
