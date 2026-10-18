@@ -1,24 +1,24 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
 import { chooseUser } from '../lib/api.ts';
-import { useT, type Key } from '../lib/i18n.ts';
+import { tr } from '../lib/i18n.ts';
 import { useMe, useUsers } from '../lib/queries.ts';
 import { AlertsPanel, useAlerts } from './Alerts.tsx';
 import { GlobalSearch } from './GlobalSearch.tsx';
 import { Bell, BulkTruck, Chevron, Factory, Logo, PieChart, Settings, Ship, Truck } from './Icons.tsx';
+import { ROLE_NAMES } from '../lib/format.ts';
 
 // Fire hovedseksjoner, med rapporter og innstillinger nederst.
 const BOAT_PATHS = ['/', '/anlop', '/kaibok', '/baater'];
 const SECTIONS = [
-  { to: '/', label: 'nav.boats', icon: Ship, paths: BOAT_PATHS },
-  { to: '/biler', label: 'nav.trucks', icon: Truck, paths: ['/biler'] },
-  { to: '/bulk', label: 'nav.bulk', icon: BulkTruck, paths: ['/bulk'] },
-  { to: '/produksjon', label: 'nav.production', icon: Factory, paths: ['/produksjon'] },
-] as const satisfies readonly { to: string; label: Key; icon: unknown; paths: readonly string[] }[];
+  { to: '/', label: 'Båter', icon: Ship, paths: BOAT_PATHS },
+  { to: '/biler', label: 'Biler', icon: Truck, paths: ['/biler'] },
+  { to: '/bulk', label: 'Bulkbil', icon: BulkTruck, paths: ['/bulk'] },
+  { to: '/produksjon', label: 'Produksjon', icon: Factory, paths: ['/produksjon'] },
+] as const;
 
 /** Smal ikonmeny til venstre. Tekst vises som hint ved hover/fokus. */
 export function Sidebar() {
-  const t = useT();
   const { pathname } = useLocation();
   const item = (to: string, label: string, Icon: typeof Ship, active: boolean) => (
     <Link key={to} to={to} aria-label={label} aria-current={active ? 'page' : undefined} className={`side-link${active ? ' active' : ''}`}>
@@ -27,14 +27,14 @@ export function Sidebar() {
     </Link>
   );
   return (
-    <nav className="sidebar" aria-label={t('nav.main')}>
-      <Link to="/" aria-label="Flow – til kartet" className="side-logo" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'auto' }}>
+    <nav className="sidebar" aria-label={tr('Hovedmeny')}>
+      <Link to="/" aria-label={tr('Flow – til kartet')} className="side-logo" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'auto' }}>
         <Logo size={34} />
       </Link>
-      {SECTIONS.map(s => item(s.to, t(s.label), s.icon, (s.paths as readonly string[]).includes(pathname)))}
+      {SECTIONS.map(s => item(s.to, tr(s.label), s.icon, (s.paths as readonly string[]).includes(pathname)))}
       <span aria-hidden="true" className="side-divider" style={{ width: 28, height: 1, background: 'var(--line)', margin: '8px 0' }} />
-      {item('/rapporter', t('nav.reports'), PieChart, pathname === '/rapporter')}
-      {item('/innstillinger', t('nav.settings'), Settings, pathname === '/innstillinger')}
+      {item('/rapporter', tr('Rapporter'), PieChart, pathname === '/rapporter')}
+      {item('/innstillinger', tr('Innstillinger'), Settings, pathname === '/innstillinger')}
       <span className="side-end" style={{ marginTop: 'auto' }} />
     </nav>
   );
@@ -43,12 +43,11 @@ export function Sidebar() {
 /** Underfaner for Båter-seksjonen (kart, anløp, kaibok og båtregister samlet). */
 export function BoatTabs({ wide }: { wide?: boolean }) {
   const { pathname } = useLocation();
-  const t = useT();
   if (!BOAT_PATHS.includes(pathname)) return null;
-  const tabs = [['/', t('tab.map')], ['/anlop', t('tab.calls')], ['/kaibok', t('tab.log')], ['/baater', t('tab.registry')]] as const;
+  const tabs = [['/', tr('Kart')], ['/anlop', tr('Anløp')], ['/kaibok', tr('Kaibok')], ['/baater', tr('Båtregister')]] as const;
   return (
     // wide: like bred som anløpspanelet på kartet (--col), med fanene jevnt fordelt.
-    <nav aria-label={t('nav.boats')} className="pill seg boat-tabs" style={{ display: 'inline-flex', backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .6)', ...(wide ? { width: 'var(--col)', maxWidth: '100%' } : {}) }}>
+    <nav aria-label={tr('Båter')} className="pill seg boat-tabs" style={{ display: 'inline-flex', backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .6)', ...(wide ? { width: 'var(--col)', maxWidth: '100%' } : {}) }}>
       {tabs.map(([to, label]) => (
         <NavLink key={to} to={to} end className="tab" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', ...(wide ? { flex: 1 } : {}) }}
           aria-current={pathname === to ? 'page' : undefined} {...(pathname === to ? { 'aria-pressed': true } : {})}>
@@ -79,20 +78,20 @@ function UserMenu({ top, align, onClose }: { top: number; align: 'left' | 'right
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="glass scroll" role="dialog" aria-label="Velg bruker"
+    <div className="glass scroll" role="dialog" aria-label={tr('Velg bruker')}
       style={{ position: 'absolute', top, [align]: 0, width: 280, maxHeight: 420, padding: 10, zIndex: 40, background: 'rgba(var(--glass-rgb), .95)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span className="eyebrow" style={{ padding: '4px 8px 6px' }}>Hvem er du?</span>
+      <span className="eyebrow" style={{ padding: '4px 8px 6px' }}>{tr('Hvem er du?')}</span>
       {(users.data ?? []).map(u => (
         <button key={u.id} type="button" className="tab" aria-pressed={u.id === me.data?.id} onClick={() => pick(u.email)}
           style={{ justifyContent: 'flex-start', textAlign: 'left', display: 'flex', gap: 10, alignItems: 'center', minHeight: 46 }}>
           <span style={{ width: 28, height: 28, flex: 'none', borderRadius: '50%', background: 'rgba(var(--tint), .1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{u.initials}</span>
           <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
             <span>{u.name}</span>
-            <span style={{ fontSize: 12, opacity: .7 }}>{u.title ?? u.roles.join(', ')}</span>
+            <span style={{ fontSize: 12, opacity: .7 }}>{u.title ?? u.roles.map(r => tr(ROLE_NAMES[r])).join(', ')}</span>
           </span>
         </button>
       ))}
-      <span style={{ padding: '6px 8px 2px', fontSize: 12, color: 'var(--fg-55)' }}>Flow kjører uten innlogging.</span>
+      <span style={{ padding: '6px 8px 2px', fontSize: 12, color: 'var(--fg-55)' }}>{tr('Flow kjører uten innlogging.')}</span>
     </div>
   );
 }
@@ -101,10 +100,10 @@ function UserMenu({ top, align, onClose }: { top: number; align: 'left' | 'right
 export function UserBadge({ size = 46, align = 'right' }: { size?: number; align?: 'left' | 'right' }) {
   const me = useMe();
   const [open, setOpen] = useState(false);
-  if (!me.data?.open) return <span role="img" aria-label={me.data?.name ?? 'Innlogget bruker'}><Avatar initials={me.data?.initials} size={size} /></span>;
+  if (!me.data?.open) return <span role="img" aria-label={me.data?.name ?? tr('Innlogget bruker')}><Avatar initials={me.data?.initials} size={size} /></span>;
   return (
     <span style={{ position: 'relative' }}>
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={`Du er ${me.data.name}. Bytt bruker`}
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={tr('Du er {navn}. Bytt bruker', { navn: me.data.name })}
         style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', borderRadius: '50%' }}>
         <Avatar initials={me.data.initials} size={size} />
       </button>
@@ -126,10 +125,10 @@ export function UserPill() {
     </>
   );
   const style: CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, minHeight: 48, padding: '5px 14px 5px 5px', borderRadius: 999, background: 'rgba(var(--tint), .08)', border: '1px solid var(--line)', color: 'var(--fg)', backdropFilter: 'blur(16px)' };
-  if (!canSwitch) return <span style={style} aria-label={`Innlogget som ${me.data?.name ?? ''}`}>{body}</span>;
+  if (!canSwitch) return <span style={style} aria-label={tr('Innlogget som {navn}', { navn: me.data?.name ?? '' })}>{body}</span>;
   return (
     <span style={{ position: 'relative' }}>
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={`Du er ${me.data?.name}. Bytt bruker`} style={{ ...style, cursor: 'pointer' }}>
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={tr('Du er {navn}. Bytt bruker', { navn: me.data?.name ?? '' })} style={{ ...style, cursor: 'pointer' }}>
         {body}
       </button>
       {open && <UserMenu top={58} align="right" onClose={() => setOpen(false)} />}
@@ -142,7 +141,7 @@ export function BellButton({ open, onToggle, glass }: { open: boolean; onToggle:
   const { count } = useAlerts();
   return (
     <button type="button" className="icon-btn" onClick={onToggle} aria-expanded={open}
-      aria-label={count ? `${count} varsler` : 'Varsler'}
+      aria-label={count ? tr('{n} varsler', { n: count }) : tr('Varsler')}
       style={{ position: 'relative', background: 'var(--fg)', color: 'var(--ink)', width: 48, height: 48, backdropFilter: glass ? 'blur(16px)' : undefined }}>
       <Bell size={19} />
       {count > 0 && (

@@ -1,155 +1,90 @@
 import type { Lang } from '../../../shared/api.ts';
-import { useMe } from './queries.ts';
 
-// Språk (demo): menyer, faner, søk, innstillinger og kartet er oversatt. Resten av Flow er på norsk.
-// Mangler en tekst i et språk, brukes den norske.
+// Språk: all tekst i grensesnittet skrives på norsk og sendes gjennom tr(). Den norske teksten er
+// nøkkelen i ordbøkene (web/src/i18n/*.ts), med {navn} for verdier som settes inn.
+// Tekst som kommer ferdig fra serveren (varsler, kollisjoner, feilmeldinger, flaggbegrunnelser)
+// oversettes med tx(), som også kjenner igjen maler med verdier i.
+// `npm run i18n:check` sjekker at alle tekster finnes i alle språk.
 
-const NB = {
-  'nav.boats': 'Båter',
-  'nav.trucks': 'Biler',
-  'nav.bulk': 'Bulkbil',
-  'nav.production': 'Produksjon',
-  'nav.reports': 'Rapporter',
-  'nav.settings': 'Innstillinger',
-  'nav.main': 'Hovedmeny',
-  'tab.map': 'Kart',
-  'tab.calls': 'Anløp',
-  'tab.log': 'Kaibok',
-  'tab.registry': 'Båtregister',
-  'search.placeholder': 'Søk båt, anløp, kunde, person – eller fartøy i AIS',
-  'settings.sub': 'Dine valg for Flow. Admin styrer også kaier og brukere.',
-  'settings.quays': 'Kaier',
-  'settings.users': 'Brukere',
-  'settings.prefs': 'Preferanser',
-  'prefs.intro': 'Valgene gjelder bare deg, og følger deg på PC og telefon.',
-  'prefs.theme': 'Tema',
-  'prefs.dark': 'Mørk',
-  'prefs.light': 'Lys',
-  'prefs.system': 'Følg maskinen',
-  'prefs.lang': 'Språk',
-  'prefs.langNote': 'Demo: menyer, faner, søk og kartet er oversatt. Resten av Flow er foreløpig på norsk.',
-  'prefs.timeline': 'Kaiplan på kartet',
-  'prefs.timelineNote': 'Hvor langt fram kaiplanen nederst på kartet viser.',
-  'prefs.saved': 'Lagret',
-  'legend.label': 'Båter på kartet',
-  'legend.hideOthers': 'Skjul andre båter',
-  'legend.showOthers': 'Vis andre båter',
-  'legend.grey': 'Gjør andre grå',
-  'legend.color': 'Farger etter type',
-  'legend.coast': 'Hele kysten',
-  'legend.range': 'Område',
-  'legend.toggleType': 'Trykk for å skjule eller vise',
-  'legend.boats': 'Båter',
-  'cat.flow': 'Våre båter',
-  'cat.fiske': 'Fiske',
-  'cat.last': 'Last',
-  'cat.tank': 'Tank',
-  'cat.passasjer': 'Passasjer',
-  'cat.slep': 'Slep',
-  'cat.spesial': 'Los/redning',
-  'cat.fritid': 'Fritid',
-  'cat.annet': 'Annet',
-  'cat.gra': 'Andre båter',
-  'map.dark': 'Mørk',
-  'map.light': 'Lys',
-  'map.satellite': 'Satellitt',
-  'map.hybrid': 'Hybrid',
-} as const;
+export type Dict = Record<string, string>;
+type Vars = Record<string, string | number>;
 
-export type Key = keyof typeof NB;
-
-const DICT: Record<Exclude<Lang, 'nb'>, Partial<Record<Key, string>>> = {
-  en: {
-    'nav.boats': 'Vessels', 'nav.trucks': 'Trucks', 'nav.bulk': 'Bulk truck', 'nav.production': 'Production', 'nav.reports': 'Reports',
-    'nav.settings': 'Settings', 'nav.main': 'Main menu',
-    'tab.map': 'Map', 'tab.calls': 'Port calls', 'tab.log': 'Quay log', 'tab.registry': 'Vessel registry',
-    'search.placeholder': 'Search vessel, port call, customer, person – or any ship in AIS',
-    'settings.sub': 'Your choices for Flow. Admins also manage quays and users.',
-    'settings.quays': 'Quays', 'settings.users': 'Users', 'settings.prefs': 'Preferences',
-    'prefs.intro': 'These choices only apply to you, on both computer and phone.',
-    'prefs.theme': 'Theme', 'prefs.dark': 'Dark', 'prefs.light': 'Light', 'prefs.system': 'Match device',
-    'prefs.lang': 'Language', 'prefs.langNote': 'Demo: menus, tabs, search and the map are translated. The rest of Flow is still in Norwegian.',
-    'prefs.timeline': 'Quay plan on the map', 'prefs.timelineNote': 'How far ahead the quay plan at the bottom of the map shows.', 'prefs.saved': 'Saved',
-    'legend.label': 'Vessels on the map', 'legend.hideOthers': 'Hide other vessels', 'legend.showOthers': 'Show other vessels',
-    'legend.grey': 'Make others grey', 'legend.color': 'Colour by type', 'legend.coast': 'Whole coast', 'legend.range': 'Area',
-    'legend.toggleType': 'Click to hide or show', 'legend.boats': 'Vessels',
-    'cat.flow': 'Our vessels', 'cat.fiske': 'Fishing', 'cat.last': 'Cargo', 'cat.tank': 'Tanker', 'cat.passasjer': 'Passenger',
-    'cat.slep': 'Tug', 'cat.spesial': 'Pilot/rescue', 'cat.fritid': 'Leisure', 'cat.annet': 'Other', 'cat.gra': 'Other vessels',
-    'map.dark': 'Dark', 'map.light': 'Light', 'map.satellite': 'Satellite', 'map.hybrid': 'Hybrid',
-  },
-  lt: {
-    'nav.boats': 'Laivai', 'nav.trucks': 'Sunkvežimiai', 'nav.bulk': 'Birių krovinių sunkvežimis', 'nav.production': 'Gamyba', 'nav.reports': 'Ataskaitos',
-    'nav.settings': 'Nustatymai', 'nav.main': 'Pagrindinis meniu',
-    'tab.map': 'Žemėlapis', 'tab.calls': 'Laivų atvykimai', 'tab.log': 'Prieplaukos žurnalas', 'tab.registry': 'Laivų registras',
-    'search.placeholder': 'Ieškoti laivo, atvykimo, kliento, asmens – arba laivo AIS sistemoje',
-    'settings.sub': 'Jūsų Flow nustatymai. Administratorius taip pat tvarko prieplaukas ir naudotojus.',
-    'settings.quays': 'Prieplaukos', 'settings.users': 'Naudotojai', 'settings.prefs': 'Nuostatos',
-    'prefs.intro': 'Šie pasirinkimai taikomi tik jums – kompiuteryje ir telefone.',
-    'prefs.theme': 'Tema', 'prefs.dark': 'Tamsi', 'prefs.light': 'Šviesi', 'prefs.system': 'Pagal įrenginį',
-    'prefs.lang': 'Kalba', 'prefs.langNote': 'Demonstracija: išversti meniu, skirtukai, paieška ir žemėlapis. Likusi Flow dalis kol kas norvegų kalba.',
-    'prefs.timeline': 'Prieplaukos planas žemėlapyje', 'prefs.timelineNote': 'Kiek dienų į priekį rodo planas žemėlapio apačioje.', 'prefs.saved': 'Išsaugota',
-    'legend.label': 'Laivai žemėlapyje', 'legend.hideOthers': 'Slėpti kitus laivus', 'legend.showOthers': 'Rodyti kitus laivus',
-    'legend.grey': 'Kitus rodyti pilkai', 'legend.color': 'Spalvos pagal tipą', 'legend.coast': 'Visa pakrantė', 'legend.range': 'Zona',
-    'legend.toggleType': 'Spustelėkite, kad paslėptumėte ar parodytumėte', 'legend.boats': 'Laivai',
-    'cat.flow': 'Mūsų laivai', 'cat.fiske': 'Žvejybos', 'cat.last': 'Krovininiai', 'cat.tank': 'Tanklaiviai', 'cat.passasjer': 'Keleiviniai',
-    'cat.slep': 'Vilkikai', 'cat.spesial': 'Locmanų/gelbėjimo', 'cat.fritid': 'Pramoginiai', 'cat.annet': 'Kiti', 'cat.gra': 'Kiti laivai',
-    'map.dark': 'Tamsus', 'map.light': 'Šviesus', 'map.satellite': 'Palydovas', 'map.hybrid': 'Hibridinis',
-  },
-  da: {
-    'nav.boats': 'Både', 'nav.trucks': 'Biler', 'nav.bulk': 'Bulkbil', 'nav.production': 'Produktion', 'nav.reports': 'Rapporter',
-    'nav.settings': 'Indstillinger', 'nav.main': 'Hovedmenu',
-    'tab.map': 'Kort', 'tab.calls': 'Anløb', 'tab.log': 'Kajbog', 'tab.registry': 'Bådregister',
-    'search.placeholder': 'Søg båd, anløb, kunde, person – eller fartøj i AIS',
-    'settings.sub': 'Dine valg i Flow. Admin styrer også kajer og brugere.',
-    'settings.quays': 'Kajer', 'settings.users': 'Brugere', 'settings.prefs': 'Præferencer',
-    'prefs.intro': 'Valgene gælder kun dig og følger dig på pc og telefon.',
-    'prefs.theme': 'Tema', 'prefs.dark': 'Mørk', 'prefs.light': 'Lys', 'prefs.system': 'Følg enheden',
-    'prefs.lang': 'Sprog', 'prefs.langNote': 'Demo: menuer, faner, søgning og kortet er oversat. Resten af Flow er indtil videre på norsk.',
-    'prefs.timeline': 'Kajplan på kortet', 'prefs.timelineNote': 'Hvor langt frem kajplanen nederst på kortet viser.', 'prefs.saved': 'Gemt',
-    'legend.label': 'Både på kortet', 'legend.hideOthers': 'Skjul andre både', 'legend.showOthers': 'Vis andre både',
-    'legend.grey': 'Gør andre grå', 'legend.color': 'Farver efter type', 'legend.coast': 'Hele kysten', 'legend.range': 'Område',
-    'legend.toggleType': 'Klik for at skjule eller vise', 'legend.boats': 'Både',
-    'cat.flow': 'Vores både', 'cat.fiske': 'Fiskeri', 'cat.last': 'Last', 'cat.tank': 'Tank', 'cat.passasjer': 'Passager',
-    'cat.slep': 'Slæb', 'cat.spesial': 'Lods/redning', 'cat.fritid': 'Fritid', 'cat.annet': 'Andet', 'cat.gra': 'Andre både',
-    'map.dark': 'Mørk', 'map.light': 'Lys', 'map.satellite': 'Satellit', 'map.hybrid': 'Hybrid',
-  },
-  sv: {
-    'nav.boats': 'Båtar', 'nav.trucks': 'Bilar', 'nav.bulk': 'Bulkbil', 'nav.production': 'Produktion', 'nav.reports': 'Rapporter',
-    'nav.settings': 'Inställningar', 'nav.main': 'Huvudmeny',
-    'tab.map': 'Karta', 'tab.calls': 'Anlöp', 'tab.log': 'Kajbok', 'tab.registry': 'Båtregister',
-    'search.placeholder': 'Sök båt, anlöp, kund, person – eller fartyg i AIS',
-    'settings.sub': 'Dina val i Flow. Admin hanterar även kajer och användare.',
-    'settings.quays': 'Kajer', 'settings.users': 'Användare', 'settings.prefs': 'Preferenser',
-    'prefs.intro': 'Valen gäller bara dig och följer dig på dator och telefon.',
-    'prefs.theme': 'Tema', 'prefs.dark': 'Mörkt', 'prefs.light': 'Ljust', 'prefs.system': 'Följ enheten',
-    'prefs.lang': 'Språk', 'prefs.langNote': 'Demo: menyer, flikar, sök och kartan är översatta. Resten av Flow är än så länge på norska.',
-    'prefs.timeline': 'Kajplan på kartan', 'prefs.timelineNote': 'Hur långt fram kajplanen längst ner på kartan visar.', 'prefs.saved': 'Sparat',
-    'legend.label': 'Båtar på kartan', 'legend.hideOthers': 'Dölj andra båtar', 'legend.showOthers': 'Visa andra båtar',
-    'legend.grey': 'Gör andra grå', 'legend.color': 'Färg efter typ', 'legend.coast': 'Hela kusten', 'legend.range': 'Område',
-    'legend.toggleType': 'Klicka för att dölja eller visa', 'legend.boats': 'Båtar',
-    'cat.flow': 'Våra båtar', 'cat.fiske': 'Fiske', 'cat.last': 'Last', 'cat.tank': 'Tank', 'cat.passasjer': 'Passagerare',
-    'cat.slep': 'Bogsering', 'cat.spesial': 'Lots/räddning', 'cat.fritid': 'Fritid', 'cat.annet': 'Övrigt', 'cat.gra': 'Andra båtar',
-    'map.dark': 'Mörk', 'map.light': 'Ljus', 'map.satellite': 'Satellit', 'map.hybrid': 'Hybrid',
-  },
-  is: {
-    'nav.boats': 'Skip', 'nav.trucks': 'Bílar', 'nav.bulk': 'Lausavörubíll', 'nav.production': 'Framleiðsla', 'nav.reports': 'Skýrslur',
-    'nav.settings': 'Stillingar', 'nav.main': 'Aðalvalmynd',
-    'tab.map': 'Kort', 'tab.calls': 'Skipakomur', 'tab.log': 'Bryggjubók', 'tab.registry': 'Skipaskrá',
-    'search.placeholder': 'Leita að skipi, skipakomu, viðskiptavini, manneskju – eða skipi í AIS',
-    'settings.sub': 'Þínar stillingar í Flow. Stjórnandi sér líka um bryggjur og notendur.',
-    'settings.quays': 'Bryggjur', 'settings.users': 'Notendur', 'settings.prefs': 'Kjörstillingar',
-    'prefs.intro': 'Stillingarnar gilda bara fyrir þig, bæði í tölvu og síma.',
-    'prefs.theme': 'Þema', 'prefs.dark': 'Dökkt', 'prefs.light': 'Ljóst', 'prefs.system': 'Eins og tækið',
-    'prefs.lang': 'Tungumál', 'prefs.langNote': 'Prufa: valmyndir, flipar, leit og kortið eru þýdd. Annað í Flow er enn á norsku.',
-    'prefs.timeline': 'Bryggjuáætlun á kortinu', 'prefs.timelineNote': 'Hversu langt fram í tímann áætlunin neðst á kortinu nær.', 'prefs.saved': 'Vistað',
-    'legend.label': 'Skip á kortinu', 'legend.hideOthers': 'Fela önnur skip', 'legend.showOthers': 'Sýna önnur skip',
-    'legend.grey': 'Hafa önnur grá', 'legend.color': 'Litir eftir tegund', 'legend.coast': 'Öll ströndin', 'legend.range': 'Svæði',
-    'legend.toggleType': 'Smelltu til að fela eða sýna', 'legend.boats': 'Skip',
-    'cat.flow': 'Okkar skip', 'cat.fiske': 'Fiskiskip', 'cat.last': 'Flutningaskip', 'cat.tank': 'Tankskip', 'cat.passasjer': 'Farþegaskip',
-    'cat.slep': 'Dráttarbátar', 'cat.spesial': 'Hafnsögu/björgun', 'cat.fritid': 'Skemmtibátar', 'cat.annet': 'Annað', 'cat.gra': 'Önnur skip',
-    'map.dark': 'Dökkt', 'map.light': 'Ljóst', 'map.satellite': 'Gervihnöttur', 'map.hybrid': 'Blandað',
-  },
+const LOADERS: Record<Exclude<Lang, 'nb'>, () => Promise<{ default: Dict }>> = {
+  en: () => import('../i18n/en.ts'),
+  lt: () => import('../i18n/lt.ts'),
+  da: () => import('../i18n/da.ts'),
+  sv: () => import('../i18n/sv.ts'),
+  is: () => import('../i18n/is.ts'),
 };
+
+const LOCALE: Record<Lang, string> = { nb: 'nb-NO', en: 'en-GB', lt: 'lt-LT', da: 'da-DK', sv: 'sv-SE', is: 'is-IS' };
+
+let lang: Lang = 'nb';
+let dict: Dict = {};
+let templates: { re: RegExp; names: string[]; out: string }[] | null = null;
+
+/** Henter ordboka for språket og tar den i bruk. Norsk trenger ingen ordbok. */
+export async function loadLang(l: Lang): Promise<void> {
+  const d = l === 'nb' ? {} : (await LOADERS[l]()).default;
+  lang = l;
+  dict = d;
+  templates = null;
+  document.documentElement.lang = l === 'nb' ? 'no' : l;
+}
+
+export const getLang = () => lang;
+/** Språkkode for Intl (datoer, tall). */
+export const locale = () => LOCALE[lang];
+
+// Feltnavn kan ha æ, ø og å ({år}, {båt}).
+const FIELD = /\{([\p{L}\d_]+)\}/gu;
+const fill = (s: string, vars?: Vars) => (vars ? s.replace(FIELD, (m, k: string) => (k in vars ? String(vars[k]) : m)) : s);
+
+/**
+ * Entall og flertall: en oversettelse kan ha former skilt med «|», valgt etter {n} med språkets
+ * regler (Intl.PluralRules). To former: «én|flere». Tre (litauisk): «one|few|other».
+ */
+function plural(s: string, vars?: Vars): string {
+  if (!s.includes('|') || typeof vars?.n !== 'number') return s.split('|').pop()!;
+  const forms = s.split('|');
+  const cat = new Intl.PluralRules(LOCALE[lang]).select(vars.n);
+  if (forms.length === 2) return cat === 'one' ? forms[0] : forms[1];
+  return cat === 'one' ? forms[0] : cat === 'few' ? forms[1] : forms[forms.length - 1];
+}
+
+/** Oversetter en norsk tekst. `vars` settes inn for {navn}. */
+export function tr(nb: string, vars?: Vars): string {
+  return fill(plural(dict[nb] ?? nb, vars), vars);
+}
+
+const esc = (s: string) => s.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+
+/**
+ * Oversetter tekst som allerede er satt sammen (fra serveren). Først direkte oppslag, så maler:
+ * «Ingen avvik siste {n} anløp.» kjenner igjen «Ingen avvik siste 3 anløp.». Verdiene som fanges,
+ * oversettes også hvis de selv er kjente tekster (f.eks. kategorinavn).
+ */
+export function tx(text: string | null | undefined): string {
+  if (!text) return text ?? '';
+  if (lang === 'nb') return text;
+  if (dict[text]) return plural(dict[text]);
+  templates ??= Object.entries(dict)
+    .filter(([k]) => /\{[\p{L}\d_]+\}/u.test(k))
+    .sort((a, b) => b[0].replace(FIELD, '').length - a[0].replace(FIELD, '').length)
+    .map(([k, out]) => {
+      const names: string[] = [];
+      const re = new RegExp(`^${k.split(/(\{[\p{L}\d_]+\})/u).map(p => { const m = /^\{([\p{L}\d_]+)\}$/u.exec(p); if (m) { names.push(m[1]); return '(.+?)'; } return esc(p); }).join('')}$`, 's');
+      return { re, names, out };
+    });
+  for (const t of templates) {
+    const m = t.re.exec(text);
+    if (!m) continue;
+    const vars: Vars = {};
+    t.names.forEach((n, i) => { vars[n] = n === 'n' && /^\d+$/.test(m[i + 1]) ? Number(m[i + 1]) : tx(m[i + 1]); });
+    return fill(plural(t.out, vars), vars);
+  }
+  return text;
+}
 
 /** Språkene i velgeren, skrevet på sitt eget språk. */
 export const LANGS: { value: Lang; label: string }[] = [
@@ -160,12 +95,3 @@ export const LANGS: { value: Lang; label: string }[] = [
   { value: 'sv', label: 'Svenska' },
   { value: 'is', label: 'Íslenska' },
 ];
-
-export const translate = (lang: Lang, k: Key): string => (lang === 'nb' ? NB[k] : DICT[lang][k] ?? NB[k]);
-
-/** Oversetter til språket brukeren har valgt (standard norsk). */
-export function useT() {
-  const me = useMe();
-  const lang = me.data?.prefs.lang ?? 'nb';
-  return (k: Key) => translate(lang, k);
-}

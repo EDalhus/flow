@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode, Suspense, lazy, useEffect, useSyncExternalStore } from 'react';
+import { Fragment, StrictMode, Suspense, lazy, useEffect, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { ApiError } from './lib/api.ts';
 import { useMe } from './lib/queries.ts';
 import { useRealtime } from './lib/realtime.ts';
 import { setTheme } from './lib/theme.ts';
+import { getLang, loadLang, tr, tx } from './lib/i18n.ts';
+import type { Lang } from '../../shared/api.ts';
 import './styles/global.css';
 
 // Hver side lastes ved behov; kartbiblioteket (MapLibre) hentes bare på kart og mobil.
@@ -34,14 +36,25 @@ const queryClient = new QueryClient({
 const narrow = window.matchMedia('(max-width: 900px)');
 const useNarrow = () => useSyncExternalStore(cb => { narrow.addEventListener('change', cb); return () => narrow.removeEventListener('change', cb); }, () => narrow.matches);
 
+const LANG_CODES: Lang[] = ['nb', 'en', 'lt', 'da', 'sv', 'is'];
+/** Språket fra forrige besøk, til brukeren er hentet. */
+const storedLang = (): Lang => { try { const v = localStorage.getItem('flow-sprak'); return LANG_CODES.includes(v as Lang) ? v as Lang : 'nb'; } catch { return 'nb'; } };
+
 function App() {
   const me = useMe();
   useRealtime();
   const isNarrow = useNarrow();
   const theme = me.data?.prefs.theme;
-  const lang = me.data?.prefs.lang ?? 'nb';
+  const lang = me.data?.prefs.lang ?? storedLang();
   useEffect(() => { if (me.data) setTheme(theme ?? 'mork'); }, [me.data, theme]);
-  useEffect(() => { document.documentElement.lang = lang === 'nb' ? 'no' : lang; }, [lang]);
+  // Språket: ordboka hentes før siden vises på nytt, og valget huskes til neste gang siden åpnes.
+  const [ready, setReady] = useState<Lang>(getLang());
+  useEffect(() => {
+    let live = true;
+    try { localStorage.setItem('flow-sprak', lang); } catch { /* ignorer */ }
+    loadLang(lang).then(() => live && setReady(lang), () => live && setReady(getLang()));
+    return () => { live = false; };
+  }, [lang]);
 
   if (me.isError) {
     const e = me.error;
@@ -49,16 +62,17 @@ function App() {
       <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
         <div className="glass" style={{ maxWidth: 420, padding: 28, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <h1 style={{ margin: 0, fontWeight: 300, fontSize: 32 }}>Flow</h1>
-          <p style={{ margin: 0 }}>{e instanceof ApiError ? e.message : 'Kunne ikke kontakte serveren.'}</p>
-          {e instanceof ApiError && e.status === 401 && <p className="muted" style={{ margin: 0 }}>Last siden på nytt for å logge inn via Cloudflare Access.</p>}
+          <p style={{ margin: 0 }}>{e instanceof ApiError ? tx(e.message) : tr('Kunne ikke kontakte serveren.')}</p>
+          {e instanceof ApiError && e.status === 401 && <p className="muted" style={{ margin: 0 }}>{tr('Last siden på nytt for å logge inn via Cloudflare Access.')}</p>}
         </div>
       </main>
     );
   }
-  if (me.isPending) return <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }} className="loading">Flow</main>;
+  if (me.isPending || ready !== lang) return <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }} className="loading">Flow</main>;
 
   return (
     <Suspense fallback={<main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }} className="loading">Flow</main>}>
+    <Fragment key={ready}>
     <Routes>
       {/* Smale skjermer (kaiarbeidere på telefon) får mobilvisningen på forsiden. */}
       <Route path="/" element={isNarrow ? <MobileApp /> : <KartPage />} />
@@ -75,6 +89,7 @@ function App() {
       <Route path="/admin" element={<Navigate to="/innstillinger" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Fragment>
     </Suspense>
   );
 }

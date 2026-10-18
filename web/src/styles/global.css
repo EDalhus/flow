@@ -91,6 +91,17 @@
   --glass-rgb: 255, 255, 255;
   --chrome-rgb: 244, 247, 245;
 }
+/* Alltid mørkt (kaibok-skjemaet), også i lyst tema. */
+.force-dark {
+  color-scheme: dark;
+  --bg: #141B17; --ink: #1A231E; --fg: #F2F5F3; --sage: #B1C2B7; --tint: 242, 245, 243;
+  --fg-85: rgba(242, 245, 243, .85); --fg-75: rgba(242, 245, 243, .75); --fg-62: rgba(242, 245, 243, .62);
+  --fg-55: rgba(242, 245, 243, .55); --fg-45: rgba(242, 245, 243, .45);
+  --line: rgba(242, 245, 243, .09); --line-soft: rgba(242, 245, 243, .06);
+  --warn-fg: #F7C873; --bad-fg: #FF9A91; --ok-fg: #7FE0A3; --focus: #80EFDE;
+  --glass-rgb: 32, 42, 36; --chrome-rgb: 20, 27, 23;
+  color: var(--fg);
+}
 :root[data-theme='light'] .glass { box-shadow: 0 18px 40px -24px rgba(22, 32, 27, .35); }
 :root[data-theme='light'] .panel-light { border: 1px solid rgba(22, 32, 27, .08); box-shadow: 0 18px 40px -24px rgba(22, 32, 27, .3); }
 :root[data-theme='light'] .panel-accent { --fg: #F2F5F3; --tint: 242, 245, 243; --sage: #CFE3D8; color: var(--fg); }

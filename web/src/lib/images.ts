@@ -1,5 +1,6 @@
 import type { BoatDetail, BoatPhotoCategory, PhotoUpload } from '../../../shared/api.ts';
 import { ApiError, chosenHeaders } from './api.ts';
+import { tr } from './i18n.ts';
 
 // Bilder skaleres ned og kodes på telefonen før opplasting: et mobilbilde på 4–8 MB blir
 // ca. 300–500 kB WebP. Det gir raskere opplasting på 4G og raske visninger senere.
@@ -15,13 +16,13 @@ async function encode(source: ImageBitmap, maxSide: number, quality: number): Pr
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Nettleseren kan ikke behandle bilder.');
+  if (!ctx) throw new Error(tr('Nettleseren kan ikke behandle bilder.'));
   ctx.drawImage(source, 0, 0, width, height);
   const toBlob = (type: string) => new Promise<Blob | null>(res => canvas.toBlob(res, type, quality));
   // WebP der nettleseren kan kode det, ellers JPEG (eldre Safari).
   let blob = await toBlob('image/webp');
   if (!blob || blob.type !== 'image/webp') blob = await toBlob('image/jpeg');
-  if (!blob) throw new Error('Kunne ikke kode bildet.');
+  if (!blob) throw new Error(tr('Kunne ikke kode bildet.'));
   return { blob, width, height };
 }
 

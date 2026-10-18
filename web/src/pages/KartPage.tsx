@@ -15,7 +15,7 @@ import { STATUS_STYLE, addDays, dayShort, nb, isOwnQuay, osloTime, timeRange, to
 import { useMe, usePortCalls, useSavePrefs, useQuays, useSettings, useSummary } from '../lib/queries.ts';
 import { VesselLayer } from '../map/Vessels.tsx';
 import { useNow } from '../lib/useNow.ts';
-import { useT } from '../lib/i18n.ts';
+import { tr } from '../lib/i18n.ts';
 import './kart.css';
 
 const FALLBACK = { lat: 62.47918, lon: 6.19292 };
@@ -43,7 +43,6 @@ export function KartPage() {
   const selected = selectedId ? list.find(c => c.id === selectedId) : undefined;
   const fence = settings.data?.geofence ?? { ...FALLBACK, radius_m: 300, label: '' };
   const t = useTraffic(list, selected?.boat.id ?? null, fence);
-  const tr = useT();
   const { vessels, traffic, hot, shipSel, setShipSel, selShip, layers, setZoomNames, trackError } = t;
   const select = (id: string, t?: DetailTab) => {
     setShipSel(null);
@@ -107,7 +106,7 @@ export function KartPage() {
     return (
       <>
         {quayPt && (
-          <span title="Vår kai" aria-label="Vår kai" style={{ position: 'absolute', left: quayPt[0], top: quayPt[1], transform: 'translate(-50%, -50%)', width: 26, height: 26, borderRadius: '50%', background: '#1A231E', color: '#F2F5F3', border: '2px solid rgba(242,245,243,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <span title={tr('Vår kai')} aria-label={tr('Vår kai')} style={{ position: 'absolute', left: quayPt[0], top: quayPt[1], transform: 'translate(-50%, -50%)', width: 26, height: 26, borderRadius: '50%', background: '#1A231E', color: '#F2F5F3', border: '2px solid rgba(242,245,243,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <Anchor size={13} />
           </span>
         )}
@@ -148,15 +147,15 @@ export function KartPage() {
       {!selected && !shipSel && <MainStats />}
 
       <div className="ov kart-zoom">
-        <div role="group" aria-label="Kartvisning" className="pill seg" style={{ backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .7)', marginRight: 8 }}>
+        <div role="group" aria-label={tr('Kartvisning')} className="pill seg" style={{ backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .7)', marginRight: 8 }}>
           {BASEMAPS.map(b => (
             <button key={b.value} type="button" className="tab" aria-pressed={basemap === b.value} onClick={() => pickBasemap(b.value)}
-              style={{ minHeight: 32, padding: '0 12px', fontSize: 13 }}>{tr(b.key)}</button>
+              style={{ minHeight: 32, padding: '0 12px', fontSize: 13 }}>{tr(b.label)}</button>
           ))}
         </div>
-        <button type="button" className="zoom-btn" onClick={() => mapRef.current?.zoomIn()} aria-label="Zoom inn"><Plus size={16} /></button>
-        <button type="button" className="zoom-btn" onClick={() => mapRef.current?.zoomOut()} aria-label="Zoom ut"><Minus size={16} /></button>
-        <button type="button" className="zoom-btn solid" onClick={() => mapRef.current?.flyTo(fence.lon, fence.lat, 14)} aria-label="Sentrer på kaia"><Target size={17} /></button>
+        <button type="button" className="zoom-btn" onClick={() => mapRef.current?.zoomIn()} aria-label={tr('Zoom inn')}><Plus size={16} /></button>
+        <button type="button" className="zoom-btn" onClick={() => mapRef.current?.zoomOut()} aria-label={tr('Zoom ut')}><Minus size={16} /></button>
+        <button type="button" className="zoom-btn solid" onClick={() => mapRef.current?.flyTo(fence.lon, fence.lat, 14)} aria-label={tr('Sentrer på kaia')}><Target size={17} /></button>
       </div>
 
       <TrafficLegend s={t} />
@@ -166,7 +165,7 @@ export function KartPage() {
       {alertsOpen && <div className="ov kart-alerts"><AlertsPanel onClose={() => setAlertsOpen(false)} /></div>}
 
       {selected && (
-        <aside className="ov glass scroll kart-right" aria-label="Valgt anløp">
+        <aside className="ov glass scroll kart-right" aria-label={tr('Valgt anløp')}>
           <CallDetail call={selected} tab={tab} onTab={t => select(selected.id, t)} onOpenKaibok={() => setKaibok(true)}
             onOpenAlerts={() => setAlertsOpen(true)} onClose={deselect}
             extra={selShip && t.approach && selected.status !== 'ved_kai' && selected.status !== 'ferdig' && (
@@ -183,9 +182,10 @@ export function KartPage() {
   );
 }
 
-const PERIODS = [7, 30, 90, 180] as const;
+/** 0 = hittil i år. */
+const PERIODS = [7, 30, 90, 180, 0] as const;
 
-/** Hovedtall: tonn utlevert (og mottatt) siste 7/30/90/180 dager mot perioden før. */
+/** Hovedtall: tonn utlevert (og mottatt) siste 7/30/90/180 dager mot perioden før, eller hittil i år mot samme tid i fjor. */
 function MainStats() {
   const [days, setDays] = useState<number>(() => {
     try { const v = Number(localStorage.getItem('flow-periode')); return PERIODS.includes(v as 30) ? v : 30; } catch { return 30; }
@@ -200,31 +200,31 @@ function MainStats() {
   };
   const main = d && change(d.out.tonnes, d.prev.out.tonnes);
   return (
-    <aside className="ov kart-stats" aria-label="Hovedtall">
-      <h2 style={{ margin: 0, fontSize: 32, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.08 }}>Hovedtall</h2>
-      <div role="group" aria-label="Periode" style={{ display: 'flex', gap: 4 }}>
+    <aside className="ov kart-stats" aria-label={tr('Hovedtall')}>
+      <h2 style={{ margin: 0, fontSize: 32, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.08 }}>{tr('Hovedtall')}</h2>
+      <div role="group" aria-label={tr('Periode')} style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {PERIODS.map(p => (
           <button key={p} type="button" className="tab" aria-pressed={days === p} onClick={() => pick(p)} style={{ minHeight: 32, padding: '0 11px', fontSize: 13 }}>
-            {p} d
+            {p ? tr('{n} d', { n: p }) : tr('Hittil i år')}
           </button>
         ))}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 14, color: 'var(--sage)' }}>Tonn utlevert</span>
+        <span style={{ fontSize: 14, color: 'var(--sage)' }}>{tr('Tonn utlevert')}</span>
         <span className="n" style={{ fontSize: 52, fontWeight: 200, lineHeight: 1.02, letterSpacing: '-0.03em' }}>{d ? nb(d.out.tonnes) : '–'}</span>
         {main && (
           <span className="n" style={{ fontSize: 13, color: main.up ? 'var(--aqua)' : 'var(--bad-fg)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <TrendUp size={14} style={main.up ? undefined : { transform: 'scaleY(-1)' }} />{main.text} mot forrige {days} d
+            <TrendUp size={14} style={main.up ? undefined : { transform: 'scaleY(-1)' }} />{main.text} {days ? tr('mot forrige {n} d', { n: days }) : tr('mot samme tid i fjor')}
           </span>
         )}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: 13, color: 'var(--sage)' }}>Mottatt</span>
+          <span style={{ fontSize: 13, color: 'var(--sage)' }}>{tr('Mottatt')}</span>
           <span className="n" style={{ fontSize: 26, fontWeight: 300 }}>{d ? nb(d.in.tonnes) : '–'}<span style={{ fontSize: 14, color: 'var(--fg-55)' }}> t</span></span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: 13, color: 'var(--sage)' }}>Anløp</span>
+          <span style={{ fontSize: 13, color: 'var(--sage)' }}>{tr('Anløp')}</span>
           <span className="n" style={{ fontSize: 26, fontWeight: 300 }}>{d ? nb(d.calls) : '–'}</span>
         </div>
       </div>
@@ -232,7 +232,7 @@ function MainStats() {
   );
 }
 
-const PERIODS_TL = [{ days: 1, label: '24 t' }, { days: 3, label: '3 d' }, { days: 7, label: '7 d' }, { days: 14, label: '14 d' }] as const;
+const PERIODS_TL = [{ days: 1 }, { days: 3 }, { days: 7 }, { days: 14 }] as const;
 type TlDays = (typeof PERIODS_TL)[number]['days'];
 const DAY_MS = 86_400_000;
 
@@ -286,13 +286,13 @@ function Timeline({ today, selected, onSelect, now, quays, open, onToggle }: {
   const nowT = now.getTime();
   const ownQuays = quays.filter(q => isOwnQuay(q) || calls.some(c => c.quay.id === q.id));
   const bar = (c: PortCallView) => c.time_known ? span(c) : [ms(osloToUtc(c.service_date, 0)), ms(osloToUtc(addDays(c.service_date, 1), 0))];
-  const periodLabel = days === 1 ? 'i dag' : `neste ${days} dager`;
+  const periodLabel = days === 1 ? tr('i dag') : tr('neste {n} dager', { n: days });
 
   const picker = (
-    <div role="group" aria-label="Periode" className="pill seg" style={{ flex: 'none' }}>
+    <div role="group" aria-label={tr('Periode')} className="pill seg" style={{ flex: 'none' }}>
       {PERIODS_TL.map(p => (
         <button key={p.days} type="button" className="tab" aria-pressed={days === p.days} onClick={() => savePrefs.mutate({ timeline_days: p.days })}
-          style={{ minHeight: 30, padding: '0 10px', fontSize: 12 }}>{p.label}</button>
+          style={{ minHeight: 30, padding: '0 10px', fontSize: 12 }}>{p.days === 1 ? tr('24 t') : tr('{n} d', { n: p.days })}</button>
       ))}
     </div>
   );
@@ -319,7 +319,7 @@ function Timeline({ today, selected, onSelect, now, quays, open, onToggle }: {
                         style={{ position: 'absolute', top: 4, bottom: 4, left: `${pct(a)}%`, width: `max(6px, ${pct(b) - pct(a)}%)`, borderRadius: 9, padding: '0 8px', fontSize: 12, cursor: 'pointer', textAlign: 'left', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: 'var(--fg)',
                           background: c.time_known ? `color-mix(in srgb, ${st.c} 26%, rgba(var(--chrome-rgb), .6))` : 'rgba(var(--tint), .04)', opacity: c.status === 'ferdig' ? .55 : 1,
                           border: `1.5px ${c.time_known ? 'solid' : 'dashed'} ${selected === c.id ? 'var(--aqua)' : `color-mix(in srgb, ${st.c} 65%, transparent)`}` }}>
-                        {c.boat.name}{!c.time_known && <span style={{ color: 'var(--fg-45)' }}> · tid ikke satt</span>}
+                        {c.boat.name}{!c.time_known && <span style={{ color: 'var(--fg-45)' }}> · {tr('tid ikke satt')}</span>}
                       </button>
                     );
                   })}
@@ -344,9 +344,9 @@ function Timeline({ today, selected, onSelect, now, quays, open, onToggle }: {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 150 }}>
-          <span id="tl-h" style={{ fontSize: 15 }}>Kaiplan <span style={{ color: 'var(--fg-62)' }}>· {periodLabel}</span></span>
+          <span id="tl-h" style={{ fontSize: 15 }}>{tr('Kaiplan')} <span style={{ color: 'var(--fg-62)' }}>· {periodLabel}</span></span>
           <span style={{ fontSize: 12, color: 'var(--fg-62)' }}>
-            {remaining} gjenstår{untimed ? ` · ${untimed} uten tid` : ''}{zones.length ? <> · <span style={{ color: 'var(--bad-fg)' }}>{zones.length} {zones.length === 1 ? 'kollisjon' : 'kollisjoner'}</span></> : ''}
+            {tr('{n} gjenstår', { n: remaining })}{untimed ? ` · ${tr('{n} uten tid', { n: untimed })}` : ''}{zones.length ? <> · <span style={{ color: 'var(--bad-fg)' }}>{zones.length === 1 ? tr('1 kollisjon') : tr('{n} kollisjoner', { n: zones.length })}</span></> : ''}
           </span>
         </div>
         {open ? (
@@ -354,8 +354,8 @@ function Timeline({ today, selected, onSelect, now, quays, open, onToggle }: {
             {(['ved_kai', 'paa_vei'] as const).map(st => (
               <span key={st} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ width: 8, height: 8, background: STATUS_STYLE[st].c }} />{STATUS_STYLE[st].label}</span>
             ))}
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="hatch" style={{ width: 12, height: 8, borderRadius: 2, border: '1px dashed #FF6B5E' }} />Kollisjon</span>
-            {days > 1 && <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 8, borderRadius: 2, border: '1px dashed var(--fg-45)' }} />Uten tid</span>}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="hatch" style={{ width: 12, height: 8, borderRadius: 2, border: '1px dashed #FF6B5E' }} />{tr('Kollisjon')}</span>
+            {days > 1 && <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 8, borderRadius: 2, border: '1px dashed var(--fg-45)' }} />{tr('Uten tid')}</span>}
           </div>
         ) : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }} aria-hidden="true">
@@ -372,7 +372,7 @@ function Timeline({ today, selected, onSelect, now, quays, open, onToggle }: {
         )}
         {picker}
         <button type="button" className="btn" onClick={onToggle} aria-expanded={open} aria-controls="tl-h" style={{ minHeight: 36, fontSize: 13, padding: '0 14px', width: 64, flex: 'none' }}>
-          {open ? 'Skjul' : 'Vis'}
+          {open ? tr('Skjul') : tr('Vis')}
         </button>
       </div>
     </section>

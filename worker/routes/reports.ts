@@ -49,13 +49,16 @@ app.get('/quality', query(z.object({ weeks: z.coerce.number().int().min(1).max(5
 /**
  * Tonn og anløp siste N dager mot de N dagene før (hovedtallene på kartet).
  * «Ut» = utlevert fra kaia (henting), «inn» = mottatt (levering). Bare ferdige anløp.
+ * `ytd=1`: hittil i år (1. januar til i dag) mot samme tid i fjor.
  */
-app.get('/summary', query(z.object({ days: z.coerce.number().int().min(1).max(366).default(30) })), async c => {
-  const { days } = c.req.valid('query');
+app.get('/summary', query(z.object({ days: z.coerce.number().int().min(1).max(366).default(30), ytd: z.literal('1').optional() })), async c => {
+  const { days: n, ytd } = c.req.valid('query');
   const today = todayOslo();
-  const from = addDays(today, -(days - 1));
-  const prevTo = addDays(from, -1);
-  const prevFrom = addDays(prevTo, -(days - 1));
+  const lastYear = (d: string) => `${Number(d.slice(0, 4)) - 1}${d.slice(4) === '-02-29' ? '-02-28' : d.slice(4)}`;
+  const from = ytd ? `${today.slice(0, 4)}-01-01` : addDays(today, -(n - 1));
+  const days = ytd ? Math.round((Date.parse(today) - Date.parse(from)) / 86_400_000) + 1 : n;
+  const prevTo = ytd ? lastYear(today) : addDays(from, -1);
+  const prevFrom = ytd ? lastYear(from) : addDays(prevTo, -(days - 1));
   const window = async (a: string, b: string) => {
     const [dirs, calls] = await c.env.DB.batch([
       c.env.DB.prepare(`
@@ -74,7 +77,7 @@ app.get('/summary', query(z.object({ days: z.coerce.number().int().min(1).max(36
     };
   };
   const [current, previous] = await Promise.all([window(from, today), window(prevFrom, prevTo)]);
-  return c.json({ days, from, to: today, ...current, prev: { from: prevFrom, to: prevTo, ...previous } });
+  return c.json({ days, ytd: !!ytd, from, to: today, ...current, prev: { from: prevFrom, to: prevTo, ...previous } });
 });
 
 export default app;

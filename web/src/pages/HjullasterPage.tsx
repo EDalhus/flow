@@ -9,6 +9,7 @@ import { useBulkOrders, useBulkQualities, useProduction } from '../lib/queries.t
 import { useNow } from '../lib/useNow.ts';
 import { ADVICE, Silo, lineSilo } from './ProduksjonPage.tsx';
 import './moduler.css';
+import { tr, tx } from '../lib/i18n.ts';
 
 /** Nettbrett i hjullasteren: hva traktene og siloene trenger, i stor skrift. Bare visning, ingen knapper for lasting. */
 export function HjullasterPage() {
@@ -25,17 +26,17 @@ export function HjullasterPage() {
   return (
     <main className="hl">
       <header style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <Link to="/produksjon" className="icon-btn pill" aria-label="Tilbake" style={{ width: 52, height: 52 }}><ArrowLeft size={22} /></Link>
-        <h1 style={{ margin: 0, fontSize: 34, fontWeight: 300 }}>Hjullaster</h1>
+        <Link to="/produksjon" className="icon-btn pill" aria-label={tr('Tilbake')} style={{ width: 52, height: 52 }}><ArrowLeft size={22} /></Link>
+        <h1 style={{ margin: 0, fontSize: 34, fontWeight: 300 }}>{tr('Hjullaster')}</h1>
         <button type="button" className="btn" aria-pressed={demo} onClick={() => setDemo(!demo)} style={{ marginLeft: 'auto', minHeight: 44 }}>
-          {demo ? 'Avslutt demo' : 'Demo: påfylling av silo'}
+          {demo ? tr('Avslutt demo') : tr('Demo: påfylling av silo')}
         </button>
         <span className="n muted" style={{ fontSize: 34, fontWeight: 300 }}>{osloTime(now.toISOString())}</span>
       </header>
 
       <div className="hl-grid">
-        <section className="hl-card" aria-label="Bulkbil">
-          <span className="eyebrow" style={{ fontSize: 15 }}>Bulkbil · fyll traktene</span>
+        <section className="hl-card" aria-label={tr('Bulkbil')}>
+          <span className="eyebrow" style={{ fontSize: 15 }}>{tr('Bulkbil · fyll traktene')}</span>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
             {(qualities.data ?? []).map(q => (
               <div key={q.id} style={{ borderRadius: 20, padding: '12px 16px', border: `2px solid ${demand[q.id] ? q.color : 'var(--line)'}`, opacity: demand[q.id] ? 1 : .5 }}>
@@ -45,13 +46,13 @@ export function HjullasterPage() {
             ))}
           </div>
           {open.map(o => <TruckCard key={o.id} order={o} />)}
-          {bulk.isSuccess && !open.length && <p className="muted" style={{ fontSize: 20, margin: 0 }}>Ingen bulkbiler i kø.</p>}
+          {bulk.isSuccess && !open.length && <p className="muted" style={{ fontSize: 20, margin: 0 }}>{tr('Ingen bulkbiler i kø.')}</p>}
         </section>
 
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }} aria-label="Pakkelinjer">
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }} aria-label={tr('Pakkelinjer')}>
           {demo && (
             <div className="advice advice-stopp" style={{ fontSize: 17, padding: '12px 16px' }}>
-              Demo: slik ser siloene ut i produksjon. Nivået synker mens linjen pakker, og når det blir lavt går salt inn i siloen.
+              {tr('Demo: slik ser siloene ut i produksjon. Nivået synker mens linjen pakker, og når det blir lavt går salt inn i siloen.')}
             </div>
           )}
           {(lines.data ?? []).map(l => {
@@ -63,22 +64,22 @@ export function HjullasterPage() {
             return (
               <div key={l.id} className="hl-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <span style={{ fontSize: 26 }}>{l.name}</span>
-                  <span style={{ fontSize: 20 }}>{o?.product_name ?? <span className="muted">Står</span>}</span>
+                  <span style={{ fontSize: 26 }}>{tx(l.name)}</span>
+                  <span style={{ fontSize: 20 }}>{o?.product_name ?? <span className="muted">{tr('Står')}</span>}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 22, alignItems: 'center' }}>
                   <Silo line={l} s={s} height={170} pouring={d?.pouring} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
                     <span className="n hl-big">{fr(s.level)}<span style={{ fontSize: 24 }}> / {l.silo_capacity_t} t</span></span>
                     {d?.pouring ? (
-                      <div className="advice advice-stopp" style={{ fontSize: 22, padding: '12px 16px' }}>Salt går inn i siloen<span className="n"> · +{fr(d.added)} t</span></div>
+                      <div className="advice advice-stopp" style={{ fontSize: 22, padding: '12px 16px' }}>{tr('Salt går inn i siloen')}<span className="n"> · +{fr(d.added)} t</span></div>
                     ) : (
                       <div className={`advice advice-${s.advice}`} style={{ fontSize: 22, padding: '12px 16px' }}>
                         {ADVICE[s.advice]}{!d && s.fillNow > 0 && <span className="n"> · {fr(s.fillNow)} t</span>}
                       </div>
                     )}
-                    {o && !d && <span className="n" style={{ fontSize: 17, color: 'var(--fg-75)' }}>Gjenstår av ordren {fr(s.remaining)} t{s.finishAt ? ` · ferdig ca. ${osloTime(s.finishAt)}` : ''}</span>}
-                    {next && <span style={{ fontSize: 17, color: o && next.product_id !== o.product_id ? 'var(--warn-fg)' : 'var(--fg-62)' }}>Neste: {next.product_name} {fr(next.tonnes)} t</span>}
+                    {o && !d && <span className="n" style={{ fontSize: 17, color: 'var(--fg-75)' }}>{tr('Gjenstår av ordren {n} t', { n: fr(s.remaining) })}{s.finishAt ? ` · ${tr('ferdig ca. {tid}', { tid: osloTime(s.finishAt) })}` : ''}</span>}
+                    {next && <span style={{ fontSize: 17, color: o && next.product_id !== o.product_id ? 'var(--warn-fg)' : 'var(--fg-62)' }}>{tr('Neste: {hva}', { hva: `${next.product_name} ${fr(next.tonnes)} t` })}</span>}
                   </div>
                 </div>
               </div>
@@ -103,9 +104,9 @@ function TruckCard({ order: o }: { order: BulkOrderView }) {
       ...(o.status === 'lastes' ? { borderColor: 'rgba(128,239,222,.45)' } : {}) }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 26 }}>{o.truck}</span>
-        <span className="muted n" style={{ fontSize: 18 }}>bestilt {osloTime(o.created_at)}</span>
+        <span className="muted n" style={{ fontSize: 18 }}>{tr('bestilt {tid}', { tid: osloTime(o.created_at) })}</span>
       </div>
-      <span style={{ fontSize: 20, color: 'var(--fg-75)' }}>Sjåfør: {o.driver?.name ?? 'ukjent'}{o.destination ? <span className="muted"> · til {o.destination}</span> : null}</span>
+      <span style={{ fontSize: 20, color: 'var(--fg-75)' }}>{tr('Sjåfør: {navn}', { navn: o.driver?.name ?? tr('ukjent') })}{o.destination ? <span className="muted"> · {tr('til {sted}', { sted: o.destination })}</span> : null}</span>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {[...byQuality.values()].map(q => (
           <span key={q.name} style={{ ['--q' as string]: q.color, display: 'flex', alignItems: 'center', gap: 10, borderRadius: 16, padding: '12px 18px', fontSize: 22,

@@ -11,7 +11,7 @@ import { BellButton, BoatTabs, Sidebar, UserBadge } from '../components/Topbar.t
 import { QuayMark, StatusBadge } from '../components/ui.tsx';
 import { BASEMAPS, FlowMap, attribution, type MapHandle } from '../map/FlowMap.tsx';
 import { ShipCard, TrafficLegend } from '../map/ShipCard.tsx';
-import { useT } from '../lib/i18n.ts';
+import { tr, tx } from '../lib/i18n.ts';
 import { useBasemap, useTraffic } from '../map/useTraffic.ts';
 import { FLAG_STYLE, addDays, dayShort, fr, goodsParts, osloTime, telHref, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useBoat, useMe, usePortCalls, useQuays, useSettings, useUsers } from '../lib/queries.ts';
@@ -42,7 +42,6 @@ export function MobileApp() {
   const go = (id: string | null, kaibok = false) => { setShipSel(null); setParams(id ? { id, ...(kaibok ? { kaibok: '1' } : {}) } : {}); };
   const fence = settings.data?.geofence ?? FALLBACK;
   const t = useTraffic(list, sel?.boat.id ?? null, fence);
-  const tr = useT();
   const [legendOpen, setLegendOpen] = useState(false);
   const { vessels, shipSel, setShipSel, selShip, layers, setZoomNames, trackError } = t;
   const [basemap, pickBasemap] = useBasemap();
@@ -81,7 +80,7 @@ export function MobileApp() {
               const q = project(fence.lon, fence.lat);
               return (
                 <>
-                  {q && <span aria-label="Vår kai" style={{ position: 'absolute', left: q[0], top: q[1], transform: 'translate(-50%, -50%)', width: 24, height: 24, borderRadius: '50%', background: '#1A231E', color: '#F2F5F3', border: '2px solid rgba(242,245,243,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}><Anchor size={12} /></span>}
+                  {q && <span aria-label={tr('Vår kai')} style={{ position: 'absolute', left: q[0], top: q[1], transform: 'translate(-50%, -50%)', width: 24, height: 24, borderRadius: '50%', background: '#1A231E', color: '#F2F5F3', border: '2px solid rgba(242,245,243,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}><Anchor size={12} /></span>}
                   <VesselLayer project={project} vessels={vessels} calls={list} selectedId={sel?.id} onSelect={id => go(id)} quayPos={quayPos} />
                 </>
               );
@@ -103,13 +102,13 @@ export function MobileApp() {
             {legendOpen && <TrafficLegend s={t} className="m-legend" />}
             <button type="button" className="tab legend-btn" aria-expanded={legendOpen} onClick={() => setLegendOpen(!legendOpen)}
               style={{ backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .85)', pointerEvents: 'auto' }}>
-              {tr('legend.boats')} {legendOpen ? '▾' : '▴'}
+              {tr('Båter')} {legendOpen ? '▾' : '▴'}
             </button>
           </div>
-          <div role="group" aria-label="Kartvisning" className="pill seg" style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 24px)', right: 10, zIndex: 2, backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .7)' }}>
+          <div role="group" aria-label={tr('Kartvisning')} className="pill seg" style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 24px)', right: 10, zIndex: 2, backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .7)' }}>
             {BASEMAPS.map(b => (
               <button key={b.value} type="button" className="tab" aria-pressed={basemap === b.value} onClick={() => pickBasemap(b.value)}
-                style={{ minHeight: 30, padding: '0 9px', fontSize: 12 }}>{tr(b.key)}</button>
+                style={{ minHeight: 30, padding: '0 9px', fontSize: 12 }}>{tr(b.label)}</button>
             ))}
           </div>
           <span style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 6px)', left: 12, right: 12, fontSize: 9.5, color: 'var(--fg-45)', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{attribution(basemap)}</span>
@@ -137,17 +136,17 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
   const f = FLAG_STYLE[c.boat.flag];
   const mins = Math.round((Date.parse(c.eta) - now.getTime()) / 60_000);
   const card = !c.time_known && c.status !== 'ferdig' && c.status !== 'kaibok_mangler'
-    ? { title: c.status === 'ved_kai' ? 'Ved kai' : 'Dag', sub: 'Klokkeslett ikke satt', big: dayShort(c.service_date), dim: '' }
+    ? { title: c.status === 'ved_kai' ? tr('Ved kai') : tr('Dag'), sub: tr('Klokkeslett ikke satt'), big: dayShort(c.service_date), dim: '' }
     : c.status === 'ved_kai'
-    ? { title: 'Ved kai', sub: 'Planlagt avgang', big: osloTime(c.etd).slice(0, 2), dim: osloTime(c.etd).slice(2) }
-    : c.status === 'ferdig' ? { title: 'Ferdig', sub: 'Kaibok levert', big: osloTime(c.etd).slice(0, 2), dim: osloTime(c.etd).slice(2) }
-    : c.status === 'kaibok_mangler' ? { title: 'Kaibok mangler', sub: 'ETD passert', big: osloTime(c.etd).slice(0, 2), dim: osloTime(c.etd).slice(2) }
-    : c.service_date === today && mins > 0 ? { title: 'Til ankomst', sub: `ETA ${osloTime(c.eta)}`, big: String(Math.floor(mins / 60)), dim: ` t ${String(mins % 60).padStart(2, '0')} min` }
+    ? { title: tr('Ved kai'), sub: tr('Planlagt avgang'), big: osloTime(c.etd).slice(0, 2), dim: osloTime(c.etd).slice(2) }
+    : c.status === 'ferdig' ? { title: tr('Ferdig'), sub: tr('Kaibok levert'), big: osloTime(c.etd).slice(0, 2), dim: osloTime(c.etd).slice(2) }
+    : c.status === 'kaibok_mangler' ? { title: tr('Kaibok mangler'), sub: tr('ETD passert'), big: osloTime(c.etd).slice(0, 2), dim: osloTime(c.etd).slice(2) }
+    : c.service_date === today && mins > 0 ? { title: tr('Til ankomst'), sub: `ETA ${osloTime(c.eta)}`, big: String(Math.floor(mins / 60)), dim: ` ${tr('t {m} min', { m: String(mins % 60).padStart(2, '0') })}` }
     : { title: 'ETA', sub: dayShort(c.service_date), big: osloTime(c.eta).slice(0, 2), dim: osloTime(c.eta).slice(2) };
   const contacts = [
-    boat.data?.agent?.phone && ['Agent', boat.data.agent.name, boat.data.agent.phone],
-    boat.data?.ship_phone && ['Båtens mobil', boat.data.ship_contact ?? c.boat.name, boat.data.ship_phone],
-    c.seller?.phone && ['Ansvarlig selger', c.seller.name, c.seller.phone],
+    boat.data?.agent?.phone && [tr('Agent'), boat.data.agent.name, boat.data.agent.phone],
+    boat.data?.ship_phone && [tr('Båtens mobil'), boat.data.ship_contact ?? c.boat.name, boat.data.ship_phone],
+    c.seller?.phone && [tr('Ansvarlig selger'), c.seller.name, c.seller.phone],
   ].filter((x): x is string[] => !!x);
   const chips = [...new Set([c.seller?.short_name, c.responsible?.short_name, ...(users.data ?? []).filter(u => u.roles.includes('produksjon')).map(u => u.short_name)])]
     .filter((s): s is string => !!s && s !== me.data?.short_name).slice(0, 4);
@@ -156,7 +155,7 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
   return (
     <>
       <header style={{ position: 'absolute', top: 14, left: 14, right: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
-        <button type="button" className="icon-btn" onClick={onBack} aria-label="Tilbake til anløpslista" style={{ ...pill, width: 48, height: 48 }}><ArrowLeft size={20} /></button>
+        <button type="button" className="icon-btn" onClick={onBack} aria-label={tr('Tilbake til anløpslista')} style={{ ...pill, width: 48, height: 48 }}><ArrowLeft size={20} /></button>
         <span style={{ fontSize: 18, fontWeight: 300, textShadow: '0 2px 12px rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <QuayMark quay={c.quay} compact /> · {typeLabel(c.type)}
         </span>
@@ -178,17 +177,17 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
               <span className="n" style={{ color: 'rgba(var(--tint), .65)' }}>{timeRange(c)}</span>
               <StatusBadge status={c.status} basis={c.status_basis} />
             </span>
-            {c.boat.flag_reason && <span style={{ fontSize: 14, color: 'rgba(var(--tint), .65)' }}>{c.boat.flag_reason}</span>}
+            {c.boat.flag_reason && <span style={{ fontSize: 14, color: 'rgba(var(--tint), .65)' }}>{tx(c.boat.flag_reason)}</span>}
           </div>
 
-          {c.status === 'ferdig' && <div style={{ borderRadius: 20, padding: 16, background: 'rgba(177,194,183,.14)' }}>Ferdig – kaibok levert.</div>}
+          {c.status === 'ferdig' && <div style={{ borderRadius: 20, padding: 16, background: 'rgba(177,194,183,.14)' }}>{tr('Ferdig – kaibok levert.')}</div>}
 
           {c.collisions.length > 0 && (
             <div role="alert" className="alert-red" style={{ borderRadius: 22, padding: '14px 16px', background: 'rgba(120,42,38,.5)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 16 }}>Booket for tett</span>
+              <span style={{ fontSize: 16 }}>{tr('Booket for tett')}</span>
               {c.collisions.map((x, i) => (
                 <span key={i} className="n" style={{ fontSize: 14, color: 'rgba(var(--tint), .75)', borderLeft: '1px solid rgba(var(--tint), .35)', paddingLeft: 10 }}>
-                  {x.text} · {osloTime(x.from)}–{osloTime(x.to)}{x.with.length ? ` · ${x.with.map(w => w.boat_name).join(', ')}` : ''}
+                  {tx(x.text)} · {osloTime(x.from)}–{osloTime(x.to)}{x.with.length ? ` · ${x.with.map(w => w.boat_name).join(', ')}` : ''}
                 </span>
               ))}
             </div>
@@ -196,9 +195,9 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '0 4px' }}>
-              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 400, color: 'var(--fg-62)' }}>Mannskap</h3>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 400, color: 'var(--fg-62)' }}>{tr('Mannskap')}</h3>
               <span style={{ fontSize: 14, color: c.responsible ? 'var(--fg-62)' : 'var(--warn-fg)' }}>
-                {c.responsible ? (auto ? 'Eneste på båten = ansvarlig' : `Ansvarlig: ${c.responsible.short_name}`) : 'Ansvarlig ikke valgt'}
+                {c.responsible ? (auto ? tr('Eneste på båten = ansvarlig') : tr('Ansvarlig: {navn}', { navn: c.responsible.short_name })) : tr('Ansvarlig ikke valgt')}
               </span>
             </div>
             <div style={{ borderRadius: 22, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)', padding: '2px 6px' }}>
@@ -211,14 +210,14 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
                       {s.user?.initials ?? '?'}
                     </span>
                     <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25, flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 16, color: s.user ? undefined : 'var(--warn-fg)' }}>{s.user ? `${s.user.short_name}${mine ? ' (deg)' : ''}` : 'Ikke satt'}</span>
-                      <span style={{ fontSize: 13, color: 'rgba(var(--tint), .6)' }}>{CREW_ROLE_LABEL[s.crew_role]}</span>
+                      <span style={{ fontSize: 16, color: s.user ? undefined : 'var(--warn-fg)' }}>{s.user ? `${s.user.short_name}${mine ? ` (${tr('deg')})` : ''}` : tr('Ikke satt')}</span>
+                      <span style={{ fontSize: 13, color: 'rgba(var(--tint), .6)' }}>{tx(CREW_ROLE_LABEL[s.crew_role])}</span>
                     </span>
-                    {s.user && c.responsible?.id === s.user.id && <span style={{ fontSize: 13, borderRadius: 999, padding: '5px 12px', background: '#F2F5F3', color: '#1A231E' }}>Ansvarlig</span>}
+                    {s.user && c.responsible?.id === s.user.id && <span style={{ fontSize: 13, borderRadius: 999, padding: '5px 12px', background: '#F2F5F3', color: '#1A231E' }}>{tr('Ansvarlig')}</span>}
                   </div>
                 );
               })}
-              {c.boat_crane && <div style={{ padding: 10, fontSize: 14, color: 'rgba(var(--tint), .65)' }}>+ Båtens egen kran brukes</div>}
+              {c.boat_crane && <div style={{ padding: 10, fontSize: 14, color: 'rgba(var(--tint), .65)' }}>+ {tr('Båtens egen kran brukes')}</div>}
             </div>
           </div>
 
@@ -236,7 +235,7 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {contacts.map(([kind, name, phone]) => (
-              <a key={kind} href={telHref(phone)} aria-label={`Ring ${kind.toLowerCase()}, ${name}`}
+              <a key={kind} href={telHref(phone)} aria-label={tr('Ring {hvem}, {navn}', { hvem: kind.toLowerCase(), navn: name })}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 64, padding: '8px 8px 8px 16px', borderRadius: 22, background: 'rgba(var(--tint), .05)', border: '1px solid rgba(var(--tint), .07)', textDecoration: 'none', color: 'var(--fg)' }}>
                 <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3, flex: 1, minWidth: 0 }}>
                   <span style={{ fontSize: 13, color: 'rgba(var(--tint), .6)' }}>{kind}</span>
@@ -253,7 +252,7 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
           <div style={{ flex: 'none', padding: '10px 16px 20px' }}>
             <button type="button" onClick={onKaibok}
               style={{ width: '100%', minHeight: 60, borderRadius: 999, border: 'none', background: '#F2F5F3', color: '#1A231E', fontSize: 17, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-              <Check size={20} strokeWidth={2.2} />Ferdigstill og fyll ut kaibok
+              <Check size={20} strokeWidth={2.2} />{tr('Ferdigstill og fyll ut kaibok')}
             </button>
           </div>
         )}

@@ -13,7 +13,7 @@ Internt logistikksystem for kaia på Flatholmen i Ålesund. Menyen har fire hove
 
 Mannskap på anløp er valgfritt. Det ligger sammenfoldet på anløpet, og roller og personer kan legges til eller fjernes ved behov.
 
-Rapporter og **Innstillinger** ligger nederst i menyen. Under Innstillinger → **Preferanser** velger hver bruker tema (mørkt, lyst eller som maskinen), språk og hvor langt fram kaiplanen viser. Språk er en demo (norsk, engelsk, litauisk, dansk, svensk og islandsk): menyer, faner, søk, innstillinger og kartet er oversatt, resten er på norsk. Kaier og brukere ligger på samme side for admin. `/hjullaster` er en fullskjermvisning for nettbrettet i hjullasteren: behov i traktene, hvilke biler som har bestilt (sjåfør og tonn per kvalitet) og begge siloene. Skjermen er bare til visning. Knappen «Demo: påfylling av silo» viser hvordan siloene tømmes og fylles i produksjon, uten å lagre noe.
+Rapporter og **Innstillinger** ligger nederst i menyen. Under Innstillinger → **Preferanser** velger hver bruker tema (mørkt, lyst eller som maskinen), språk og hvor langt fram kaiplanen viser. Hele grensesnittet finnes på norsk, engelsk, litauisk, dansk, svensk og islandsk, også varsler, feilmeldinger og tekster fra serveren. Navn på båter, kunder, varer og kaier, og det folk skriver i chatten, vises som det er lagt inn. Kaier og brukere ligger på samme side for admin. `/hjullaster` er en fullskjermvisning for nettbrettet i hjullasteren: behov i traktene, hvilke biler som har bestilt (sjåfør og tonn per kvalitet) og begge siloene. Skjermen er bare til visning. Knappen «Demo: påfylling av silo» viser hvordan siloene tømmes og fylles i produksjon, uten å lagre noe.
 
 **Klokkeslett på anløp er valgfritt.** Tidene er sjelden kjent før ca. en time før båten kommer, så et anløp kan legges inn med bare dag. Tiden settes på anløpet («Sett tid») når den er kjent. Anløp uten tid er utenfor kollisjonssjekken og kaibelegget til tiden er satt.
 
@@ -185,6 +185,7 @@ Bilder som lastes opp uten at kaiboka lagres, ryddes bort hver natt kl. 03:17 UT
 - **Databaseendringer:** Legg til en ny fil i `migrations/` (`0002_….sql`, `0003_….sql` osv.). Den kjøres automatisk ved neste deploy. Gamle migrasjoner skal aldri endres.
 - **Bygget feiler hvis typesjekken feiler:** `npm run build` kjører `tsc` før Vite.
 - **Tester:** API-et og forretningslogikken har tester under `worker/test/` (`npm test`). De kan kjøres i CI, for eksempel i en GitHub Action.
+- **Språk:** All tekst skrives på norsk i koden og sendes gjennom `tr('Norsk tekst {navn}', { navn })` (`web/src/lib/i18n.ts`). Oversettelsene ligger i `web/src/i18n/<språk>.ts` med den norske teksten som nøkkel; flertall skrives som `entall|flertall` (litauisk `one|few|other`). Tekst som lages på serveren står i `web/src/i18n/server.ts` og oversettes med `tx()`. `npm run i18n:check` viser tekster som mangler i et språk.
 
 ### Prosjektstruktur
 

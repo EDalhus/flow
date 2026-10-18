@@ -3,6 +3,7 @@ import type { AisVessel, AreaVessel } from '../../../shared/api.ts';
 import { MOVING_KNOTS, RANGE_MINUTES, destination, metersAfter, moveBearing, shipCategory, type ShipCategory } from '../../../shared/domain/ais.ts';
 import { distanceM } from '../../../shared/domain/geo.ts';
 import { fr } from '../lib/format.ts';
+import { tr } from '../lib/i18n.ts';
 
 // Trafikkbildet som GeoJSON for MapLibre: skip farget etter type, stiplet spor de siste 12 minuttene,
 // hvit linje for hvor de er om 6 minutter, og for valgt fartøy ringer for 6 min–3 t og spor siste døgn.
@@ -144,8 +145,8 @@ export function trafficLayers(vessels: TrafficVessel[], o: TrafficOptions): Traf
         const r = metersAfter(v.sog!, min);
         const coords: [number, number][] = [];
         for (let i = 0; i <= 96; i++) coords.push(destination(v.lat, v.lon, (i / 96) * 360, r));
-        const when = min < 60 ? `${min} min` : `${min / 60} t`;
-        rings.features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: { label: `Etter ${when}: ${fr(r / 1852)} nm` } });
+        const when = min < 60 ? `${min} min` : tr('{n} t', { n: min / 60 });
+        rings.features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: { label: tr('Etter {tid}: {nm} nm', { tid: when, nm: fr(r / 1852) }) } });
       }
     }
   }
@@ -211,7 +212,7 @@ export function degMin(v: number, pos: string, neg: string) {
 /** «12 sek siden», «4 min siden», «2 t siden». */
 export function ago(iso: string, now: number) {
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 90) return `${s} sek siden`;
-  if (s < 90 * 60) return `${Math.round(s / 60)} min siden`;
-  return `${Math.round(s / 3600)} t siden`;
+  if (s < 90) return tr('{n} sek siden', { n: s });
+  if (s < 90 * 60) return tr('{n} min siden', { n: Math.round(s / 60) });
+  return tr('{n} t siden', { n: Math.round(s / 3600) });
 }

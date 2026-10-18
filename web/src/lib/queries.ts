@@ -186,12 +186,13 @@ export function useSaveQuay() {
 }
 
 export type Summary = {
-  days: number; from: string; to: string;
+  days: number; ytd: boolean; from: string; to: string;
   out: { tonnes: number; calls: number }; in: { tonnes: number; calls: number }; calls: number;
   prev: { from: string; to: string; out: { tonnes: number; calls: number }; in: { tonnes: number; calls: number }; calls: number };
 };
+/** days = 0: hittil i år mot samme tid i fjor. */
 export const useSummary = (days: number) =>
-  useQuery({ queryKey: ['summary', days], queryFn: () => api<Summary>(`/reports/summary?days=${days}`), placeholderData: keepPreviousData, staleTime: 5 * 60_000 });
+  useQuery({ queryKey: ['summary', days], queryFn: () => api<Summary>(days ? `/reports/summary?days=${days}` : '/reports/summary?ytd=1'), placeholderData: keepPreviousData, staleTime: 5 * 60_000 });
 
 // ---------------------------------------------------------------- biler, bulk, produksjon
 

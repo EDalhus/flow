@@ -10,6 +10,7 @@ import { canCrew, canPlan, canQuayLog } from '../lib/roles.ts';
 import { Chat } from './Chat.tsx';
 import { Check, Chevron, Close, Phone, Plus } from './Icons.tsx';
 import { BigNumber, FlagBadge, QuayMark, Rating, RatingBars, Segmented } from './ui.tsx';
+import { tr, tx } from '../lib/i18n.ts';
 
 export type DetailTab = 'oversikt' | 'chat' | 'profil';
 
@@ -33,7 +34,7 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
             {typeLabel(call.type)} · <QuayMark quay={call.quay} compact /> · {dayRelative(call.service_date)} {timeRange(call)}
           </span>
           {onClose && (
-            <button type="button" className="icon-btn pill" onClick={onClose} aria-label="Lukk anløpet" title="Lukk (Esc)" style={{ width: 36, height: 36, flex: 'none', marginRight: -6 }}>
+            <button type="button" className="icon-btn pill" onClick={onClose} aria-label={tr('Lukk anløpet')} title={tr('Lukk (Esc)')} style={{ width: 36, height: 36, flex: 'none', marginRight: -6 }}>
               <Close size={14} />
             </button>
           )}
@@ -42,13 +43,13 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, fontSize: 13 }}>
           <FlagBadge flag={call.boat.flag} style={{ fontSize: 13, padding: '3px 10px' }} />
           <Rating value={call.boat.rating_count ? call.boat.avg_total : null}
-            suffix={<span style={{ color: 'var(--fg-62)' }}>· {call.boat.rating_count} {call.boat.rating_count === 1 ? 'kaibok' : 'kaibøker'}</span>} />
+            suffix={<span style={{ color: 'var(--fg-62)' }}>· {call.boat.rating_count === 1 ? tr('1 kaibok') : tr('{n} kaibøker', { n: call.boat.rating_count })}</span>} />
         </div>
         {extra && <div style={{ marginTop: 8 }}>{extra}</div>}
       </div>
 
-      <Segmented<DetailTab> label="Anløpsdetaljer" value={tab} onChange={onTab} stretch
-        options={[{ value: 'oversikt', label: 'Oversikt' }, { value: 'chat', label: `Chat · ${call.message_count}` }, { value: 'profil', label: 'Båtprofil' }]} />
+      <Segmented<DetailTab> label={tr('Anløpsdetaljer')} value={tab} onChange={onTab} stretch
+        options={[{ value: 'oversikt', label: tr('Oversikt') }, { value: 'chat', label: `${tr('Chat')} · ${call.message_count}` }, { value: 'profil', label: tr('Båtprofil') }]} />
 
       {tab === 'oversikt' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -57,7 +58,7 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
           <CrewEditor call={call} users={users.data ?? []} />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <h3 style={{ margin: '0 6px', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>Varer</h3>
+            <h3 style={{ margin: '0 6px', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>{tr('Varer')}</h3>
             {call.goods.map(g => {
               const [q, d] = goodsParts(g);
               return (
@@ -67,16 +68,16 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
                 </div>
               );
             })}
-            {!call.goods.length && <span className="muted" style={{ padding: 6, fontSize: 14 }}>Ingen varer registrert.</span>}
+            {!call.goods.length && <span className="muted" style={{ padding: 6, fontSize: 14 }}>{tr('Ingen varer registrert.')}</span>}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
             {[
-              boat.data?.agent?.phone && ['Agent', boat.data.agent.name, boat.data.agent.phone],
-              boat.data?.ship_phone && ['Båten', boat.data.ship_contact ?? call.boat.name, boat.data.ship_phone],
-              call.seller?.phone && ['Selger', call.seller.name, call.seller.phone],
+              boat.data?.agent?.phone && [tr('Agent'), boat.data.agent.name, boat.data.agent.phone],
+              boat.data?.ship_phone && [tr('Båten'), boat.data.ship_contact ?? call.boat.name, boat.data.ship_phone],
+              call.seller?.phone && [tr('Selger'), call.seller.name, call.seller.phone],
             ].filter((x): x is string[] => !!x).map(([kind, name, phone]) => (
-              <a key={kind} className="tel" href={telHref(phone)} aria-label={`Ring ${kind.toLowerCase()}, ${name}, ${phone}`}
+              <a key={kind} className="tel" href={telHref(phone)} aria-label={tr('Ring {hvem}, {navn}, {tlf}', { hvem: kind.toLowerCase(), navn: name, tlf: phone })}
                 style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1, padding: '9px 12px', minHeight: 64, minWidth: 0 }}>
                 <span style={{ fontSize: 11, color: 'rgba(var(--tint), .6)', display: 'flex', alignItems: 'center', gap: 5 }}>
                   <Phone size={11} strokeWidth={2.4} style={{ color: '#5BD68A' }} />{kind}
@@ -88,10 +89,10 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
           </div>
 
           {call.status === 'ferdig' ? (
-            <div style={{ borderRadius: 16, padding: '14px 16px', background: 'rgba(177,194,183,.12)', color: '#D6E0D9', fontSize: 14 }}>Ferdig – kaibok er levert for dette anløpet.</div>
+            <div style={{ borderRadius: 16, padding: '14px 16px', background: 'rgba(177,194,183,.12)', color: '#D6E0D9', fontSize: 14 }}>{tr('Ferdig – kaibok er levert for dette anløpet.')}</div>
           ) : canQuayLog(me.data) ? (
             <button type="button" className="btn btn-w" onClick={onOpenKaibok} style={{ minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 15 }}>
-              <Check size={17} strokeWidth={2.2} />Ferdigstill og fyll ut kaibok
+              <Check size={17} strokeWidth={2.2} />{tr('Ferdigstill og fyll ut kaibok')}
             </button>
           ) : null}
         </div>
@@ -104,7 +105,7 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 6px' }}>
             <BigNumber value={call.boat.rating_count ? call.boat.avg_total : null} size={64} />
             <span style={{ fontSize: 13, color: 'var(--fg-62)', paddingBottom: 8 }}>
-              {call.boat.rating_count ? `av 5 · snitt av ${call.boat.rating_count} kaibøker` : 'ingen vurderinger ennå'}
+              {call.boat.rating_count ? tr('av 5 · snitt av {n} kaibøker', { n: call.boat.rating_count }) : tr('ingen vurderinger ennå')}
             </span>
           </div>
           {boat.data && (
@@ -112,20 +113,20 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
               <RatingBars values={{ p: boat.data.avg_punctuality, s: boat.data.avg_cooperation, u: boat.data.avg_equipment }} />
             </div>
           )}
-          {call.boat.flag_reason && <p style={{ margin: '0 6px', fontSize: 14, color: 'var(--fg-75)' }}>{call.boat.flag_reason}</p>}
+          {call.boat.flag_reason && <p style={{ margin: '0 6px', fontSize: 14, color: 'var(--fg-75)' }}>{tx(call.boat.flag_reason)}</p>}
           {boat.data && <div style={{ padding: '0 6px' }}><BoatPhotos boat={boat.data} /></div>}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ margin: '0 6px 4px', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>Siste kaibøker</h3>
+            <h3 style={{ margin: '0 6px 4px', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>{tr('Siste kaibøker')}</h3>
             {(boat.data?.recent_logs ?? []).slice(0, 5).map(l => (
               <div key={l.id} style={{ padding: '10px 6px', borderBottom: '1px solid rgba(var(--tint), .06)', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span className="n" style={{ fontSize: 12, color: 'rgba(var(--tint), .6)' }}>
                   {ddmm(l.delivered_at)} · {l.delivered_by?.short_name} · {fr(l.avg)}/5
-                  {l.had_deviation && <span style={{ color: 'var(--bad-fg)' }}> · Avvik</span>}
+                  {l.had_deviation && <span style={{ color: 'var(--bad-fg)' }}> · {tr('Avvik')}</span>}
                 </span>
                 <span style={{ fontSize: 14 }}>{l.boat_note ?? l.description ?? '—'}</span>
               </div>
             ))}
-            {boat.data && !boat.data.recent_logs.length && <p className="muted" style={{ margin: 0, padding: '10px 6px', fontSize: 14 }}>Ingen kaibøker ennå.</p>}
+            {boat.data && !boat.data.recent_logs.length && <p className="muted" style={{ margin: 0, padding: '10px 6px', fontSize: 14 }}>{tr('Ingen kaibøker ennå.')}</p>}
           </div>
         </div>
       )}
@@ -140,10 +141,10 @@ function ClashButton({ collisions, onClick }: { collisions: CollisionView[]; onC
       style={{ textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, minHeight: 48, padding: '8px 8px 8px 14px', borderRadius: 16 }}>
       <span className="dot" style={{ width: 8, height: 8, background: '#E5484D' }} />
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
-        <span style={{ fontSize: 14 }}>{boats.length ? `Kolliderer med ${boats.join(', ')}` : 'Kapasitet overskredet'}</span>
-        <span style={{ fontSize: 12, color: 'rgba(var(--tint), .65)' }}>{collisions.map(c => c.text).join(' · ')}</span>
+        <span style={{ fontSize: 14 }}>{boats.length ? tr('Kolliderer med {båter}', { båter: boats.join(', ') }) : tr('Kapasitet overskredet')}</span>
+        <span style={{ fontSize: 12, color: 'rgba(var(--tint), .65)' }}>{collisions.map(c => tx(c.text)).join(' · ')}</span>
       </span>
-      <span style={{ flex: 'none', fontSize: 13, borderRadius: 999, padding: '6px 12px', background: 'rgba(var(--tint), .1)' }}>Løs</span>
+      <span style={{ flex: 'none', fontSize: 13, borderRadius: 999, padding: '6px 12px', background: 'rgba(var(--tint), .1)' }}>{tr('Løs')}</span>
     </button>
   );
 }
@@ -169,8 +170,8 @@ function CrewEditor({ call, users }: { call: PortCallView; users: UserView[] }) 
   const slots = call.crew.map(s => ({ crew_role: s.crew_role, user_id: s.user?.id ?? null }));
   const named = call.crew.filter(s => s.user);
   const summary = call.crew.length
-    ? `${named.length ? named.map(s => s.user!.short_name).join(', ') : 'Ingen navn ennå'} · ${call.crew.length} ${call.crew.length === 1 ? 'rolle' : 'roller'}`
-    : 'Ikke satt opp';
+    ? `${named.length ? named.map(s => s.user!.short_name).join(', ') : tr('Ingen navn ennå')} · ${call.crew.length === 1 ? tr('1 rolle') : tr('{n} roller', { n: call.crew.length })}`
+    : tr('Ikke satt opp');
 
   if (!call.crew.length && !editable) return null;
 
@@ -179,10 +180,10 @@ function CrewEditor({ call, users }: { call: PortCallView; users: UserView[] }) 
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open}
         style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: 'none', color: 'var(--fg)', cursor: 'pointer', padding: open ? '0 2px 4px' : '10px 12px', textAlign: 'left' }}>
         <span style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-          <span className="sub">Mannskap{call.responsible ? ` · ansvarlig ${call.responsible.short_name}` : ''}</span>
+          <span className="sub">{tr('Mannskap')}{call.responsible ? ` · ${tr('ansvarlig {navn}', { navn: call.responsible.short_name })}` : ''}</span>
           {!open && <span style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</span>}
         </span>
-        <span style={{ fontSize: 13, color: 'var(--fg-62)', flex: 'none' }}>{open ? 'Lukk' : editable ? (call.crew.length ? 'Endre' : '+ Legg til') : 'Vis'}</span>
+        <span style={{ fontSize: 13, color: 'var(--fg-62)', flex: 'none' }}>{open ? tr('Lukk') : editable ? (call.crew.length ? tr('Endre') : `+ ${tr('Legg til')}`) : tr('Vis')}</span>
         <Chevron size={15} style={{ flex: 'none', transform: open ? 'rotate(180deg)' : undefined }} />
       </button>
 
@@ -196,23 +197,23 @@ function CrewEditor({ call, users }: { call: PortCallView; users: UserView[] }) 
             display: 'flex', alignItems: 'center', gap: 8, minHeight: 46, padding: '3px 3px 3px 12px', borderRadius: 14,
             ...(hit ? { background: 'rgba(255,107,94,.12)', border: '1px solid rgba(255,107,94,.35)' } : { background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .06)' }),
           }}>
-            <label htmlFor={`crew-${s.id}`} style={{ width: 84, flex: 'none', fontSize: 13, color: 'rgba(var(--tint), .68)' }}>{CREW_ROLE_LABEL[s.crew_role]}</label>
+            <label htmlFor={`crew-${s.id}`} style={{ width: 84, flex: 'none', fontSize: 13, color: 'rgba(var(--tint), .68)' }}>{tx(CREW_ROLE_LABEL[s.crew_role])}</label>
             <select id={`crew-${s.id}`} className="sel" value={who} disabled={!editable || put.isPending}
               onChange={e => save(slots.map((x, j) => (j === i ? { ...x, user_id: e.target.value || null } : x)))}>
-              <option value="">Ingen valgt</option>
+              <option value="">{tr('Ingen valgt')}</option>
               {options.map(u => <option key={u.id} value={u.id}>{u.short_name}</option>)}
             </select>
-            {who && (auto || !editable) && isAns && <span style={{ fontSize: 12, flex: 'none', minHeight: 36, padding: '0 10px', borderRadius: 999, background: '#F2F5F3', color: '#1A231E', display: 'flex', alignItems: 'center' }}>Ansvarlig</span>}
+            {who && (auto || !editable) && isAns && <span style={{ fontSize: 12, flex: 'none', minHeight: 36, padding: '0 10px', borderRadius: 999, background: '#F2F5F3', color: '#1A231E', display: 'flex', alignItems: 'center' }}>{tr('Ansvarlig')}</span>}
             {!auto && who && editable && (
-              <button type="button" aria-pressed={isAns} aria-label={isAns ? `${s.user?.short_name} er ansvarlig` : `Gjør ${s.user?.short_name} til ansvarlig`}
+              <button type="button" aria-pressed={isAns} aria-label={isAns ? tr('{navn} er ansvarlig', { navn: s.user?.short_name ?? '' }) : tr('Gjør {navn} til ansvarlig', { navn: s.user?.short_name ?? '' })}
                 onClick={() => save(slots, isAns ? null : who)} disabled={put.isPending}
                 style={{ fontSize: 12, cursor: 'pointer', flex: 'none', minHeight: 36, padding: '0 10px', borderRadius: 999,
                   ...(isAns ? { background: '#F2F5F3', color: '#1A231E', border: '1px solid #F2F5F3' } : { background: 'transparent', color: 'rgba(var(--tint), .62)', border: '1px dashed rgba(var(--tint), .3)' }) }}>
-                Ansvarlig
+                {tr('Ansvarlig')}
               </button>
             )}
             {editable && (
-              <button type="button" className="icon-btn" aria-label={`Fjern ${CREW_ROLE_LABEL[s.crew_role].toLowerCase()}`} disabled={put.isPending}
+              <button type="button" className="icon-btn" aria-label={tr('Fjern {rolle}', { rolle: tx(CREW_ROLE_LABEL[s.crew_role]).toLowerCase() })} disabled={put.isPending}
                 onClick={() => save(slots.filter((_, j) => j !== i), isAns ? null : undefined)} style={{ width: 34, height: 34, flex: 'none' }}>
                 <Close size={13} />
               </button>
@@ -223,17 +224,17 @@ function CrewEditor({ call, users }: { call: PortCallView; users: UserView[] }) 
 
       {open && editable && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <select className="sel" aria-label="Rolle som skal legges til" value={newRole} onChange={e => setNewRole(e.target.value as CrewRole)} style={{ flex: 'none', width: 'auto' }}>
-            {CREW_ROLES.map(r => <option key={r} value={r}>{CREW_ROLE_LABEL[r]}</option>)}
+          <select className="sel" aria-label={tr('Rolle som skal legges til')} value={newRole} onChange={e => setNewRole(e.target.value as CrewRole)} style={{ flex: 'none', width: 'auto' }}>
+            {CREW_ROLES.map(r => <option key={r} value={r}>{tx(CREW_ROLE_LABEL[r])}</option>)}
           </select>
           <button type="button" className="btn" disabled={put.isPending} onClick={() => save([...slots, { crew_role: newRole, user_id: null }])}
             style={{ minHeight: 40, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Plus size={13} /> Legg til rolle
+            <Plus size={13} /> {tr('Legg til rolle')}
           </button>
         </div>
       )}
-      {open && call.boat_crane && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .6)' }}>+ Båtens egen kran brukes</span>}
-      {open && !editable && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .55)' }}>Mannskap settes av produksjonen.</span>}
+      {open && call.boat_crane && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .6)' }}>+ {tr('Båtens egen kran brukes')}</span>}
+      {open && !editable && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .55)' }}>{tr('Mannskap settes av produksjonen.')}</span>}
       {error && <div className="error-box" role="alert">{error}</div>}
     </div>
   );
@@ -256,11 +257,11 @@ function TimeEditor({ call }: { call: PortCallView }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 16, background: 'rgba(var(--tint), .05)' }}>
         <span style={{ fontSize: 14 }}>
-          <span className="sub">Klokkeslett </span>
-          <span className="n">{call.time_known ? timeRange(call) : 'ikke satt'}</span>
+          <span className="sub">{tr('Klokkeslett')} </span>
+          <span className="n">{call.time_known ? timeRange(call) : tr('ikke satt')}</span>
         </span>
         <button type="button" className="btn" onClick={() => setOpen(true)} style={{ minHeight: 34, fontSize: 13 }}>
-          {call.time_known ? 'Endre' : 'Sett tid'}
+          {call.time_known ? tr('Endre') : tr('Sett tid')}
         </button>
       </div>
     );
@@ -273,9 +274,9 @@ function TimeEditor({ call }: { call: PortCallView }) {
       </div>
       {patch.isError && <div className="error-box">{errorText(patch.error)}</div>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button type="button" className="btn btn-w" disabled={!ok || patch.isPending} onClick={save} style={{ minHeight: 38 }}>Lagre</button>
-        <button type="button" className="btn" onClick={() => setOpen(false)} style={{ minHeight: 38 }}>Avbryt</button>
-        {call.time_known && <button type="button" className="btn" disabled={patch.isPending} onClick={clear} style={{ minHeight: 38, marginLeft: 'auto' }}>Fjern tid</button>}
+        <button type="button" className="btn btn-w" disabled={!ok || patch.isPending} onClick={save} style={{ minHeight: 38 }}>{tr('Lagre')}</button>
+        <button type="button" className="btn" onClick={() => setOpen(false)} style={{ minHeight: 38 }}>{tr('Avbryt')}</button>
+        {call.time_known && <button type="button" className="btn" disabled={patch.isPending} onClick={clear} style={{ minHeight: 38, marginLeft: 'auto' }}>{tr('Fjern tid')}</button>}
       </div>
     </div>
   );

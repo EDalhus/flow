@@ -3,13 +3,14 @@ import type { BoatSummary, PortCallView, QuayRef } from '../../../shared/api.ts'
 import type { CallStatus, Flag } from '../../../shared/domain/types.ts';
 import { FLAG_STYLE, STATUS_STYLE, fr, isOwnQuay, quayTitle, ratingColor } from '../lib/format.ts';
 import { Flag as FlagIcon, Search, Star } from './Icons.tsx';
+import { tr, tx } from '../lib/i18n.ts';
 
 export function StatusBadge({ status, basis, size = 'sm' }: { status: CallStatus; basis?: PortCallView['status_basis']; size?: 'sm' | 'lg' }) {
   const s = STATUS_STYLE[status];
   const estimated = basis === 'tid' && status === 'ved_kai';
   const lg = size === 'lg';
   return (
-    <span className="badge" title={estimated ? 'Anslått ut fra ETA/ETD – ingen AIS-posisjon ennå' : undefined}
+    <span className="badge" title={estimated ? tr('Anslått ut fra ETA/ETD – ingen AIS-posisjon ennå') : undefined}
       style={lg
         ? { background: s.solid, color: s.solidFg, padding: '6px 12px', fontSize: 14, fontWeight: 500, gap: 7 }
         : ({ background: s.bg, '--badge-c': s.c, color: 'var(--badge-c)' } as CSSProperties)}>
@@ -38,7 +39,7 @@ export function QuayMark({ quay, compact }: { quay: Pick<QuayRef, 'name' | 'nick
       {/* Egne kaier er standard og trenger ikke merke; bare naboens kaier merkes. */}
       {!own && (
         <span className="badge" style={{ flex: 'none', fontSize: compact ? 10 : 11, padding: compact ? '2px 6px' : '3px 8px', fontWeight: 500, background: 'rgba(232,176,110,.18)', color: '#C98A3E' }}>
-          Nabo
+          {tr('Nabo')}
         </span>
       )}
       <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, minWidth: 0 }}>
@@ -74,7 +75,7 @@ export function BoatFlagLine({ boat }: { boat: BoatSummary }) {
 
 export function Stars({ value, size = 16, label }: { value: number; size?: number; label?: string }) {
   return (
-    <span className="stars" role="img" aria-label={label ?? `${value} av 5`}>
+    <span className="stars" role="img" aria-label={label ?? tr('{n} av 5', { n: value })}>
       {[1, 2, 3, 4, 5].map(n => <Star key={n} size={size} fill={n <= value ? '#F7B955' : 'rgba(var(--tint), .14)'} />)}
     </span>
   );
@@ -113,9 +114,9 @@ export function RatingBars({ values, variant = 'long' }: {
   values: { p: number | null; s: number | null; u: number | null }; variant?: 'long' | 'card';
 }) {
   const rows: [string, string, number | null][] = [
-    ['Punktlighet', 'Punktlighet', values.p],
-    ['Samarbeid', 'Samarbeidsvilje (mannskap)', values.s],
-    ['Utstyr', 'Utstyr / kran', values.u],
+    [tr('Punktlighet'), tr('Punktlighet'), values.p],
+    [tr('Samarbeid'), tr('Samarbeidsvilje (mannskap)'), values.s],
+    [tr('Utstyr'), tr('Utstyr / kran'), values.u],
   ];
   if (variant === 'card') {
     return (
@@ -151,7 +152,7 @@ export function RatingBars({ values, variant = 'long' }: {
 /** Stort tall med dempet desimal: "4" + ",6". */
 export function BigNumber({ value, size = 42, digits = 1 }: { value: number | null; size?: number; digits?: number }) {
   const t = value == null ? '–' : fr(value, digits);
-  const i = t.indexOf(',');
+  const i = t.search(/[,.]/);
   return (
     <span className="n" style={{ fontSize: size, fontWeight: 200, lineHeight: 1, letterSpacing: '-0.02em' }}>
       {i < 0 ? t : t.slice(0, i)}
@@ -160,8 +161,8 @@ export function BigNumber({ value, size = 42, digits = 1 }: { value: number | nu
   );
 }
 
-export function Loading({ text = 'Laster …' }: { text?: string }) {
-  return <p className="empty loading" role="status">{text}</p>;
+export function Loading({ text }: { text?: string }) {
+  return <p className="empty loading" role="status">{text ?? tr('Laster …')}</p>;
 }
 
 /**
@@ -174,12 +175,12 @@ export function CallIssues({ call, showFlag = true }: { call: PortCallView; show
   const chips: { key: string; text: string; title?: string; tone: 'bad' | 'warn' }[] = [];
   if (call.collisions.length && !done) {
     const boats = [...new Set(call.collisions.flatMap(x => x.with.map(w => w.boat_name)))];
-    chips.push({ key: 'c', tone: 'bad', text: boats.length ? `Kolliderer med ${boats.join(', ')}` : 'Kollisjon', title: call.collisions.map(x => x.text).join(' · ') });
+    chips.push({ key: 'c', tone: 'bad', text: boats.length ? tr('Kolliderer med {båter}', { båter: boats.join(', ') }) : tr('Kollisjon'), title: call.collisions.map(x => tx(x.text)).join(' · ') });
   }
-  if (!done && call.crew.length && !call.responsible) chips.push({ key: 'a', tone: 'warn', text: 'Ansvarlig mangler' });
-  else if (!done && open) chips.push({ key: 'o', tone: 'warn', text: `${open} ${open === 1 ? 'rolle' : 'roller'} uten navn` });
+  if (!done && call.crew.length && !call.responsible) chips.push({ key: 'a', tone: 'warn', text: tr('Ansvarlig mangler') });
+  else if (!done && open) chips.push({ key: 'o', tone: 'warn', text: open === 1 ? tr('1 rolle uten navn') : tr('{n} roller uten navn', { n: open }) });
   if (showFlag && (call.boat.flag === 'red' || call.boat.flag === 'yellow')) {
-    chips.push({ key: 'f', tone: call.boat.flag === 'red' ? 'bad' : 'warn', text: FLAG_STYLE[call.boat.flag].label, title: call.boat.flag_reason ?? undefined });
+    chips.push({ key: 'f', tone: call.boat.flag === 'red' ? 'bad' : 'warn', text: FLAG_STYLE[call.boat.flag].label, title: call.boat.flag_reason ? tx(call.boat.flag_reason) : undefined });
   }
   if (!chips.length) return null;
   return (

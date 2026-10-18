@@ -1,3 +1,5 @@
+import { tx } from './i18n.ts';
+
 // Tynn fetch-klient mot /api. Feil fra API-et kastes som ApiError med norsk melding.
 
 export class ApiError extends Error {
@@ -46,4 +48,5 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   return data as T;
 }
 
-export const errorText = (e: unknown) => (e instanceof ApiError ? e.detail : e instanceof Error ? e.message : 'Noe gikk galt.');
+/** Feilmelding på brukerens språk (meldingene fra API-et er norske og oversettes her). */
+export const errorText = (e: unknown) => tx(e instanceof ApiError ? e.detail : e instanceof Error ? e.message : 'Noe gikk galt.');

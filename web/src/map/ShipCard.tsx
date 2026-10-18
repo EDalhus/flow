@@ -8,20 +8,21 @@ import { api, errorText } from '../lib/api.ts';
 import { fr, osloTime, titleCase } from '../lib/format.ts';
 import { useMe } from '../lib/queries.ts';
 import { canBoats } from '../lib/roles.ts';
-import { useT } from '../lib/i18n.ts';
-import { CATEGORY_COLOR, LEGEND_TYPES, RANGE_STEPS, ago, degMin, type LegendType, type RangeKm, type TrafficVessel } from './traffic.ts';
+import { tr, tx } from '../lib/i18n.ts';
+import { CATEGORY_COLOR, CATEGORY_LABEL, LEGEND_TYPES, RANGE_STEPS, ago, degMin, type LegendType, type RangeKm, type TrafficVessel } from './traffic.ts';
 import type { Approach } from './useTraffic.ts';
 
 // Kort for et valgt fartøy i trafikkbildet (desktop ved skipet, mobil festet over kartet).
 
 /** «4,1 nm til kaia · ca. 26 min i 9,5 kn». */
 export function approachText(a: Approach) {
-  const when = a.minutes == null ? 'ligger stille' : a.minutes < 90 ? `ca. ${Math.round(a.minutes)} min` : `ca. ${fr(a.minutes / 60)} t`;
-  return `${fr(a.nm)} nm til kaia · ${when}${a.knots != null && a.minutes != null ? ` i ${fr(a.knots)} kn` : ''}`;
+  const when = a.minutes == null ? tr('ligger stille') : a.minutes < 90 ? tr('ca. {n} min', { n: Math.round(a.minutes) }) : tr('ca. {n} t', { n: fr(a.minutes / 60) });
+  const speed = a.knots != null && a.minutes != null ? ` ${tr('i {fart} kn', { fart: fr(a.knots) })}` : '';
+  return `${tr('{nm} nm til kaia', { nm: fr(a.nm) })} · ${when}${speed}`;
 }
 
 export const approachLabel = (a: Approach | null) =>
-  !a ? 'Til vår kai' : a.sea ? 'Til vår kai (sjøvei)' : a.pending ? 'Til vår kai (beregner sjøvei …)' : 'Til vår kai (luftlinje – fant ikke sjøvei)';
+  !a ? tr('Til vår kai') : a.sea ? tr('Til vår kai (sjøvei)') : a.pending ? tr('Til vår kai (beregner sjøvei …)') : tr('Til vår kai (luftlinje – fant ikke sjøvei)');
 
 /** Info om et fartøy i trafikkbildet, som når man klikker et skip i Kystverkets kart. */
 export function ShipCard({ v, x = 0, y = 0, now, approach: a, trackError, onClose, docked }: {
@@ -36,7 +37,7 @@ export function ShipCard({ v, x = 0, y = 0, now, approach: a, trackError, onClos
   const [error, setError] = useState<string | null>(null);
   const info = v.info;
   const name = v.name ? titleCase(v.name) : `MMSI ${v.mmsi}`;
-  const type = v.cat === 'flow' ? 'Vår båt' : shipTypeLabel(info?.ship_type) ?? 'Ukjent type';
+  const type = v.cat === 'flow' ? tr('Vår båt') : tx(shipTypeLabel(info?.ship_type)) || tr('Ukjent type');
   const add = async () => {
     setBusy(true); setError(null);
     try {
@@ -59,8 +60,8 @@ export function ShipCard({ v, x = 0, y = 0, now, approach: a, trackError, onClos
     </div>
   );
   return (
-    <div className={docked ? 'glass' : 'glass ov-hide'} role="dialog" aria-label={`Fartøy ${name}`}
-      style={{ position: 'absolute', left, top, width: 300, ...docked, padding: 16, borderRadius: 18, background: 'rgba(30,34,38,.88)', display: 'flex', flexDirection: 'column', gap: 12, zIndex: 6 }}>
+    <div className={docked ? 'glass' : 'glass ov-hide'} role="dialog" aria-label={tr('Fartøy {navn}', { navn: name })}
+      style={{ position: 'absolute', left, top, width: 300, ...docked, padding: 16, borderRadius: 18, background: 'rgba(var(--chrome-rgb), .92)', display: 'flex', flexDirection: 'column', gap: 12, zIndex: 6 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <span style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(242,245,243,.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
           <span style={{ width: 12, height: 22, background: CATEGORY_COLOR[v.cat], clipPath: 'polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%)', transform: 'rotate(30deg)' }} />
@@ -71,19 +72,19 @@ export function ShipCard({ v, x = 0, y = 0, now, approach: a, trackError, onClos
             {[info?.country, info?.callsign, type].filter(Boolean).join(' · ')}
           </span>
         </div>
-        <button type="button" className="icon-btn" onClick={onClose} aria-label="Lukk" style={{ width: 32, height: 32 }}><Close size={14} /></button>
+        <button type="button" className="icon-btn" onClick={onClose} aria-label={tr('Lukk')} style={{ width: 32, height: 32 }}><Close size={14} /></button>
       </div>
       <div style={{ display: 'flex', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', padding: '10px 0' }}>
-        {cell('Stevning', v.heading != null ? `${Math.round(v.heading)}°` : '–')}
-        {cell('Kurs', v.cog != null ? `${fr(v.cog)}°` : '–')}
-        {cell('Fart', v.sog != null ? `${fr(v.sog)} kn` : '–')}
+        {cell(tr('Stevning'), v.heading != null ? `${Math.round(v.heading)}°` : '–')}
+        {cell(tr('Kurs'), v.cog != null ? `${fr(v.cog)}°` : '–')}
+        {cell(tr('Fart'), v.sog != null ? `${fr(v.sog)} kn` : '–')}
       </div>
       <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 12px', fontSize: 13 }}>
-        {info?.destination && <><dt style={{ fontWeight: 600 }}>Destinasjon</dt><dd style={{ margin: 0, textAlign: 'right' }}>{info.destination}</dd></>}
-        {info?.length && <><dt style={{ fontWeight: 600 }}>Størrelse</dt><dd className="n" style={{ margin: 0, textAlign: 'right' }}>{fr(info.length, 0)} × {info.width ? fr(info.width, 0) : '–'} m{info.draught ? ` · ${fr(info.draught)} m dypg.` : ''}</dd></>}
-        <dt style={{ fontWeight: 600 }}>Posisjon</dt>
-        <dd className="n" style={{ margin: 0, textAlign: 'right' }}>{degMin(v.lat, 'N', 'S')}, {degMin(v.lon, 'Ø', 'V')}</dd>
-        <dt style={{ fontWeight: 600 }}>Oppdatert</dt>
+        {info?.destination && <><dt style={{ fontWeight: 600 }}>{tr('Destinasjon')}</dt><dd style={{ margin: 0, textAlign: 'right' }}>{info.destination}</dd></>}
+        {info?.length && <><dt style={{ fontWeight: 600 }}>{tr('Størrelse')}</dt><dd className="n" style={{ margin: 0, textAlign: 'right' }}>{fr(info.length, 0)} × {info.width ? fr(info.width, 0) : '–'} m{info.draught ? ` · ${tr('{m} m dypg.', { m: fr(info.draught) })}` : ''}</dd></>}
+        <dt style={{ fontWeight: 600 }}>{tr('Posisjon')}</dt>
+        <dd className="n" style={{ margin: 0, textAlign: 'right' }}>{degMin(v.lat, tr('N'), tr('S'))}, {degMin(v.lon, tr('Ø'), tr('V'))}</dd>
+        <dt style={{ fontWeight: 600 }}>{tr('Oppdatert')}</dt>
         <dd className="n" style={{ margin: 0, textAlign: 'right' }}>{osloTime(v.ts)} · {ago(v.ts, now)}</dd>
       </dl>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 10px', borderRadius: 12, background: 'rgba(128,239,222,.08)' }}>
@@ -91,13 +92,14 @@ export function ShipCard({ v, x = 0, y = 0, now, approach: a, trackError, onClos
         {a && <span className="n" style={{ fontSize: 14, color: 'var(--aqua)' }}>{approachText(a)}</span>}
       </div>
       <span style={{ fontSize: 12, color: 'var(--fg-55)' }}>
-        Ringene: 6, 12, 24, 36, 48, 60 min og 3 t med farten nå. Turkis linje: sporet siste døgn. Stiplet turkis: sjøveien til kaia{trackError ? ` (ikke tilgjengelig: ${trackError})` : ''}.
+        {tr('Ringene: 6, 12, 24, 36, 48, 60 min og 3 t med farten nå. Turkis linje: sporet siste døgn. Stiplet turkis: sjøveien til kaia.')}
+        {trackError ? ` ${tr('Sporet er ikke tilgjengelig: {feil}', { feil: tx(trackError) })}` : ''}
       </span>
       {error && <div className="error-box">{error}</div>}
       <div style={{ display: 'flex', gap: 8 }}>
         {v.boatId
-          ? <button type="button" className="btn" style={{ minHeight: 36, fontSize: 13 }} onClick={() => navigate(`/baater?id=${v.boatId}`)}>Åpne i båtregisteret</button>
-          : canBoats(me.data) && <button type="button" className="btn btn-w" style={{ minHeight: 36, fontSize: 13 }} disabled={busy} onClick={add}>Legg til i båtregisteret</button>}
+          ? <button type="button" className="btn" style={{ minHeight: 36, fontSize: 13 }} onClick={() => navigate(`/baater?id=${v.boatId}`)}>{tr('Åpne i båtregisteret')}</button>
+          : canBoats(me.data) && <button type="button" className="btn btn-w" style={{ minHeight: 36, fontSize: 13 }} disabled={busy} onClick={add}>{tr('Legg til i båtregisteret')}</button>}
       </div>
     </div>
   );
@@ -119,42 +121,41 @@ export interface LegendState {
  * fra kaia de vises (eller hele kysten), og typer som kan skrus av ved å trykke på dem.
  */
 export function TrafficLegend({ s, className = 'ov kart-legend ov-hide' }: { s: LegendState; className?: string }) {
-  const t = useT();
   const idx = RANGE_STEPS.indexOf(s.range);
   const types = s.showOthers ? LEGEND_TYPES : (['flow'] as const);
   return (
-    <div className={className} role="group" aria-label={t('legend.label')}>
+    <div className={className} role="group" aria-label={tr('Båter på kartet')}>
       <div className="legend-row">
         <button type="button" className="tab legend-btn" aria-pressed={s.showOthers} onClick={() => s.setShowOthers(!s.showOthers)}>
-          {s.showOthers ? t('legend.hideOthers') : t('legend.showOthers')}
+          {s.showOthers ? tr('Skjul andre båter') : tr('Vis andre båter')}
         </button>
         {s.showOthers && (
           <>
             <button type="button" className="tab legend-btn" aria-pressed={!s.colorOthers} onClick={() => s.setColorOthers(!s.colorOthers)}>
-              {s.colorOthers ? t('legend.grey') : t('legend.color')}
+              {s.colorOthers ? tr('Gjør andre grå') : tr('Farger etter type')}
             </button>
             <label className="legend-range">
-              <span>{t('legend.range')}</span>
+              <span>{tr('Område')}</span>
               <input type="range" min={0} max={RANGE_STEPS.length - 1} step={1} value={idx}
-                aria-valuetext={s.range === 0 ? t('legend.coast') : `${s.range} km`}
+                aria-valuetext={s.range === 0 ? tr('Hele kysten') : `${s.range} km`}
                 onChange={e => s.setRange(RANGE_STEPS[Number(e.target.value)])} />
-              <span className="n" style={{ minWidth: 70 }}>{s.range === 0 ? t('legend.coast') : `${s.range} km`}</span>
+              <span className="n" style={{ minWidth: 70 }}>{s.range === 0 ? tr('Hele kysten') : `${s.range} km`}</span>
             </label>
             <button type="button" className="tab legend-btn" aria-pressed={s.range === 0} onClick={() => s.setRange(s.range === 0 ? 75 : 0)}>
-              {t('legend.coast')}
+              {tr('Hele kysten')}
             </button>
             {s.range === 0 && (s.coastPending || s.coastError || s.coastCount != null) && (
               <span className="n" style={{ color: s.coastError ? 'var(--bad-fg)' : 'var(--fg-62)' }}>
-                {s.coastError ?? (s.coastPending ? '…' : `${s.coastCount}`)}
+                {s.coastError ? tx(s.coastError) : s.coastPending ? '…' : tr('{n} fartøy', { n: s.coastCount ?? 0 })}
               </span>
             )}
           </>
         )}
       </div>
-      <div className="legend-types" role="group" aria-label={t('legend.toggleType')}>
+      <div className="legend-types" role="group" aria-label={tr('Trykk for å skjule eller vise')}>
         {types.map(k => (
-          <button key={k} type="button" className="legend-chip" aria-pressed={!s.hidden.has(k)} title={t('legend.toggleType')} onClick={() => s.toggleType(k)}>
-            {hull(k === 'flow' || s.colorOthers ? CATEGORY_COLOR[k] : CATEGORY_COLOR.gra)}{t(`cat.${k}`)}
+          <button key={k} type="button" className="legend-chip" aria-pressed={!s.hidden.has(k)} title={tr('Trykk for å skjule eller vise')} onClick={() => s.toggleType(k)}>
+            {hull(k === 'flow' || s.colorOthers ? CATEGORY_COLOR[k] : CATEGORY_COLOR.gra)}{tr(CATEGORY_LABEL[k])}
           </button>
         ))}
       </div>

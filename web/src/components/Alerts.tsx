@@ -9,6 +9,7 @@ import { canPlan } from '../lib/roles.ts';
 import { api } from '../lib/api.ts';
 import { Chevron, Close, Sparkle } from './Icons.tsx';
 import { QuayMark } from './ui.tsx';
+import { tr, tx } from '../lib/i18n.ts';
 
 /** Kollisjoner og flagg for i dag og i morgen, pluss personlige varsler. Brukes av bjella. */
 export function useAlerts() {
@@ -21,7 +22,7 @@ export function useAlerts() {
   // AIS vises bare når noe er galt: ikke satt opp, eller siste henting feilet.
   const ais = useAis().data?.status;
   const aisProblem = ais && (!ais.configured || !ais.ok)
-    ? (ais.configured ? ais.message ?? 'Siste henting fra BarentsWatch feilet.' : 'AIS er ikke satt opp (BarentsWatch-nøkler mangler).')
+    ? (ais.configured ? (ais.message ? tx(ais.message) : tr('Siste henting fra BarentsWatch feilet.')) : tr('AIS er ikke satt opp (BarentsWatch-nøkler mangler).'))
     : null;
   return {
     aisProblem,
@@ -35,10 +36,10 @@ export function useAlerts() {
 }
 
 function collisionTitle(c: CollisionView, calls: PortCallView[]) {
-  if (c.kind === 'quay') return `Kollisjon på ${c.text.replace(' dobbeltbooket', '')}`;
-  if (c.kind === 'person') return 'Mannskap dobbeltbooket';
+  if (c.kind === 'quay') return tr('Kollisjon på {kai}', { kai: c.text.replace(' dobbeltbooket', '') });
+  if (c.kind === 'person') return tr('Mannskap dobbeltbooket');
   const call = calls.find(x => x.id === c.calls[0]);
-  return `For få på vakt${call ? ` · ${dayRelative(call.service_date).toLowerCase()}` : ''}`;
+  return `${tr('For få på vakt')}${call ? ` · ${dayRelative(call.service_date).toLowerCase()}` : ''}`;
 }
 
 export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: React.CSSProperties }) {
@@ -63,6 +64,7 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
       const what = s.kind === 'move_quay'
         ? `Flyttet ${call.boat.name} til ${s.text.split(' til ').pop()}`
         : `Utsatt ${call.boat.name} til ${osloTime(s.eta)}–${osloTime(s.etd)}`;
+      // Meldingen lagres i chatten på norsk; den oversettes når den vises.
       await api(`/port-calls/${call.id}/messages`, { body: { body: `${what} (fra varsel om kollisjon).` } });
     } catch (e) {
       setError(errorText(e));
@@ -76,12 +78,12 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
   };
 
   return (
-    <div className="glass scroll" role="dialog" aria-label="Varsler"
+    <div className="glass scroll" role="dialog" aria-label={tr('Varsler')}
       style={{ width: 360, maxHeight: 600, padding: 14, zIndex: 30, background: 'rgba(var(--glass-rgb), .88)', ...style }}>
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 40, padding: '0 2px 0 6px' }}>
-          <span style={{ fontSize: 18 }}>Varsler</span>
-          <button type="button" className="icon-btn pill" onClick={onClose} aria-label="Lukk varsler" style={{ width: 40, height: 40 }}>
+          <span style={{ fontSize: 18 }}>{tr('Varsler')}</span>
+          <button type="button" className="icon-btn pill" onClick={onClose} aria-label={tr('Lukk varsler')} style={{ width: 40, height: 40 }}>
             <Close size={16} />
           </button>
         </div>
@@ -94,21 +96,22 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
           return (
             <div key={id} className="alert-red" style={{ borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <AlertHead badge="1" badgeStyle={{ background: '#E5484D', color: '#fff' }} title={collisionTitle(c, a.calls)}
-                sub={boats.join(' og ')} open={isOpen} onClick={() => toggle(id)} />
+                sub={boats.join(` ${tr('og')} `)} open={isOpen} onClick={() => toggle(id)} />
               {isOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 30 }}>
-                  <Line a={c.text} b={`${osloTime(c.from)}–${osloTime(c.to)}`} />
+                  <Line a={tx(c.text)} b={`${osloTime(c.from)}–${osloTime(c.to)}`} />
                   {planner && c.suggestions.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--fg-75)' }}><Sparkle size={15} />Anbefaling</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--fg-75)' }}><Sparkle size={15} />{tr('Anbefaling')}</span>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {c.suggestions.map(s => {
                           const boat = byId.get(s.call_id)?.boat.name;
-                          const label = s.text.includes(': ') ? s.text.replace(/^[^:]+: (.)/, (_, ch: string) => ch.toUpperCase()) : s.text;
+                          const where = s.text.split(' til ').pop() ?? '';
+                          const label = s.kind === 'move_quay' ? tr('Flytt {båt} til {kai}', { båt: boat ?? '', kai: where }) : tr('Utsett {båt} til {tid}', { båt: boat ?? '', tid: where });
                           return (
                             <button key={s.kind + s.call_id} type="button" className="btn" disabled={patch.isPending} onClick={() => apply(s)}
                               style={{ minHeight: 40, fontSize: 13, padding: '0 14px' }}>
-                              {label.replace(/^(Flytt|Utsett)/, `$1 ${boat}`)}
+                              {label}
                             </button>
                           );
                         })}
@@ -116,7 +119,7 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
                     </div>
                   )}
                   <button type="button" className="btn" onClick={() => goTo(c.calls[c.calls.length - 1])} style={{ alignSelf: 'flex-start', minHeight: 36, fontSize: 13 }}>
-                    Åpne anløpet
+                    {tr('Åpne anløpet')}
                   </button>
                 </div>
               )}
@@ -131,13 +134,13 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
           return (
             <div key={id} className={red ? 'alert-red' : 'alert-yellow'} style={{ borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, ...(red ? { background: 'rgba(120,42,38,.3)' } : {}) }}>
               <AlertHead badge="!" badgeStyle={red ? { background: '#E5484D', color: '#fff' } : { background: '#F7B955', color: '#1A231E' }}
-                title={`${red ? 'Rødt flagg' : 'Gult varsel'}: ${c.boat.name}`}
+                title={`${red ? tr('Rødt flagg') : tr('Gult varsel')}: ${c.boat.name}`}
                 sub={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{dayRelative(c.service_date)}{c.time_known ? ` ${osloTime(c.eta)}` : ''} · <QuayMark quay={c.quay} compact /></span>}
                 open={isOpen} onClick={() => toggle(id)} />
               {isOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 30 }}>
-                  <Line a={c.boat.flag_reason ?? FLAG_STYLE[c.boat.flag].label} b={`Snittrating ${fr(c.boat.avg_total)} · ${c.boat.rating_count} kaibøker`} />
-                  <button type="button" className="btn" onClick={() => goTo(c.id)} style={{ alignSelf: 'flex-start', minHeight: 36, fontSize: 13 }}>Åpne anløpet</button>
+                  <Line a={c.boat.flag_reason ? tx(c.boat.flag_reason) : FLAG_STYLE[c.boat.flag].label} b={tr('Snittrating {snitt} · {n} kaibøker', { snitt: fr(c.boat.avg_total), n: c.boat.rating_count })} />
+                  <button type="button" className="btn" onClick={() => goTo(c.id)} style={{ alignSelf: 'flex-start', minHeight: 36, fontSize: 13 }}>{tr('Åpne anløpet')}</button>
                 </div>
               )}
             </div>
@@ -146,7 +149,7 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
 
         {a.aisProblem && (
           <div className="alert-yellow" style={{ borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <AlertHead badge="!" badgeStyle={{ background: '#F7B955', color: '#1A231E' }} title="Problem med AIS" sub={a.aisProblem}
+            <AlertHead badge="!" badgeStyle={{ background: '#F7B955', color: '#1A231E' }} title={tr('Problem med AIS')} sub={a.aisProblem}
               open={aisCheck} onClick={() => me.data?.roles.includes('admin') && setAisCheck(!aisCheck)} />
             {aisCheck && <AisCheck onClose={() => setAisCheck(false)} />}
           </div>
@@ -154,22 +157,22 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
 
         {a.notifications.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 6px 0' }}>
-            <span className="sub">Til deg</span>
+            <span className="sub">{tr('Til deg')}</span>
             {a.unread > 0 && (
-              <button type="button" className="tab" style={{ minHeight: 30, fontSize: 13 }} onClick={() => read.mutate({ all: true })}>Merk alle som lest</button>
+              <button type="button" className="tab" style={{ minHeight: 30, fontSize: 13 }} onClick={() => read.mutate({ all: true })}>{tr('Merk alle som lest')}</button>
             )}
           </div>
         )}
         {a.notifications.slice(0, 12).map(n => (
           <button key={n.id} type="button" onClick={() => { if (!n.read_at) read.mutate({ ids: [n.id] }); goTo(n.port_call_id, n.kind === 'mention' ? 'chat' : undefined); }}
             style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 18, padding: '10px 14px', border: '1px solid rgba(var(--tint), .06)', background: n.read_at ? 'rgba(var(--tint), .03)' : 'rgba(128,239,222,.12)', display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: 14 }}>{n.text}</span>
+            <span style={{ fontSize: 14 }}>{tx(n.text)}</span>
             <span className="n" style={{ fontSize: 12, color: 'rgba(var(--tint), .6)' }}>{dayRelative(n.created_at.slice(0, 10))} {osloTime(n.created_at)}</span>
           </button>
         ))}
 
         {!a.collisions.length && !a.flagged.length && !a.notifications.length && (
-          <p style={{ margin: 0, padding: '12px 16px', borderRadius: 18, background: 'rgba(91,214,138,.1)', color: 'var(--ok-fg)', fontSize: 14 }}>Ingen aktive varsler.</p>
+          <p style={{ margin: 0, padding: '12px 16px', borderRadius: 18, background: 'rgba(91,214,138,.1)', color: 'var(--ok-fg)', fontSize: 14 }}>{tr('Ingen aktive varsler.')}</p>
         )}
       </section>
     </div>

@@ -4,9 +4,10 @@ import { CATEGORY_LABEL } from '../../../shared/domain/types.ts';
 import { TrendUp } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
 import { Loading, Segmented, StatStrip } from '../components/ui.tsx';
-import { arrow, nb, pct } from '../lib/format.ts';
+import { arrow, fr, nb, pct } from '../lib/format.ts';
 import { useProductReport, useProducts, useQualityReport, useWeeklyReport } from '../lib/queries.ts';
 import './rapporter.css';
+import { tr, tx } from '../lib/i18n.ts';
 
 type Dir = 'begge' | 'inn' | 'ut';
 type View = 'graf' | 'tabell';
@@ -29,29 +30,29 @@ export function RapporterPage() {
   const quality = useQualityReport();
 
   const w = weekly.data;
-  const name = prod ? products.data?.find(p => p.id === prod)?.name ?? 'varen' : 'alle varer';
-  const dirWord = dir === 'inn' ? 'inn' : dir === 'ut' ? 'ut' : 'inn og ut';
+  const name = prod ? products.data?.find(p => p.id === prod)?.name ?? tr('varen') : tr('alle varer');
+  const dirWord = dir === 'inn' ? tr('inn') : dir === 'ut' ? tr('ut') : tr('inn og ut');
 
   return (
     <Page>
       <div style={{ width: '100%', maxWidth: 1600, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h1 className="page-title">Rapporter</h1>
+            <h1 className="page-title">{tr('Rapporter')}</h1>
             <span className="muted">
-              {w ? `Flatholmen · ${w.year} mot ${w.prev_year} · uke 1–${w.last_actual_week} faktisk${w.last_actual_week < w.weeks_in_year ? `, uke ${w.last_actual_week + 1}–${w.weeks_in_year} prognose` : ''}` : 'Flatholmen'}
+              {w ? `Flatholmen · ${tr('{år} mot {fjor}', { år: w.year, fjor: w.prev_year })} · ${tr('uke 1–{n} faktisk', { n: w.last_actual_week })}${w.last_actual_week < w.weeks_in_year ? `, ${tr('uke {fra}–{til} prognose', { fra: w.last_actual_week + 1, til: w.weeks_in_year })}` : ''}` : 'Flatholmen'}
             </span>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="sub">Vare</span>
+              <span className="sub">{tr('Vare')}</span>
               <select className="inp inp-round" value={prod} onChange={e => { setProd(e.target.value); setHover(null); }}>
-                <option value="">Alle varer</option>
-                <optgroup label="Varer">{(products.data ?? []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>
+                <option value="">{tr('Alle varer')}</option>
+                <optgroup label={tr('Varer')}>{(products.data ?? []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>
               </select>
             </label>
-            <Segmented<Dir> label="Retning" value={dir} onChange={setDir} options={[{ value: 'begge', label: 'Inn + ut' }, { value: 'inn', label: 'Inn' }, { value: 'ut', label: 'Ut' }]} />
-            <Segmented<View> label="Visning" value={view} onChange={setView} options={[{ value: 'graf', label: 'Grafer' }, { value: 'tabell', label: 'Tabell' }]} />
+            <Segmented<Dir> label={tr('Retning')} value={dir} onChange={setDir} options={[{ value: 'begge', label: tr('Inn + ut') }, { value: 'inn', label: tr('Inn') }, { value: 'ut', label: tr('Ut') }]} />
+            <Segmented<View> label={tr('Visning')} value={view} onChange={setView} options={[{ value: 'graf', label: tr('Grafer') }, { value: 'tabell', label: tr('Tabell') }]} />
           </div>
         </div>
 
@@ -74,20 +75,20 @@ export function RapporterPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(380px, 100%), 1fr))', gap: 12 }}>
             <Punctuality points={quality.data.punctuality} />
             <section className="glass" aria-labelledby="c3" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div><h2 id="c3" className="ttl">Avvik per kategori</h2>
-                <span className="sub">{sum(quality.data.deviations.categories.map(c => c.count))} avvik registrert i kaiboka · siste 8 uker</span></div>
+              <div><h2 id="c3" className="ttl">{tr('Avvik per kategori')}</h2>
+                <span className="sub">{tr('{n} avvik registrert i kaiboka · siste 8 uker', { n: sum(quality.data.deviations.categories.map(c => c.count)) })}</span></div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {quality.data.deviations.categories.map(c => (
-                  <HBar key={c.category} label={CATEGORY_LABEL[c.category]} value={String(c.count)} share={c.count / Math.max(1, quality.data!.deviations.categories[0].count)} height={12} labelWidth={120} />
+                  <HBar key={c.category} label={tx(CATEGORY_LABEL[c.category])} value={String(c.count)} share={c.count / Math.max(1, quality.data!.deviations.categories[0].count)} height={12} labelWidth={120} />
                 ))}
-                {!quality.data.deviations.categories.length && <span className="sub">Ingen avvik siste 8 uker.</span>}
+                {!quality.data.deviations.categories.length && <span className="sub">{tr('Ingen avvik siste 8 uker.')}</span>}
               </div>
             </section>
             <section className="glass" aria-labelledby="c4" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div><h2 id="c4" className="ttl">Snittvurdering per båt</h2><span className="sub">Fra kaibøkene, 1–5</span></div>
+              <div><h2 id="c4" className="ttl">{tr('Snittvurdering per båt')}</h2><span className="sub">{tr('Fra kaibøkene, 1–5')}</span></div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {quality.data.boat_ratings.map(b => (
-                  <HBar key={b.id} label={b.name} value={b.avg_total.toFixed(1).replace('.', ',')} share={b.avg_total / 5} height={9} labelWidth={110} />
+                  <HBar key={b.id} label={b.name} value={fr(b.avg_total)} share={b.avg_total / 5} height={9} labelWidth={110} />
                 ))}
               </div>
             </section>
@@ -102,13 +103,13 @@ function Kpis({ w, dirWord }: { w: WeeklyReport; dirWord: string }) {
   const t = w.totals;
   const per = (tn: number, n: number) => (n ? `${nb(tn / n)} t` : '–');
   const kpis = [
-    { label: `Tonn ${dirWord} hittil i år`, big: nb(t.ytd_tonnes), unit: ' t', cmp: `${arrow(t.ytd_tonnes, t.ytd_tonnes_prev)}${pct(t.ytd_tonnes, t.ytd_tonnes_prev)} mot ${w.prev_year} (${nb(t.ytd_tonnes_prev)} t)` },
-    { label: 'Anløp hittil i år', big: nb(t.ytd_calls), unit: '', cmp: `${arrow(t.ytd_calls, t.ytd_calls_prev)}${pct(t.ytd_calls, t.ytd_calls_prev)} mot ${w.prev_year} (${t.ytd_calls_prev})` },
-    { label: 'Snitt per anløp', big: t.ytd_calls ? nb(t.ytd_tonnes / t.ytd_calls) : '–', unit: ' t', cmp: `i fjor ${per(t.ytd_tonnes_prev, t.ytd_calls_prev)}` },
+    { label: tr('Tonn {retning} hittil i år', { retning: dirWord }), big: nb(t.ytd_tonnes), unit: ' t', cmp: `${arrow(t.ytd_tonnes, t.ytd_tonnes_prev)}${pct(t.ytd_tonnes, t.ytd_tonnes_prev)} ${tr('mot {år}', { år: w.prev_year })} (${nb(t.ytd_tonnes_prev)} t)` },
+    { label: tr('Anløp hittil i år'), big: nb(t.ytd_calls), unit: '', cmp: `${arrow(t.ytd_calls, t.ytd_calls_prev)}${pct(t.ytd_calls, t.ytd_calls_prev)} ${tr('mot {år}', { år: w.prev_year })} (${t.ytd_calls_prev})` },
+    { label: tr('Snitt per anløp'), big: t.ytd_calls ? nb(t.ytd_tonnes / t.ytd_calls) : '–', unit: ' t', cmp: tr('i fjor {verdi}', { verdi: per(t.ytd_tonnes_prev, t.ytd_calls_prev) }) },
     {
-      label: w.last_actual_week < w.weeks_in_year ? `Prognose uke ${w.last_actual_week + 1}–${w.weeks_in_year}` : 'Prognose',
-      big: nb(t.forecast_tonnes), unit: ` t · ${t.forecast_calls} anløp`,
-      cmp: `${arrow(t.forecast_tonnes, t.forecast_tonnes_prev)}${pct(t.forecast_tonnes, t.forecast_tonnes_prev)} mot samme uker i fjor`,
+      label: w.last_actual_week < w.weeks_in_year ? tr('Prognose uke {fra}–{til}', { fra: w.last_actual_week + 1, til: w.weeks_in_year }) : tr('Prognose'),
+      big: nb(t.forecast_tonnes), unit: ` t · ${tr('{n} anløp', { n: t.forecast_calls })}`,
+      cmp: `${arrow(t.forecast_tonnes, t.forecast_tonnes_prev)}${pct(t.forecast_tonnes, t.forecast_tonnes_prev)} ${tr('mot samme uker i fjor')}`,
     },
   ];
   return <StatStrip items={kpis.map(k => ({ label: k.label, value: k.big, unit: k.unit, note: k.cmp }))} />;
@@ -120,14 +121,15 @@ function Outlook({ w, name, dirWord }: { w: WeeklyReport; name: string; dirWord:
   const empty = w.totals.forecast_tonnes + w.totals.forecast_tonnes_prev < 1;
   const up = o.next4_tonnes >= o.next4_tonnes_prev;
   const diff = o.busiest_calls - o.busiest_calls_prev;
-  const versus = diff === 0 ? 'like mange anløp som' : diff > 0 ? `${diff} flere anløp enn` : `${-diff} færre anløp enn`;
-  const title = empty ? `Ingen varer ${dirWord} for ${name}` : `${up ? 'Økende' : 'Lavere'} trykk de neste fire ukene – ${name}`;
+  const versus = diff === 0 ? tr('like mange anløp som') : diff > 0 ? tr('{n} flere anløp enn', { n: diff }) : tr('{n} færre anløp enn', { n: -diff });
+  const title = empty ? tr('Ingen varer {retning} for {vare}', { retning: dirWord, vare: name })
+    : up ? tr('Økende trykk de neste fire ukene – {vare}', { vare: name }) : tr('Lavere trykk de neste fire ukene – {vare}', { vare: name });
   const text = empty
-    ? `${name.charAt(0).toUpperCase() + name.slice(1)} går ikke ${dirWord} over kaia i perioden – velg «Inn + ut» eller en annen vare.`
-    : `Uke ${last + 1}–${Math.min(last + 4, w.weeks_in_year)}: ${nb(o.next4_tonnes)} t (${pct(o.next4_tonnes, o.next4_tonnes_prev)} mot i fjor).` +
-      (o.busiest_week ? ` Travleste uke: ${o.busiest_week}, ca. ${o.busiest_calls} anløp.` : '');
+    ? tr('{vare} går ikke {retning} over kaia i perioden – velg «Inn + ut» eller en annen vare.', { vare: name.charAt(0).toUpperCase() + name.slice(1), retning: dirWord })
+    : tr('Uke {fra}–{til}: {t} t ({endring} mot i fjor).', { fra: last + 1, til: Math.min(last + 4, w.weeks_in_year), t: nb(o.next4_tonnes), endring: pct(o.next4_tonnes, o.next4_tonnes_prev) }) +
+      (o.busiest_week ? ` ${tr('Travleste uke: {uke}, ca. {n} anløp.', { uke: o.busiest_week, n: o.busiest_calls })}` : '');
   const detail = o.busiest_week
-    ? `Uke ${o.busiest_week} ventes ${nb(o.busiest_tonnes)} t – ${versus} samme uke i fjor (${pct(o.busiest_tonnes, o.busiest_tonnes_prev)} tonn). `
+    ? `${tr('Uke {uke} ventes {t} t – {sammenlignet} samme uke i fjor ({endring} tonn).', { uke: o.busiest_week, t: nb(o.busiest_tonnes), sammenlignet: versus, endring: pct(o.busiest_tonnes, o.busiest_tonnes_prev) })} `
     : '';
   return (
     <div className="panel-accent" style={{ padding: '18px 24px', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
@@ -139,9 +141,9 @@ function Outlook({ w, name, dirWord }: { w: WeeklyReport; name: string; dirWord:
         <span style={{ fontSize: 15, color: 'var(--fg-85)' }}>{text}</span>
         {!empty && (
           <details style={{ fontSize: 13, color: 'var(--fg-62)', marginTop: 2 }}>
-            <summary style={{ cursor: 'pointer', width: 'fit-content' }}>Slik regnes prognosen</summary>
+            <summary style={{ cursor: 'pointer', width: 'fit-content' }}>{tr('Slik regnes prognosen')}</summary>
             <p style={{ margin: '6px 0 0' }}>
-              {detail}Prognose = fjorårets tall for samme uke × årets trend siste 8 uker ({pct(w.trend.tonnes, 1)} mot {w.prev_year}). Tallene er eksempeldata.
+              {detail}{tr('Prognose = fjorårets tall for samme uke × årets trend siste 8 uker ({trend} mot {år}). Tallene er eksempeldata.', { trend: pct(w.trend.tonnes, 1), år: w.prev_year })}
             </p>
           </details>
         )}
@@ -165,13 +167,13 @@ function MainChart({ w, name, dirWord, dir, prodSelected, hover, onHover }: {
   const per = (t: number, c: number) => (c ? `${nb(t / c)} t` : '–');
   const nowPos = `${(w.last_actual_week / n) * 100}%`;
   const fc = (i: number) => w.weeks[i].kind === 'prognose';
-  const anlWord = dir === 'inn' ? 'Anløp med levering' : dir === 'ut' ? 'Anløp med henting' : prodSelected ? `Anløp med ${name}` : 'Anløp';
+  const anlWord = dir === 'inn' ? tr('Anløp med levering') : dir === 'ut' ? tr('Anløp med henting') : prodSelected ? tr('Anløp med {vare}', { vare: name }) : tr('Anløp');
 
   const readout = [
-    { label: `Uke ${hw + 1}${fc(hw) ? ' · prognose' : ''}`, v: `${nb(cur[hw])} t`, cmp: `i fjor ${nb(prev[hw])} t · ${pct(cur[hw], prev[hw])}` },
-    { label: 'Anløp', v: String(curC[hw]), cmp: `i fjor ${prevC[hw]}` },
-    { label: 'Tonn per anløp', v: per(cur[hw], curC[hw]), cmp: `i fjor ${per(prev[hw], prevC[hw])}` },
-    { label: 'Andel av året', v: `${Math.round((cur[hw] / Math.max(1, sum(cur))) * 100)} %`, cmp: 'av årets tonn' },
+    { label: `${tr('Uke {n}', { n: hw + 1 })}${fc(hw) ? ` · ${tr('prognose')}` : ''}`, v: `${nb(cur[hw])} t`, cmp: `${tr('i fjor {verdi}', { verdi: `${nb(prev[hw])} t` })} · ${pct(cur[hw], prev[hw])}` },
+    { label: tr('Anløp'), v: String(curC[hw]), cmp: tr('i fjor {verdi}', { verdi: prevC[hw] }) },
+    { label: tr('Tonn per anløp'), v: per(cur[hw], curC[hw]), cmp: tr('i fjor {verdi}', { verdi: per(prev[hw], prevC[hw]) }) },
+    { label: tr('Andel av året'), v: `${Math.round((cur[hw] / Math.max(1, sum(cur))) * 100)} %`, cmp: tr('av årets tonn') },
   ];
   const bars = (values: number[], max: number) => values.map((v, i) => {
     const on = i === hw;
@@ -188,11 +190,11 @@ function MainChart({ w, name, dirWord, dir, prodSelected, hover, onHover }: {
   return (
     <section className="glass" aria-labelledby="c-main" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div><h2 id="c-main" className="ttl" style={{ fontSize: 20 }}>Varer og anløp per uke</h2>
-          <span className="sub">{name.charAt(0).toUpperCase() + name.slice(1)} · {dirWord} · hold over en uke for detaljer</span></div>
+        <div><h2 id="c-main" className="ttl" style={{ fontSize: 20 }}>{tr('Varer og anløp per uke')}</h2>
+          <span className="sub">{name.charAt(0).toUpperCase() + name.slice(1)} · {dirWord} · {tr('hold over en uke for detaljer')}</span></div>
         <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'rgba(var(--tint), .7)', flexWrap: 'wrap' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 10, borderRadius: 2, background: 'rgba(128,239,222,.5)' }} />{w.year}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 10, borderRadius: 2, background: 'rgba(128,239,222,.28)', border: '1px dashed #80EFDE' }} />Prognose</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 10, borderRadius: 2, background: 'rgba(128,239,222,.28)', border: '1px dashed #80EFDE' }} />{tr('Prognose')}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 2, background: '#D6E0D9' }} />{w.prev_year}</span>
         </div>
       </div>
@@ -212,14 +214,14 @@ function MainChart({ w, name, dirWord, dir, prodSelected, hover, onHover }: {
           {bars(cur, tMax)}
           <Line points={line(prev, tMax)} n={n} />
         </ChartArea>
-        <span className="sub" style={{ marginLeft: 62 }}>Tonn {dirWord}</span>
+        <span className="sub" style={{ marginLeft: 62 }}>{tr('Tonn {retning}', { retning: dirWord })}</span>
         <ChartArea height={120} axis={[String(aMax), '0']} nowPos={nowPos}>
           {bars(curC, aMax)}
           <Line points={line(prevC, aMax)} n={n} />
         </ChartArea>
         <span className="sub" style={{ marginLeft: 62 }}>{anlWord}</span>
         <div className="n" style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--fg-55)' }}>
-          <div style={{ width: 52, flex: 'none', textAlign: 'right' }}>Uke</div>
+          <div style={{ width: 52, flex: 'none', textAlign: 'right' }}>{tr('Uke')}</div>
           <div style={{ flex: 1, position: 'relative', height: 14 }}>
             {Array.from({ length: Math.ceil(n / 4) }, (_, i) => 1 + i * 4).map(wk => (
               <span key={wk} style={{ position: 'absolute', transform: 'translateX(-50%)', left: `${((wk - 0.5) / n) * 100}%` }}>{wk}</span>
@@ -242,7 +244,7 @@ function ChartArea({ height, axis, nowPos, showNowLabel, children }: { height: n
         <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 2, alignItems: 'flex-end' }}>{barsEl}</div>
         {lineEl}
         <div style={{ position: 'absolute', top: showNowLabel ? -8 : -4, bottom: -4, width: 0, borderLeft: '1px dashed rgba(var(--tint), .55)', pointerEvents: 'none', left: nowPos }} />
-        {showNowLabel && <span className="n" style={{ position: 'absolute', top: -22, transform: 'translateX(-50%)', fontSize: 11, background: '#F2F5F3', color: '#1A231E', borderRadius: 999, padding: '0 7px', left: nowPos }}>Nå</span>}
+        {showNowLabel && <span className="n" style={{ position: 'absolute', top: -22, transform: 'translateX(-50%)', fontSize: 11, background: '#F2F5F3', color: '#1A231E', borderRadius: 999, padding: '0 7px', left: nowPos }}>{tr('Nå')}</span>}
       </div>
     </div>
   );
@@ -257,19 +259,19 @@ const Line = ({ points, n }: { points: string; n: number }) => (
 function WeekTable({ w, name, dirWord }: { w: WeeklyReport; name: string; dirWord: string }) {
   return (
     <section className="glass" style={{ padding: '18px 20px' }}>
-      <h2 className="ttl" style={{ marginBottom: 8 }}>Per uke – {name}, {dirWord}</h2>
+      <h2 className="ttl" style={{ marginBottom: 8 }}>{tr('Per uke – {vare}, {retning}', { vare: name, retning: dirWord })}</h2>
       <div className="scroll" style={{ maxHeight: 520 }}>
         <table className="rtable">
-          <thead><tr><th>Uke</th><th className="r">Tonn {w.prev_year}</th><th className="r">Tonn {w.year}</th><th className="r">Anløp {w.prev_year}</th><th className="r">Anløp {w.year}</th><th>Type</th></tr></thead>
+          <thead><tr><th>{tr('Uke')}</th><th className="r">{tr('Tonn')} {w.prev_year}</th><th className="r">{tr('Tonn')} {w.year}</th><th className="r">{tr('Anløp')} {w.prev_year}</th><th className="r">{tr('Anløp')} {w.year}</th><th>{tr('Type')}</th></tr></thead>
           <tbody>
             {w.weeks.map(r => (
               <tr key={r.week}>
-                <td>Uke {r.week}</td>
+                <td>{tr('Uke {n}', { n: r.week })}</td>
                 <td className="r n">{nb(r.tonnes_prev)}</td>
                 <td className="r n">{nb(r.tonnes ?? r.forecast_tonnes ?? 0)}</td>
                 <td className="r n">{r.calls_prev}</td>
                 <td className="r n">{r.calls ?? r.forecast_calls}</td>
-                <td style={{ color: 'rgba(var(--tint), .6)' }}>{r.kind === 'faktisk' ? 'Faktisk' : 'Prognose'}</td>
+                <td style={{ color: 'rgba(var(--tint), .6)' }}>{r.kind === 'faktisk' ? tr('Faktisk') : tr('Prognose')}</td>
               </tr>
             ))}
           </tbody>
@@ -286,14 +288,14 @@ function ProductTable({ rows, last, dirWord, selected, onPick }: { rows: Product
   return (
     <section className="panel-light" aria-labelledby="c-prod" style={{ padding: '18px 8px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ padding: '0 14px' }}>
-        <h2 id="c-prod" className="ttl" style={{ fontSize: 20 }}>Varer {dirWord}</h2>
-        <span className="sub">Hittil i år mot samme uker i fjor, og prognose for resten av året. Velg en vare for å se den i grafen.</span>
+        <h2 id="c-prod" className="ttl" style={{ fontSize: 20 }}>{tr('Varer {retning}', { retning: dirWord })}</h2>
+        <span className="sub">{tr('Hittil i år mot samme uker i fjor, og prognose for resten av året. Velg en vare for å se den i grafen.')}</span>
       </div>
       <div className="scroll" style={{ overflowX: 'auto' }}>
         <div style={{ minWidth: 940 }}>
           <div className="prow" style={{ cursor: 'default', fontSize: 12, color: 'var(--fg-55)', borderTop: 'none' }}>
-            <span>Vare</span><span>Emballasje</span><span className="r">Hittil i år</span><span className="r">I fjor samme</span><span className="r">Endring</span>
-            <span className="r">Prognose uke {last + 1}–{weeks}</span><span className="r">Mot i fjor</span><span>Uke 1–{weeks}</span>
+            <span>{tr('Vare')}</span><span>{tr('Emballasje')}</span><span className="r">{tr('Hittil i år')}</span><span className="r">{tr('I fjor samme')}</span><span className="r">{tr('Endring')}</span>
+            <span className="r">{tr('Prognose uke {fra}–{til}', { fra: last + 1, til: weeks })}</span><span className="r">{tr('Mot i fjor')}</span><span>{tr('Uke 1–{n}', { n: weeks })}</span>
           </div>
           {rows.map(r => {
             const mx = Math.max(1, ...r.series_prev, ...r.series);
@@ -302,13 +304,13 @@ function ProductTable({ rows, last, dirWord, selected, onPick }: { rows: Product
               <button key={r.product_id} type="button" className="prow" aria-pressed={selected === r.product_id} onClick={() => onPick(r.product_id)}
                 style={selected === r.product_id ? { background: 'rgba(128,239,222,.12)' } : undefined}>
                 <span style={{ fontSize: 15 }}>{r.name}</span>
-                <span style={{ fontSize: 13, color: 'rgba(var(--tint), .65)' }}>{r.packaging}</span>
+                <span style={{ fontSize: 13, color: 'rgba(var(--tint), .65)' }}>{tx(r.packaging)}</span>
                 <span className="n r">{r.ytd_tonnes > 0.5 ? nb(r.ytd_tonnes) : '–'}</span>
                 <span className="n r" style={{ color: 'rgba(var(--tint), .7)' }}>{r.ytd_tonnes_prev > 0.5 ? nb(r.ytd_tonnes_prev) : '–'}</span>
                 <span className="n r">{chg(r.ytd_tonnes, r.ytd_tonnes_prev)}</span>
                 <span className="n r">{r.forecast_tonnes > 0.5 ? nb(r.forecast_tonnes) : '–'}</span>
                 <span className="n r">{chg(r.forecast_tonnes, r.forecast_tonnes_prev)}</span>
-                <svg viewBox={`0 0 ${weeks} 24`} preserveAspectRatio="none" role="img" aria-label={`${r.name}: ${chg(r.ytd_tonnes, r.ytd_tonnes_prev)} hittil i år`} style={{ width: 130, height: 26, overflow: 'visible' }}>
+                <svg viewBox={`0 0 ${weeks} 24`} preserveAspectRatio="none" role="img" aria-label={`${r.name}: ${chg(r.ytd_tonnes, r.ytd_tonnes_prev)} ${tr('hittil i år')}`} style={{ width: 130, height: 26, overflow: 'visible' }}>
                   <polyline points={pts(r.series_prev, 0, weeks)} fill="none" stroke="rgba(232,236,239,.55)" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
                   <polyline points={pts(r.series, 0, last)} fill="none" stroke="#80EFDE" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
                   <polyline points={pts(r.series, Math.max(0, last - 1), weeks)} fill="none" stroke="#80EFDE" strokeWidth="1.6" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
@@ -317,7 +319,7 @@ function ProductTable({ rows, last, dirWord, selected, onPick }: { rows: Product
             );
           })}
           <div className="prow" style={{ cursor: 'default', fontWeight: 500 }}>
-            <span>Sum alle varer</span><span />
+            <span>{tr('Sum alle varer')}</span><span />
             <span className="n r">{nb(tot.y)}</span>
             <span className="n r" style={{ color: 'rgba(var(--tint), .7)' }}>{nb(tot.y5)}</span>
             <span className="n r">{chg(tot.y, tot.y5)}</span>
@@ -327,7 +329,7 @@ function ProductTable({ rows, last, dirWord, selected, onPick }: { rows: Product
           </div>
         </div>
       </div>
-      <span className="sub" style={{ padding: '4px 14px 8px' }}>Tonn. BB = 1 000 kg · pall 25 kg × 40 = 1 000 kg · pall 25 kg × 42 = 1 050 kg.</span>
+      <span className="sub" style={{ padding: '4px 14px 8px' }}>{tr('Tonn. BB = 1 000 kg · pall 25 kg × 40 = 1 000 kg · pall 25 kg × 42 = 1 050 kg.')}</span>
     </section>
   );
 }
@@ -339,7 +341,7 @@ function Punctuality({ points }: { points: { week: number; share: number | null;
   const valid = points.map((p, i) => ({ ...p, i })).filter(p => p.share != null);
   return (
     <section className="glass" aria-labelledby="c2" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div><h2 id="c2" className="ttl">Punktlighet</h2><span className="sub">Andel anløp innenfor ±30 min av ETA · siste {points.length} uker</span></div>
+      <div><h2 id="c2" className="ttl">{tr('Punktlighet')}</h2><span className="sub">{tr('Andel anløp innenfor ±30 min av ETA · siste {n} uker', { n: points.length })}</span></div>
       <div style={{ display: 'flex', gap: 8 }}>
         <div className="n" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 140, fontSize: 11, color: 'rgba(var(--tint), .5)', textAlign: 'right', width: 34 }}>
           <span>100 %</span><span>75 %</span><span>50 %</span>
@@ -355,7 +357,7 @@ function Punctuality({ points }: { points: { week: number; share: number | null;
                 <span style={{ position: 'absolute', left: '50%', width: 9, height: 9, margin: '-4.5px 0 0 -4.5px', borderRadius: '50%', background: '#80EFDE', boxShadow: '0 0 0 2px #1C2620', top: `${y(p.share! * 100)}%` }} />
                 {hl === p.i && (
                   <span className="tip n" style={{ left: '50%', top: `${y(p.share! * 100)}%` }}>
-                    Uke {p.week}: {Math.round(p.share! * 100)} % ({p.on_time} av {p.calls})
+                    {tr('Uke {uke}: {andel} % ({n} av {av})', { uke: p.week, andel: Math.round(p.share! * 100), n: p.on_time, av: p.calls })}
                   </span>
                 )}
               </div>

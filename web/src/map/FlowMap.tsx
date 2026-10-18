@@ -2,7 +2,7 @@ import { LngLatBounds, Map as MlMap, setWorkerUrl, type ExpressionSpecification,
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
-import type { Key } from '../lib/i18n.ts';
+import { tr } from '../lib/i18n.ts';
 import { shipImages, type TrafficLayers } from './traffic.ts';
 
 // Bakgrunnskart som brukeren velger selv:
@@ -18,12 +18,12 @@ const ESRI_IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World
 const ESRI_LABELS = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 
 export type Basemap = 'mork' | 'lys' | 'satellitt' | 'hybrid';
-export const BASEMAPS: { value: Basemap; label: string; key: Key }[] = [
-  { value: 'mork', label: 'Mørk', key: 'map.dark' }, { value: 'lys', label: 'Lys', key: 'map.light' },
-  { value: 'satellitt', label: 'Satellitt', key: 'map.satellite' }, { value: 'hybrid', label: 'Hybrid', key: 'map.hybrid' },
+/** label er norsk; vis den med tr(). */
+export const BASEMAPS: { value: Basemap; label: string }[] = [
+  { value: 'mork', label: 'Mørk' }, { value: 'lys', label: 'Lys' }, { value: 'satellitt', label: 'Satellitt' }, { value: 'hybrid', label: 'Hybrid' },
 ];
 export const attribution = (b: Basemap) =>
-  b === 'mork' || b === 'lys' ? '© OpenFreeMap © OpenMapTiles © OpenStreetMap-bidragsytere · AIS: Kystverket' : 'Bilder © Esri, Maxar, Earthstar Geographics · AIS: Kystverket';
+  b === 'mork' || b === 'lys' ? tr('© OpenFreeMap © OpenMapTiles © OpenStreetMap-bidragsytere · AIS: Kystverket') : tr('Bilder © Esri, Maxar, Earthstar Geographics · AIS: Kystverket');
 
 interface Palette { land: string; sea: string; road: string; roadEdge: string; ferry: string; building: string; label: string; halo: string; water: string; trafficLabel: string }
 const PALETTE: Record<'mork' | 'lys', Palette> = {
@@ -270,7 +270,7 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
 
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: 'var(--bg-map)' }}>
-      <div ref={el} style={{ position: 'absolute', inset: 0 }} aria-label="Kart over Ålesund med Flatholmen" role="region" />
+      <div ref={el} style={{ position: 'absolute', inset: 0 }} aria-label={tr('Kart over Ålesund med Flatholmen')} role="region" />
       <div aria-hidden="true" style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
         background: 'linear-gradient(90deg, rgba(var(--chrome-rgb), .55) 0%, rgba(var(--chrome-rgb), 0) 32%, rgba(var(--chrome-rgb), 0) 68%, rgba(var(--chrome-rgb), .55) 100%), linear-gradient(180deg, rgba(var(--chrome-rgb), .5) 0%, rgba(var(--chrome-rgb), 0) 22%)',

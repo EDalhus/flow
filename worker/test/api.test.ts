@@ -338,6 +338,13 @@ describe('rapporter', () => {
     expect(week.json).toMatchObject({ days: 7, out: { tonnes: 300, calls: 1 }, in: { tonnes: 120, calls: 1 }, calls: 2 });
     expect(week.json.prev.out.tonnes).toBe(200);
     expect((await api('/reports/summary?days=0')).status).toBe(400);
+
+    // Hittil i år mot samme tid i fjor.
+    const ytd = await api('/reports/summary?ytd=1');
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Oslo' });
+    expect(ytd.json).toMatchObject({ ytd: true, from: `${today.slice(0, 4)}-01-01`, to: today });
+    expect(ytd.json.prev.from).toBe(`${Number(today.slice(0, 4)) - 1}-01-01`);
+    expect(ytd.json.prev.to.slice(0, 4)).toBe(String(Number(today.slice(0, 4)) - 1));
   });
 
   it('gir punktlighet, avvik og båtsnitt', async () => {
