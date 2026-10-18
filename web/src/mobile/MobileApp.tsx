@@ -10,7 +10,8 @@ import { GlobalSearch } from '../components/GlobalSearch.tsx';
 import { BellButton, BoatTabs, Sidebar, UserBadge } from '../components/Topbar.tsx';
 import { QuayMark, StatusBadge } from '../components/ui.tsx';
 import { BASEMAPS, FlowMap, attribution, type MapHandle } from '../map/FlowMap.tsx';
-import { ShipCard } from '../map/ShipCard.tsx';
+import { ShipCard, TrafficLegend } from '../map/ShipCard.tsx';
+import { useT } from '../lib/i18n.ts';
 import { useBasemap, useTraffic } from '../map/useTraffic.ts';
 import { FLAG_STYLE, addDays, dayShort, fr, goodsParts, osloTime, telHref, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { useBoat, useMe, usePortCalls, useQuays, useSettings, useUsers } from '../lib/queries.ts';
@@ -21,9 +22,9 @@ import { useNow } from '../lib/useNow.ts';
 const FALLBACK = { lat: 62.47918, lon: 6.19292, radius_m: 300, label: '' };
 const sheet: React.CSSProperties = {
   position: 'absolute', left: 0, right: 0, bottom: 0, borderRadius: '34px 34px 0 0', borderBottom: 'none', display: 'flex', flexDirection: 'column',
-  background: 'rgba(32,42,36,.62)', backdropFilter: 'blur(22px) saturate(140%)', WebkitBackdropFilter: 'blur(22px) saturate(140%)', border: '1px solid rgba(var(--tint), .09)',
+  background: 'rgba(var(--glass-rgb), .62)', backdropFilter: 'blur(22px) saturate(140%)', WebkitBackdropFilter: 'blur(22px) saturate(140%)', border: '1px solid rgba(var(--tint), .09)',
 };
-const pill: React.CSSProperties = { background: 'rgba(32,42,36,.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(var(--tint), .1)', borderRadius: 999 };
+const pill: React.CSSProperties = { background: 'rgba(var(--glass-rgb), .55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(var(--tint), .1)', borderRadius: 999 };
 const Grabber = () => <div aria-hidden="true" style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(var(--tint), .3)', margin: '10px auto 0', flex: 'none' }} />;
 
 /** Kaiarbeidervisning: store trykkflater, ett anløp om gangen. */
@@ -41,6 +42,8 @@ export function MobileApp() {
   const go = (id: string | null, kaibok = false) => { setShipSel(null); setParams(id ? { id, ...(kaibok ? { kaibok: '1' } : {}) } : {}); };
   const fence = settings.data?.geofence ?? FALLBACK;
   const t = useTraffic(list, sel?.boat.id ?? null, fence);
+  const tr = useT();
+  const [legendOpen, setLegendOpen] = useState(false);
   const { vessels, shipSel, setShipSel, selShip, layers, setZoomNames, trackError } = t;
   const [basemap, pickBasemap] = useBasemap();
   const mapRef = useRef<MapHandle>(null);
@@ -73,12 +76,12 @@ export function MobileApp() {
       <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: screen === 'list' ? 'calc(100% - var(--bottomnav, 0px))' : 360, transition: 'height .4s ease' }}>
         {settings.isSuccess && (
           <FlowMap ref={mapRef} center={focus ? [focus.lon, focus.lat] : [fence.lon - 0.01, fence.lat]} zoom={12.4} geofence={fence} interactive={screen === 'list'} basemap={basemap}
-            traffic={layers} onShipClick={screen === 'list' ? (mmsi, callId) => (callId ? go(callId) : setShipSel(mmsi)) : undefined} onZoomNames={setZoomNames}
+            traffic={layers} onShipClick={screen === 'list' ? (mmsi, callId) => (callId ? go(callId) : setShipSel(mmsi)) : undefined} onZoomNames={setZoomNames} onBounds={t.onBounds}
             overlays={project => {
               const q = project(fence.lon, fence.lat);
               return (
                 <>
-                  {q && <span aria-label="Vår kai" style={{ position: 'absolute', left: q[0], top: q[1], transform: 'translate(-50%, -50%)', width: 24, height: 24, borderRadius: '50%', background: '#1A231E', color: 'var(--fg)', border: '2px solid rgba(242,245,243,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}><Anchor size={12} /></span>}
+                  {q && <span aria-label="Vår kai" style={{ position: 'absolute', left: q[0], top: q[1], transform: 'translate(-50%, -50%)', width: 24, height: 24, borderRadius: '50%', background: '#1A231E', color: '#F2F5F3', border: '2px solid rgba(242,245,243,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}><Anchor size={12} /></span>}
                   <VesselLayer project={project} vessels={vessels} calls={list} selectedId={sel?.id} onSelect={id => go(id)} quayPos={quayPos} />
                 </>
               );
@@ -95,23 +98,18 @@ export function MobileApp() {
             <BellButton open={alerts} onToggle={() => setAlerts(!alerts)} glass />
           </header>
           <div style={{ position: 'absolute', top: 66, left: 12, right: 12, display: 'flex', justifyContent: 'center', zIndex: 2 }}><BoatTabs /></div>
-          {/* Andre båter (utenfor båtregisteret): vis/skjul og farger/grå, samme valg som på PC. */}
-          <div role="group" aria-label="Andre båter" style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 66px)', right: 10, zIndex: 2, display: 'flex', gap: 6 }}>
-            <button type="button" className="tab legend-btn" aria-pressed={t.showOthers} onClick={() => t.setShowOthers(!t.showOthers)}
-              style={{ backdropFilter: 'blur(16px)', background: t.showOthers ? undefined : 'rgba(32,42,36,.7)' }}>
-              {t.showOthers ? 'Skjul andre båter' : 'Vis andre båter'}
+          {/* Båtene på kartet: samme valg som på PC, samlet bak én knapp. */}
+          <div style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 66px)', left: 10, right: 10, zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, pointerEvents: 'none' }}>
+            {legendOpen && <TrafficLegend s={t} className="m-legend" />}
+            <button type="button" className="tab legend-btn" aria-expanded={legendOpen} onClick={() => setLegendOpen(!legendOpen)}
+              style={{ backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .85)', pointerEvents: 'auto' }}>
+              {tr('legend.boats')} {legendOpen ? '▾' : '▴'}
             </button>
-            {t.showOthers && (
-              <button type="button" className="tab legend-btn" aria-pressed={!t.colorOthers} onClick={() => t.setColorOthers(!t.colorOthers)}
-                style={{ backdropFilter: 'blur(16px)', background: t.colorOthers ? 'rgba(32,42,36,.7)' : undefined }}>
-                {t.colorOthers ? 'Gjør grå' : 'Farger'}
-              </button>
-            )}
           </div>
-          <div role="group" aria-label="Kartvisning" className="pill seg" style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 24px)', right: 10, zIndex: 2, backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.7)' }}>
+          <div role="group" aria-label="Kartvisning" className="pill seg" style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 24px)', right: 10, zIndex: 2, backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .7)' }}>
             {BASEMAPS.map(b => (
               <button key={b.value} type="button" className="tab" aria-pressed={basemap === b.value} onClick={() => pickBasemap(b.value)}
-                style={{ minHeight: 30, padding: '0 9px', fontSize: 12 }}>{b.label}</button>
+                style={{ minHeight: 30, padding: '0 9px', fontSize: 12 }}>{tr(b.key)}</button>
             ))}
           </div>
           <span style={{ position: 'absolute', bottom: 'calc(var(--bottomnav, 0px) + 6px)', left: 12, right: 12, fontSize: 9.5, color: 'var(--fg-45)', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{attribution(basemap)}</span>

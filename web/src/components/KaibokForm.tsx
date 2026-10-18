@@ -79,9 +79,9 @@ export function KaibokForm({ call, onClose, onDone, fullscreen }: {
         <img src="/kyst.jpg" alt="" style={{ position: 'absolute', left: -620, top: -560, width: 1500, maxWidth: 'none', opacity: .55, pointerEvents: 'none' }} />
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,35,30,.2) 0%, rgba(26,35,30,1) 100%)' }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 14, borderRadius: 999, padding: '6px 14px', background: 'rgba(32,42,36,.55)', border: '1px solid rgba(var(--tint), .12)', backdropFilter: 'blur(12px)' }}>Kaibok</span>
+          <span style={{ fontSize: 14, borderRadius: 999, padding: '6px 14px', background: 'rgba(var(--glass-rgb), .55)', border: '1px solid rgba(var(--tint), .12)', backdropFilter: 'blur(12px)' }}>Kaibok</span>
           <button type="button" onClick={onClose} aria-label="Lukk kaibok" className="icon-btn"
-            style={{ width: 48, height: 48, border: '1px solid rgba(var(--tint), .12)', background: 'rgba(32,42,36,.55)', backdropFilter: 'blur(12px)' }}>
+            style={{ width: 48, height: 48, border: '1px solid rgba(var(--tint), .12)', background: 'rgba(var(--glass-rgb), .55)', backdropFilter: 'blur(12px)' }}>
             <Close size={18} />
           </button>
         </div>

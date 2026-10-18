@@ -21,7 +21,14 @@ export interface Me extends UserRef {
 export interface UserPrefs {
   /** Periode på kaiplanen i kartet: 1, 3, 7 eller 14 dager. Standard 7. */
   timeline_days?: 1 | 3 | 7 | 14;
+  /** Fargetema. Standard mørkt. «system» følger innstillingen på maskinen. */
+  theme?: Theme;
+  /** Språk i menyer, faner og kart (demo). Standard norsk. */
+  lang?: Lang;
 }
+
+export type Theme = 'mork' | 'lys' | 'system';
+export type Lang = 'nb' | 'en' | 'lt' | 'da' | 'sv' | 'is';
 
 export type BoatPhotoCategory = 'rampe' | 'sideport' | 'heis' | 'lasterom' | 'dekk' | 'kran' | 'annet';
 
@@ -309,6 +316,12 @@ export interface AreaVessel {
   ts: string;
   /** [lon, lat, unix-sekunder] de siste minuttene. */
   trail: [number, number, number][];
+}
+
+/** Fartøy langs hele kysten innenfor et kartutsnitt (uten spor). */
+export interface AisCoast {
+  vessels: AreaVessel[];
+  error: string | null;
 }
 
 /** Spor siste 24 timer for ett fartøy. */

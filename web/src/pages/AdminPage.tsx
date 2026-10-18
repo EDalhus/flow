@@ -1,37 +1,82 @@
-import { useState } from 'react';
-import { Navigate } from 'react-router';
-import type { Quay, UserView } from '../../../shared/api.ts';
+import { useState, type ReactNode } from 'react';
+import type { Quay, Theme, UserView } from '../../../shared/api.ts';
 import { CREW_ROLES, CREW_ROLE_LABEL, USER_ROLES, type CrewRole, type UserRole } from '../../../shared/domain/types.ts';
 import { Plus } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
 import { Loading, QuayMark, Segmented } from '../components/ui.tsx';
 import { errorText } from '../lib/api.ts';
 import { quayTitle } from '../lib/format.ts';
-import { useAllQuays, useAllUsers, useMe, useSaveQuay, useSaveUser } from '../lib/queries.ts';
+import { LANGS, useT } from '../lib/i18n.ts';
+import { useAllQuays, useAllUsers, useMe, useSavePrefs, useSaveQuay, useSaveUser } from '../lib/queries.ts';
 
 const ROLE_LABEL: Record<UserRole, string> = { salg: 'Salg', produksjon: 'Produksjon', kaiarbeider: 'Kaiarbeider', admin: 'Admin' };
-type Tab = 'brukere' | 'kaier';
+type Tab = 'brukere' | 'kaier' | 'preferanser';
 
-/** Brukere og kaier (egne + nabobedrifter). Bare for admin. */
+/** Innstillinger: egne preferanser for alle, og kaier og brukere (egne + nabobedrifter) for admin. */
 export function AdminPage() {
   const me = useMe();
-  const [tab, setTab] = useState<Tab>('kaier');
-  if (me.data && !me.data.roles.includes('admin')) return <Navigate to="/" replace />;
+  const t = useT();
+  const admin = !!me.data?.roles.includes('admin');
+  const [tab, setTab] = useState<Tab>(admin ? 'kaier' : 'preferanser');
+  const shown = admin ? tab : 'preferanser';
 
   return (
     <Page>
       <div style={{ flex: '999 1 640px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h1 className="page-title">Administrasjon</h1>
-            <span className="muted">Brukere, roller og kaier – også hos nabobedrifter dere samarbeider med.</span>
+            <h1 className="page-title">{t('nav.settings')}</h1>
+            <span className="muted">{t('settings.sub')}</span>
           </div>
-          <Segmented label="Seksjon" value={tab} onChange={setTab}
-            options={[{ value: 'kaier', label: 'Kaier' }, { value: 'brukere', label: 'Brukere' }]} />
+          {admin && (
+            <Segmented label={t('nav.settings')} value={tab} onChange={setTab}
+              options={[{ value: 'kaier', label: t('settings.quays') }, { value: 'brukere', label: t('settings.users') }, { value: 'preferanser', label: t('settings.prefs') }]} />
+          )}
         </div>
-        {tab === 'brukere' ? <UsersSection /> : <QuaysSection />}
+        {shown === 'brukere' ? <UsersSection /> : shown === 'kaier' ? <QuaysSection /> : <PrefsSection />}
       </div>
     </Page>
+  );
+}
+
+const TIMELINE: { value: 1 | 3 | 7 | 14; label: string }[] = [{ value: 1, label: '24 t' }, { value: 3, label: '3 d' }, { value: 7, label: '7 d' }, { value: 14, label: '14 d' }];
+
+/** Brukerens egne valg: tema, språk og kaiplan. Lagres på brukeren med en gang. */
+function PrefsSection() {
+  const me = useMe();
+  const t = useT();
+  const save = useSavePrefs();
+  const prefs = me.data?.prefs ?? {};
+  const row = (title: string, note: string | null, control: ReactNode) => (
+    <div className="pref-row">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+        <span style={{ fontSize: 17 }}>{title}</span>
+        {note && <span className="muted" style={{ fontSize: 13 }}>{note}</span>}
+      </div>
+      {control}
+    </div>
+  );
+  return (
+    <section className="glass" style={{ maxWidth: 820, padding: '6px 22px' }} aria-label={t('settings.prefs')}>
+      <p className="muted" style={{ margin: '14px 0 4px', fontSize: 14 }}>{t('prefs.intro')}</p>
+      {row(t('prefs.theme'), null,
+        <Segmented<Theme> label={t('prefs.theme')} value={prefs.theme ?? 'mork'} onChange={v => save.mutate({ theme: v })}
+          options={[{ value: 'mork', label: t('prefs.dark') }, { value: 'lys', label: t('prefs.light') }, { value: 'system', label: t('prefs.system') }]} />)}
+      {row(t('prefs.lang'), t('prefs.langNote'),
+        <div role="group" aria-label={t('prefs.lang')} className="pill seg" style={{ flexWrap: 'wrap', borderRadius: 22 }}>
+          {LANGS.map(l => (
+            <button key={l.value} type="button" className="tab" lang={l.value === 'nb' ? 'no' : l.value} aria-pressed={(prefs.lang ?? 'nb') === l.value}
+              onClick={() => save.mutate({ lang: l.value })}>{l.label}</button>
+          ))}
+        </div>)}
+      {row(t('prefs.timeline'), t('prefs.timelineNote'),
+        <div role="group" aria-label={t('prefs.timeline')} className="pill seg">
+          {TIMELINE.map(o => (
+            <button key={o.value} type="button" className="tab" aria-pressed={(prefs.timeline_days ?? 7) === o.value} onClick={() => save.mutate({ timeline_days: o.value })}>{o.label}</button>
+          ))}
+        </div>)}
+      {save.isError && <div className="error-box" style={{ marginBottom: 14 }}>{errorText(save.error)}</div>}
+    </section>
   );
 }
 

@@ -221,6 +221,8 @@ export const packingLinePatch = z.object({
 
 export const prefsPut = z.object({
   timeline_days: z.union([z.literal(1), z.literal(3), z.literal(7), z.literal(14)]).optional(),
+  theme: z.enum(['mork', 'lys', 'system']).optional(),
+  lang: z.enum(['nb', 'en', 'lt', 'da', 'sv', 'is']).optional(),
 });
 
 export const BOAT_PHOTO_CATEGORIES = ['rampe', 'sideport', 'heis', 'lasterom', 'dekk', 'kran', 'annet'] as const;

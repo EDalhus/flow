@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
-import type { AisTrack, AisView } from '../../shared/api.ts';
-import { thin, TRAIL_MIN } from '../../shared/domain/ais.ts';
+import type { AisCoast, AisTrack, AisView } from '../../shared/api.ts';
+import { coastVessels, thin, TRAIL_MIN } from '../../shared/domain/ais.ts';
 import { effectiveFlag } from '../../shared/domain/flags.ts';
 import type { Flag } from '../../shared/domain/types.ts';
 import { loadArea } from '../ais/area.ts';
-import { fetchTrack24h } from '../ais/barentswatch.ts';
+import { fetchAllLatest, fetchTrack24h } from '../ais/barentswatch.ts';
 import { loadAisStatus, runAisSync } from '../ais/sync.ts';
 import { CAN, requireRole } from '../auth/access.ts';
 import type { AppEnv } from '../types.ts';
@@ -29,6 +29,25 @@ app.get('/', async c => {
     track: (byMmsi.get(r.mmsi) ?? []).map(t => [t.lon, t.lat] as [number, number]),
   }));
   return c.json({ status: await loadAisStatus(db), vessels, area: await loadArea(db) } satisfies AisView);
+});
+
+/** Grense for hvor mange fartøy ett kall gir, så kartet holder seg raskt også helt utzoomet. */
+const COAST_MAX = 6000;
+
+/**
+ * Alle fartøy langs kysten (hele Kystverkets AIS-dekning) innenfor kartutsnittet [vest, sør, øst, nord].
+ * Bygger på samme samlede liste som søket, som holdes noen minutter i minnet. Uten spor.
+ */
+app.get('/coast', async c => {
+  const box = (c.req.query('bbox') ?? '').split(',').map(Number);
+  if (box.length !== 4 || box.some(n => !Number.isFinite(n))) return c.json({ error: 'bbox må være vest,sør,øst,nord' }, 400);
+  if (!c.env.BW_CLIENT_ID || !c.env.BW_CLIENT_SECRET) return c.json({ vessels: [], error: 'AIS er ikke satt opp.' } satisfies AisCoast);
+  try {
+    const all = await fetchAllLatest({ clientId: c.env.BW_CLIENT_ID, clientSecret: c.env.BW_CLIENT_SECRET });
+    return c.json({ vessels: coastVessels(all, box, new Date(), COAST_MAX), error: null } satisfies AisCoast);
+  } catch (err) {
+    return c.json({ vessels: [], error: err instanceof Error ? err.message : 'Fikk ikke hentet AIS for kysten.' } satisfies AisCoast);
+  }
 });
 
 // Spor siste 24 timer hentes fra BarentsWatch når et fartøy velges, og holdes litt i minnet.

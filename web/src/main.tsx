@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode, Suspense, lazy, useSyncExternalStore } from 'react';
+import { StrictMode, Suspense, lazy, useEffect, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { ApiError } from './lib/api.ts';
 import { useMe } from './lib/queries.ts';
 import { useRealtime } from './lib/realtime.ts';
+import { setTheme } from './lib/theme.ts';
 import './styles/global.css';
 
 // Hver side lastes ved behov; kartbiblioteket (MapLibre) hentes bare på kart og mobil.
@@ -37,6 +38,10 @@ function App() {
   const me = useMe();
   useRealtime();
   const isNarrow = useNarrow();
+  const theme = me.data?.prefs.theme;
+  const lang = me.data?.prefs.lang ?? 'nb';
+  useEffect(() => { if (me.data) setTheme(theme ?? 'mork'); }, [me.data, theme]);
+  useEffect(() => { document.documentElement.lang = lang === 'nb' ? 'no' : lang; }, [lang]);
 
   if (me.isError) {
     const e = me.error;
@@ -66,7 +71,8 @@ function App() {
       <Route path="/produksjon" element={<ProduksjonPage />} />
       <Route path="/hjullaster" element={<HjullasterPage />} />
       <Route path="/rapporter" element={<RapporterPage />} />
-      <Route path="/admin" element={<AdminPage />} />
+      <Route path="/innstillinger" element={<AdminPage />} />
+      <Route path="/admin" element={<Navigate to="/innstillinger" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </Suspense>

@@ -1,23 +1,24 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
 import { chooseUser } from '../lib/api.ts';
+import { useT, type Key } from '../lib/i18n.ts';
 import { useMe, useUsers } from '../lib/queries.ts';
 import { AlertsPanel, useAlerts } from './Alerts.tsx';
 import { GlobalSearch } from './GlobalSearch.tsx';
-import { Bell, BulkTruck, Chevron, Factory, Logo, PieChart, Ship, Truck, Users } from './Icons.tsx';
+import { Bell, BulkTruck, Chevron, Factory, Logo, PieChart, Settings, Ship, Truck } from './Icons.tsx';
 
-// Fire hovedseksjoner, med rapporter og admin nederst.
+// Fire hovedseksjoner, med rapporter og innstillinger nederst.
 const BOAT_PATHS = ['/', '/anlop', '/kaibok', '/baater'];
 const SECTIONS = [
-  { to: '/', label: 'Båter', icon: Ship, paths: BOAT_PATHS },
-  { to: '/biler', label: 'Biler', icon: Truck, paths: ['/biler'] },
-  { to: '/bulk', label: 'Bulkbil', icon: BulkTruck, paths: ['/bulk'] },
-  { to: '/produksjon', label: 'Produksjon', icon: Factory, paths: ['/produksjon'] },
-] as const;
+  { to: '/', label: 'nav.boats', icon: Ship, paths: BOAT_PATHS },
+  { to: '/biler', label: 'nav.trucks', icon: Truck, paths: ['/biler'] },
+  { to: '/bulk', label: 'nav.bulk', icon: BulkTruck, paths: ['/bulk'] },
+  { to: '/produksjon', label: 'nav.production', icon: Factory, paths: ['/produksjon'] },
+] as const satisfies readonly { to: string; label: Key; icon: unknown; paths: readonly string[] }[];
 
 /** Smal ikonmeny til venstre. Tekst vises som hint ved hover/fokus. */
 export function Sidebar() {
-  const me = useMe();
+  const t = useT();
   const { pathname } = useLocation();
   const item = (to: string, label: string, Icon: typeof Ship, active: boolean) => (
     <Link key={to} to={to} aria-label={label} aria-current={active ? 'page' : undefined} className={`side-link${active ? ' active' : ''}`}>
@@ -26,14 +27,14 @@ export function Sidebar() {
     </Link>
   );
   return (
-    <nav className="sidebar" aria-label="Hovedmeny">
+    <nav className="sidebar" aria-label={t('nav.main')}>
       <Link to="/" aria-label="Flow – til kartet" className="side-logo" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'auto' }}>
         <Logo size={34} />
       </Link>
-      {SECTIONS.map(s => item(s.to, s.label, s.icon, (s.paths as readonly string[]).includes(pathname)))}
+      {SECTIONS.map(s => item(s.to, t(s.label), s.icon, (s.paths as readonly string[]).includes(pathname)))}
       <span aria-hidden="true" className="side-divider" style={{ width: 28, height: 1, background: 'var(--line)', margin: '8px 0' }} />
-      {item('/rapporter', 'Rapporter', PieChart, pathname === '/rapporter')}
-      {me.data?.roles.includes('admin') && item('/admin', 'Admin', Users, pathname === '/admin')}
+      {item('/rapporter', t('nav.reports'), PieChart, pathname === '/rapporter')}
+      {item('/innstillinger', t('nav.settings'), Settings, pathname === '/innstillinger')}
       <span className="side-end" style={{ marginTop: 'auto' }} />
     </nav>
   );
@@ -42,11 +43,12 @@ export function Sidebar() {
 /** Underfaner for Båter-seksjonen (kart, anløp, kaibok og båtregister samlet). */
 export function BoatTabs({ wide }: { wide?: boolean }) {
   const { pathname } = useLocation();
+  const t = useT();
   if (!BOAT_PATHS.includes(pathname)) return null;
-  const tabs = [['/', 'Kart'], ['/anlop', 'Anløp'], ['/kaibok', 'Kaibok'], ['/baater', 'Båtregister']] as const;
+  const tabs = [['/', t('tab.map')], ['/anlop', t('tab.calls')], ['/kaibok', t('tab.log')], ['/baater', t('tab.registry')]] as const;
   return (
     // wide: like bred som anløpspanelet på kartet (--col), med fanene jevnt fordelt.
-    <nav aria-label="Båter" className="pill seg boat-tabs" style={{ display: 'inline-flex', backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.6)', ...(wide ? { width: 'var(--col)', maxWidth: '100%' } : {}) }}>
+    <nav aria-label={t('nav.boats')} className="pill seg boat-tabs" style={{ display: 'inline-flex', backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .6)', ...(wide ? { width: 'var(--col)', maxWidth: '100%' } : {}) }}>
       {tabs.map(([to, label]) => (
         <NavLink key={to} to={to} end className="tab" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', ...(wide ? { flex: 1 } : {}) }}
           aria-current={pathname === to ? 'page' : undefined} {...(pathname === to ? { 'aria-pressed': true } : {})}>
@@ -60,7 +62,7 @@ export function BoatTabs({ wide }: { wide?: boolean }) {
 export function Avatar({ initials, size = 46 }: { initials?: string; size?: number }) {
   return (
     <span aria-hidden="true"
-      style={{ width: size, height: size, borderRadius: '50%', background: 'linear-gradient(140deg, #475A4E, #28332C)', border: '1px solid rgba(var(--tint), .16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * .32), fontWeight: 500, flex: 'none', color: 'var(--fg)' }}>
+      style={{ width: size, height: size, borderRadius: '50%', background: 'linear-gradient(140deg, #475A4E, #28332C)', border: '1px solid rgba(var(--tint), .16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * .32), fontWeight: 500, flex: 'none', color: '#F2F5F3' }}>
       {initials ?? ''}
     </span>
   );
@@ -78,7 +80,7 @@ function UserMenu({ top, align, onClose }: { top: number; align: 'left' | 'right
   }, [onClose]);
   return (
     <div className="glass scroll" role="dialog" aria-label="Velg bruker"
-      style={{ position: 'absolute', top, [align]: 0, width: 280, maxHeight: 420, padding: 10, zIndex: 40, background: 'rgba(32,42,36,.95)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      style={{ position: 'absolute', top, [align]: 0, width: 280, maxHeight: 420, padding: 10, zIndex: 40, background: 'rgba(var(--glass-rgb), .95)', display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span className="eyebrow" style={{ padding: '4px 8px 6px' }}>Hvem er du?</span>
       {(users.data ?? []).map(u => (
         <button key={u.id} type="button" className="tab" aria-pressed={u.id === me.data?.id} onClick={() => pick(u.email)}

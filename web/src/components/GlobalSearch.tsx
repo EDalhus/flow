@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import type { BoatDetail, ExternalVessel, SearchResult } from '../../../shared/api.ts';
 import { api, errorText } from '../lib/api.ts';
 import { FLAG_STYLE, STATUS_STYLE, addDays, dayRelative, fr, osloTime, telHref, titleCase, todayOslo } from '../lib/format.ts';
+import { useT } from '../lib/i18n.ts';
 import { useMe } from '../lib/queries.ts';
 import { canBoats } from '../lib/roles.ts';
 import { ArrowLeft, Close, Search } from './Icons.tsx';
@@ -14,7 +15,7 @@ import { ArrowLeft, Close, Search } from './Icons.tsx';
 const PAGES = [
   { label: 'Kart', to: '/' }, { label: 'Anløp', to: '/anlop' }, { label: 'Kaibok', to: '/kaibok' }, { label: 'Båtregister', to: '/baater' },
   { label: 'Biler', to: '/biler' }, { label: 'Bulkbil', to: '/bulk' }, { label: 'Produksjon', to: '/produksjon' },
-  { label: 'Hjullasterskjerm', to: '/hjullaster' }, { label: 'Rapporter', to: '/rapporter' }, { label: 'Admin', to: '/admin' },
+  { label: 'Hjullasterskjerm', to: '/hjullaster' }, { label: 'Rapporter', to: '/rapporter' }, { label: 'Innstillinger', to: '/innstillinger' }, { label: 'Preferanser', to: '/innstillinger' },
 ];
 
 function useDebounced<T>(value: T, ms: number) {
@@ -24,6 +25,7 @@ function useDebounced<T>(value: T, ms: number) {
 }
 
 export function GlobalSearch() {
+  const t = useT();
   const nav = useNavigate();
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
@@ -60,10 +62,10 @@ export function GlobalSearch() {
 
   return (
     <div ref={box} style={{ position: 'relative', width: 'min(460px, 100%)' }}>
-      <label className="pill gsearch" style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 46, padding: '0 16px', backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.7)' }}>
+      <label className="pill gsearch" style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 46, padding: '0 16px', backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .7)' }}>
         <Search size={16} />
         <span className="sr">Søk i Flow og AIS</span>
-        <input ref={input} type="text" role="searchbox" autoComplete="off" value={q} placeholder="Søk båt, anløp, kunde, person – eller fartøy i AIS"
+        <input ref={input} type="text" role="searchbox" autoComplete="off" value={q} placeholder={t('search.placeholder')}
           onChange={e => { setQ(e.target.value); setOpen(true); setVessel(null); }} onFocus={() => setOpen(true)}
           onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); input.current?.blur(); } }}
           style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: 14, outline: 'none' }} />
@@ -72,7 +74,7 @@ export function GlobalSearch() {
 
       {open && needle.length >= 1 && (
         <div className="glass scroll" role="dialog" aria-label="Søkeresultater"
-          style={{ position: 'absolute', top: 54, left: 0, right: 0, maxHeight: 'min(640px, calc(100vh - 120px))', padding: 10, zIndex: 40, background: 'rgba(32,42,36,.95)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          style={{ position: 'absolute', top: 54, left: 0, right: 0, maxHeight: 'min(640px, calc(100vh - 120px))', padding: 10, zIndex: 40, background: 'rgba(var(--glass-rgb), .95)', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {vessel ? <VesselCard v={vessel} onBack={() => setVessel(null)} go={go} /> : (
             <>
               {pages.length > 0 && <Group title="Sider">{pages.map(p => <Item key={p.to} title={p.label} onClick={() => go(p.to)} />)}</Group>}

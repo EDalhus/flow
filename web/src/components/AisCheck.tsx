@@ -37,7 +37,7 @@ export function AisCheck({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <div className="glass" role="dialog" aria-label="AIS-sjekk" style={{ width: 380, padding: 16, display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(32,42,36,.92)', pointerEvents: 'auto' }}>
+    <div className="glass" role="dialog" aria-label="AIS-sjekk" style={{ width: 380, padding: 16, display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(var(--glass-rgb), .92)', pointerEvents: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 17 }}>AIS-tilkobling</span>
         <button type="button" className="icon-btn pill" onClick={onClose} aria-label="Lukk" style={{ width: 36, height: 36 }}><Close size={14} /></button>

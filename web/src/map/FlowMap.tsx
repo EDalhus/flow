@@ -2,6 +2,7 @@ import { LngLatBounds, Map as MlMap, setWorkerUrl, type ExpressionSpecification,
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
+import type { Key } from '../lib/i18n.ts';
 import { shipImages, type TrafficLayers } from './traffic.ts';
 
 // Bakgrunnskart som brukeren velger selv:
@@ -17,8 +18,9 @@ const ESRI_IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World
 const ESRI_LABELS = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 
 export type Basemap = 'mork' | 'lys' | 'satellitt' | 'hybrid';
-export const BASEMAPS: { value: Basemap; label: string }[] = [
-  { value: 'mork', label: 'Mørk' }, { value: 'lys', label: 'Lys' }, { value: 'satellitt', label: 'Satellitt' }, { value: 'hybrid', label: 'Hybrid' },
+export const BASEMAPS: { value: Basemap; label: string; key: Key }[] = [
+  { value: 'mork', label: 'Mørk', key: 'map.dark' }, { value: 'lys', label: 'Lys', key: 'map.light' },
+  { value: 'satellitt', label: 'Satellitt', key: 'map.satellite' }, { value: 'hybrid', label: 'Hybrid', key: 'map.hybrid' },
 ];
 export const attribution = (b: Basemap) =>
   b === 'mork' || b === 'lys' ? '© OpenFreeMap © OpenMapTiles © OpenStreetMap-bidragsytere · AIS: Kystverket' : 'Bilder © Esri, Maxar, Earthstar Geographics · AIS: Kystverket';
@@ -119,6 +121,8 @@ interface Props {
   onShipClick?: (mmsi: string | null, callId?: string) => void;
   /** Kalles når zoomnivået krysser terskelen for skipsnavn. */
   onZoomNames?: (on: boolean) => void;
+  /** Kartutsnittet [vest, sør, øst, nord] når kartet har stoppet opp. */
+  onBounds?: (b: [number, number, number, number]) => void;
 }
 
 /** Fra dette zoomnivået vises navn på alle skip. */
@@ -135,7 +139,7 @@ function circle(lon: number, lat: number, radiusM: number, steps = 64) {
   return { type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [coords] } };
 }
 
-export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, zoom = 11.6, padding, geofence, overlays, interactive = true, basemap = 'mork', traffic, onShipClick, onZoomNames }, ref) {
+export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, zoom = 11.6, padding, geofence, overlays, interactive = true, basemap = 'mork', traffic, onShipClick, onZoomNames, onBounds }, ref) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
   const [, setFrame] = useState(0);
@@ -144,6 +148,8 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
   clickRef.current = onShipClick;
   const zoomRef = useRef(onZoomNames);
   zoomRef.current = onZoomNames;
+  const boundsRef = useRef(onBounds);
+  boundsRef.current = onBounds;
 
   useEffect(() => {
     if (!el.current) return;
@@ -151,7 +157,7 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
       container: el.current,
       center,
       zoom,
-      minZoom: 6,
+      minZoom: 4,
       maxZoom: 17,
       interactive,
       attributionControl: false,
@@ -194,6 +200,9 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
     });
     m.on('mouseenter', 'ais-ships', () => { m.getCanvas().style.cursor = 'pointer'; });
     m.on('mouseleave', 'ais-ships', () => { m.getCanvas().style.cursor = ''; });
+    const sendBounds = () => { const b = m.getBounds(); boundsRef.current?.([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]); };
+    m.on('moveend', sendBounds);
+    m.once('load', sendBounds);
     let names = m.getZoom() >= NAME_ZOOM;
     m.on('zoomend', () => {
       const on = m.getZoom() >= NAME_ZOOM;
@@ -264,7 +273,7 @@ export const FlowMap = forwardRef<MapHandle, Props>(function FlowMap({ center, z
       <div ref={el} style={{ position: 'absolute', inset: 0 }} aria-label="Kart over Ålesund med Flatholmen" role="region" />
       <div aria-hidden="true" style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'linear-gradient(90deg, rgba(20,27,23,.55) 0%, rgba(20,27,23,0) 32%, rgba(20,27,23,0) 68%, rgba(20,27,23,.55) 100%), linear-gradient(180deg, rgba(20,27,23,.5) 0%, rgba(20,27,23,0) 22%)',
+        background: 'linear-gradient(90deg, rgba(var(--chrome-rgb), .55) 0%, rgba(var(--chrome-rgb), 0) 32%, rgba(var(--chrome-rgb), 0) 68%, rgba(var(--chrome-rgb), .55) 100%), linear-gradient(180deg, rgba(var(--chrome-rgb), .5) 0%, rgba(var(--chrome-rgb), 0) 22%)',
       }} />
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div style={{ pointerEvents: 'auto' }}>{map.current && overlays?.(project)}</div>
@@ -278,10 +287,14 @@ const EMPTY = { type: 'FeatureCollection' as const, features: [] };
 /** Kilder og lag for AIS-trafikken, i rekkefølge nedenfra: døgnspor, ringer, spor, kurslinje, skip. */
 function addTraffic(m: MlMap, basemap: Basemap) {
   for (const img of shipImages()) if (!m.hasImage(img.id)) m.addImage(img.id, img.data, { pixelRatio: 2 });
-  for (const key of ['track', 'route', 'rings', 'trails', 'predict', 'ships']) m.addSource(`ais-${key}`, { type: 'geojson', data: EMPTY });
+  for (const key of ['zone', 'track', 'route', 'rings', 'trails', 'predict', 'ships']) m.addSource(`ais-${key}`, { type: 'geojson', data: EMPTY });
   const light = basemap === 'lys';
   const ink = light ? '#1A231E' : '#FFFFFF';
   const halo = light ? '#FFFFFF' : 'rgba(7,18,42,.9)';
+  m.addLayer({ id: 'ais-zone', type: 'line', source: 'ais-zone', paint: { 'line-color': '#80EFDE', 'line-width': 1.2, 'line-opacity': 0.5, 'line-dasharray': [4, 4] } });
+  m.addLayer({ id: 'ais-zone-label', type: 'symbol', source: 'ais-zone',
+    layout: { 'symbol-placement': 'line', 'symbol-spacing': 600, 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Regular'], 'text-size': 11 },
+    paint: { 'text-color': '#80EFDE', 'text-halo-color': halo, 'text-halo-width': 1.4 } });
   m.addLayer({ id: 'ais-track', type: 'line', source: 'ais-track', layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: { 'line-color': '#80EFDE', 'line-width': 2, 'line-opacity': 0.75 } });
   m.addLayer({ id: 'ais-route', type: 'line', source: 'ais-route', layout: { 'line-join': 'round', 'line-cap': 'round' },

@@ -8,7 +8,8 @@ import { api, errorText } from '../lib/api.ts';
 import { fr, osloTime, titleCase } from '../lib/format.ts';
 import { useMe } from '../lib/queries.ts';
 import { canBoats } from '../lib/roles.ts';
-import { CATEGORY_COLOR, CATEGORY_LABEL, ago, degMin, type MapCategory, type TrafficVessel } from './traffic.ts';
+import { useT } from '../lib/i18n.ts';
+import { CATEGORY_COLOR, LEGEND_TYPES, RANGE_STEPS, ago, degMin, type LegendType, type RangeKm, type TrafficVessel } from './traffic.ts';
 import type { Approach } from './useTraffic.ts';
 
 // Kort for et valgt fartøy i trafikkbildet (desktop ved skipet, mobil festet over kartet).
@@ -104,31 +105,58 @@ export function ShipCard({ v, x = 0, y = 0, now, approach: a, trackError, onClos
 
 const hull = (c: string) => <span aria-hidden="true" style={{ width: 8, height: 13, flex: 'none', background: c, clipPath: 'polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%)' }} />;
 
+/** Det fargeforklaringen trenger fra useTraffic. */
+export interface LegendState {
+  showOthers: boolean; setShowOthers: (v: boolean) => void;
+  colorOthers: boolean; setColorOthers: (v: boolean) => void;
+  hidden: ReadonlySet<LegendType>; toggleType: (k: LegendType) => void;
+  range: RangeKm; setRange: (v: RangeKm) => void;
+  coastPending: boolean; coastError: string | null; coastCount: number | null;
+}
+
 /**
- * Fargeforklaring og valg for fartøy utenfor båtregisteret: vis/skjul dem, og farger etter type eller grå
- * (så de ikke blandes med våre båter, men fortsatt synes ved andre kaier og på sjøen).
+ * Fargeforklaring og valg for båtene på kartet: andre båter av/på og farger eller grå, hvor langt ut
+ * fra kaia de vises (eller hele kysten), og typer som kan skrus av ved å trykke på dem.
  */
-export function TrafficLegend({ showOthers, setShowOthers, colorOthers, setColorOthers, className = 'ov kart-legend ov-hide' }: {
-  showOthers: boolean; setShowOthers: (v: boolean) => void; colorOthers: boolean; setColorOthers: (v: boolean) => void; className?: string;
-}) {
-  const types = (Object.keys(CATEGORY_LABEL) as MapCategory[]).filter(k => k !== 'hurtig' && k !== 'flow' && k !== 'gra');
+export function TrafficLegend({ s, className = 'ov kart-legend ov-hide' }: { s: LegendState; className?: string }) {
+  const t = useT();
+  const idx = RANGE_STEPS.indexOf(s.range);
+  const types = s.showOthers ? LEGEND_TYPES : (['flow'] as const);
   return (
-    <div className={className} aria-label="Båter på kartet">
-      <div role="group" aria-label="Andre båter" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button type="button" className="tab legend-btn" aria-pressed={showOthers} onClick={() => setShowOthers(!showOthers)}>
-          {showOthers ? 'Skjul andre båter' : 'Vis andre båter'}
+    <div className={className} role="group" aria-label={t('legend.label')}>
+      <div className="legend-row">
+        <button type="button" className="tab legend-btn" aria-pressed={s.showOthers} onClick={() => s.setShowOthers(!s.showOthers)}>
+          {s.showOthers ? t('legend.hideOthers') : t('legend.showOthers')}
         </button>
-        {showOthers && (
-          <button type="button" className="tab legend-btn" aria-pressed={!colorOthers} onClick={() => setColorOthers(!colorOthers)}>
-            {colorOthers ? 'Gjør andre grå' : 'Farger etter type'}
-          </button>
+        {s.showOthers && (
+          <>
+            <button type="button" className="tab legend-btn" aria-pressed={!s.colorOthers} onClick={() => s.setColorOthers(!s.colorOthers)}>
+              {s.colorOthers ? t('legend.grey') : t('legend.color')}
+            </button>
+            <label className="legend-range">
+              <span>{t('legend.range')}</span>
+              <input type="range" min={0} max={RANGE_STEPS.length - 1} step={1} value={idx}
+                aria-valuetext={s.range === 0 ? t('legend.coast') : `${s.range} km`}
+                onChange={e => s.setRange(RANGE_STEPS[Number(e.target.value)])} />
+              <span className="n" style={{ minWidth: 70 }}>{s.range === 0 ? t('legend.coast') : `${s.range} km`}</span>
+            </label>
+            <button type="button" className="tab legend-btn" aria-pressed={s.range === 0} onClick={() => s.setRange(s.range === 0 ? 75 : 0)}>
+              {t('legend.coast')}
+            </button>
+            {s.range === 0 && (s.coastPending || s.coastError || s.coastCount != null) && (
+              <span className="n" style={{ color: s.coastError ? 'var(--bad-fg)' : 'var(--fg-62)' }}>
+                {s.coastError ?? (s.coastPending ? '…' : `${s.coastCount}`)}
+              </span>
+            )}
+          </>
         )}
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{hull(CATEGORY_COLOR.flow)}{CATEGORY_LABEL.flow}</span>
-        {showOthers && (colorOthers
-          ? types.map(k => <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{hull(CATEGORY_COLOR[k])}{CATEGORY_LABEL[k]}</span>)
-          : <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{hull(CATEGORY_COLOR.gra)}{CATEGORY_LABEL.gra}</span>)}
+      <div className="legend-types" role="group" aria-label={t('legend.toggleType')}>
+        {types.map(k => (
+          <button key={k} type="button" className="legend-chip" aria-pressed={!s.hidden.has(k)} title={t('legend.toggleType')} onClick={() => s.toggleType(k)}>
+            {hull(k === 'flow' || s.colorOthers ? CATEGORY_COLOR[k] : CATEGORY_COLOR.gra)}{t(`cat.${k}`)}
+          </button>
+        ))}
       </div>
     </div>
   );

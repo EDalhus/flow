@@ -66,7 +66,7 @@ export function BaaterPage() {
             return (
               <button key={b.id} type="button" aria-pressed={on} onClick={() => setParams({ id: b.id }, { replace: true })}
                 style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 24, padding: 18, display: 'flex', flexDirection: 'column', gap: 12, backdropFilter: 'blur(18px)', transition: 'background .2s',
-                  ...(on ? { background: 'linear-gradient(160deg, rgba(var(--tint), .16), rgba(var(--tint), .05))', border: '1px solid rgba(var(--tint), .24)' } : { background: 'rgba(32,42,36,.6)', border: '1px solid rgba(var(--tint), .08)' }) }}>
+                  ...(on ? { background: 'linear-gradient(160deg, rgba(var(--tint), .16), rgba(var(--tint), .05))', border: '1px solid rgba(var(--tint), .24)' } : { background: 'rgba(var(--glass-rgb), .6)', border: '1px solid rgba(var(--tint), .08)' }) }}>
                 <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, width: '100%' }}>
                   <span style={{ fontSize: 19, lineHeight: 1.2 }}>{b.name}</span>
                   <FlagBadge flag={b.flag} icon={false} />

@@ -8,7 +8,7 @@
 .kart-right { top: 96px; right: 32px; bottom: 24px; width: var(--col); padding: 14px; display: flex; flex-direction: column; gap: 14px; }
 .kart-stats {
   top: 96px; right: 32px; width: 270px; display: flex; flex-direction: column; gap: 16px; padding: 22px 24px; border-radius: 28px;
-  background: rgba(20, 27, 23, .62); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  background: rgba(var(--chrome-rgb), .62); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
 }
 .kart-zoom { right: 40px; bottom: 112px; display: flex; align-items: center; gap: 8px; }
 .kart.tl-open .kart-zoom { bottom: 274px; }
@@ -16,7 +16,7 @@
 .kart.has-sel.tl-open .kart-zoom { bottom: 274px; }
 
 .kart-tl { left: var(--edge); right: 32px; bottom: 24px; padding: 12px 14px 12px 24px; display: flex; flex-direction: column; gap: 14px; }
-.kart .kart-tl.kart-tl-open { border-radius: 28px; padding-top: 18px; background: rgba(20, 27, 23, .82); }
+.kart .kart-tl.kart-tl-open { border-radius: 28px; padding-top: 18px; background: rgba(var(--chrome-rgb), .82); }
 .kart.has-sel .kart-tl { right: calc(32px + var(--col) + 24px); }
 .kart-attr { position: absolute; right: 40px; bottom: 6px; font-size: 11px; color: var(--fg-45); z-index: 4; }
 .kart-alerts { top: 84px; right: 32px; z-index: 30 !important; }
@@ -28,7 +28,7 @@
 }
 .vessel-label .n { color: rgba(26, 35, 30, .6) !important; }
 
-.zoom-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--fg); background: rgba(32, 42, 36, .7); border: 1px solid var(--line); backdrop-filter: blur(12px); }
+.zoom-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--fg); background: rgba(var(--glass-rgb), .7); border: 1px solid var(--line); backdrop-filter: blur(12px); }
 .zoom-btn:hover { background: rgba(51, 64, 56, .85); }
 .zoom-btn.solid { background: var(--fg); color: var(--ink); }
 
@@ -52,7 +52,8 @@
 
 /* Båter på kartet: fargeforklaring og valg for andre båter, nede til venstre over kaiplanen. */
 .kart-legend {
-  position: absolute; left: var(--edge); bottom: 100px; max-width: 460px; display: flex; flex-direction: column; gap: 8px;
-  font-size: 11.5px; color: var(--fg-75); padding: 10px 12px; border-radius: 16px; background: rgba(20, 24, 28, .66); backdrop-filter: blur(12px);
+  position: absolute; left: var(--edge); bottom: 100px; max-width: calc(100% - var(--edge) - 520px); display: flex; flex-direction: column; gap: 6px;
+  font-size: 11.5px; color: var(--fg-75); padding: 10px 12px; border-radius: 16px; background: rgba(var(--chrome-rgb), .72); backdrop-filter: blur(12px);
 }
 .tl-open .kart-legend { bottom: 274px; }
+

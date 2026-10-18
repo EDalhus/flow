@@ -1,6 +1,7 @@
 import type { FeatureCollection, LineString, Point } from 'geojson';
 import type { AisVessel, AreaVessel } from '../../../shared/api.ts';
 import { MOVING_KNOTS, RANGE_MINUTES, destination, metersAfter, moveBearing, shipCategory, type ShipCategory } from '../../../shared/domain/ais.ts';
+import { distanceM } from '../../../shared/domain/geo.ts';
 import { fr } from '../lib/format.ts';
 
 // Trafikkbildet som GeoJSON for MapLibre: skip farget etter type, stiplet spor de siste 12 minuttene,
@@ -33,8 +34,23 @@ export interface TrafficVessel {
   boatId: string | null;
 }
 
-/** Slår sammen områdelisten og båtene i registeret (som kan være utenfor området). */
-export function trafficVessels(area: AreaVessel[], fleet: AisVessel[]): TrafficVessel[] {
+/** Typene i fargeforklaringen, som også kan skrus av og på. Hurtigbåt følger Los/redning (samme farge). */
+export const LEGEND_TYPES = ['flow', 'fiske', 'last', 'tank', 'passasjer', 'slep', 'spesial', 'fritid', 'annet'] as const;
+export type LegendType = (typeof LEGEND_TYPES)[number];
+export const legendType = (cat: TrafficVessel['cat']): LegendType => (cat === 'hurtig' ? 'spesial' : cat);
+
+/**
+ * Valg for hvor langt ut fra kaia andre båter vises (km). 0 = hele kysten (hele Kystverkets AIS-dekning).
+ * 75 km er hele området som hentes hvert minutt (ca. 150 × 150 km).
+ */
+export const RANGE_STEPS = [5, 10, 20, 30, 50, 75, 0] as const;
+export type RangeKm = (typeof RANGE_STEPS)[number];
+
+/**
+ * Slår sammen områdelisten og båtene i registeret (som kan være utenfor området).
+ * `coast`: fartøy langs hele kysten (uten spor), for dem som ikke er i områdelisten.
+ */
+export function trafficVessels(area: AreaVessel[], fleet: AisVessel[], coast: AreaVessel[] = []): TrafficVessel[] {
   const fleetBy = new Map(fleet.map(v => [v.mmsi, v]));
   const out: TrafficVessel[] = area.map(a => {
     const f = fleetBy.get(a.mmsi);
@@ -44,6 +60,12 @@ export function trafficVessels(area: AreaVessel[], fleet: AisVessel[]): TrafficV
     };
   });
   const inArea = new Set(area.map(a => a.mmsi));
+  const fleetIds = new Set(fleet.map(f => f.mmsi));
+  for (const a of coast) {
+    if (inArea.has(a.mmsi) || fleetIds.has(a.mmsi)) continue;
+    inArea.add(a.mmsi);
+    out.push({ mmsi: a.mmsi, name: a.name, lat: a.lat, lon: a.lon, sog: a.sog, cog: a.cog, heading: a.heading, ts: a.ts, cat: shipCategory(a.ship_type), trail: [], info: a, boatId: null });
+  }
   for (const f of fleet) {
     if (inArea.has(f.mmsi)) continue;
     out.push({ mmsi: f.mmsi, name: f.name, lat: f.lat, lon: f.lon, sog: f.sog, cog: f.cog, heading: f.heading, ts: f.ais_ts, cat: 'flow', trail: f.track, info: null, boatId: f.boat_id });
@@ -62,6 +84,8 @@ export interface TrafficLayers {
   rings: Fc<LineString>;
   track: Fc<LineString>;
   route: Fc<LineString>;
+  /** Grensen for området når det er begrenset med slideren. */
+  zone: Fc<LineString>;
 }
 
 export interface TrafficOptions {
@@ -76,16 +100,26 @@ export interface TrafficOptions {
   showOthers: boolean;
   /** Farg andre fartøy etter type; ellers grå. */
   colorOthers: boolean;
+  /** Typer som er skrudd av i fargeforklaringen. */
+  hidden: ReadonlySet<LegendType>;
+  /** Andre båter vises bare innenfor så mange km fra kaia (null = ingen grense). */
+  radiusKm: number | null;
+  quay: { lat: number; lon: number };
 }
 
 export function trafficLayers(vessels: TrafficVessel[], o: TrafficOptions): TrafficLayers {
   const fc = <G extends Point | LineString>(): Fc<G> => ({ type: 'FeatureCollection', features: [] });
-  const ships = fc<Point>(), trails = fc<LineString>(), predict = fc<LineString>(), rings = fc<LineString>(), track = fc<LineString>(), route = fc<LineString>();
+  const ships = fc<Point>(), trails = fc<LineString>(), predict = fc<LineString>(), rings = fc<LineString>(), track = fc<LineString>(), route = fc<LineString>(), zone = fc<LineString>();
+  const maxM = o.radiusKm != null ? o.radiusKm * 1000 : null;
 
   for (const v of vessels) {
     const ours = v.cat === 'flow';
     const sel = v.mmsi === o.selected;
-    if (!ours && !o.showOthers && !sel) continue;
+    if (!sel) {
+      if (!ours && !o.showOthers) continue;
+      if (o.hidden.has(legendType(v.cat))) continue;
+      if (!ours && maxM != null && distanceM(v, o.quay) > maxM) continue;
+    }
     const cat: MapCategory = ours || o.colorOthers ? v.cat : 'gra';
     const bearing = moveBearing(v);
     const go = moving(v) && bearing != null;
@@ -117,7 +151,12 @@ export function trafficLayers(vessels: TrafficVessel[], o: TrafficOptions): Traf
   }
   if (o.track24 && o.track24.length > 1) track.features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: o.track24 }, properties: {} });
   if (o.route && o.route.length > 1) route.features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: o.route }, properties: {} });
-  return { ships, trails, predict, rings, track, route };
+  if (maxM != null && o.showOthers) {
+    const coords: [number, number][] = [];
+    for (let i = 0; i <= 128; i++) coords.push(destination(o.quay.lat, o.quay.lon, (i / 128) * 360, maxM));
+    zone.features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: { label: `${o.radiusKm} km` } });
+  }
+  return { ships, trails, predict, rings, track, route, zone };
 }
 
 // ---------------------------------------------------------------- symboler

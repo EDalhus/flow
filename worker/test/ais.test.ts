@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { STALE_MIN, destination, mergeArea, metersAfter, shipCategory, thin } from '../../shared/domain/ais.ts';
+import { STALE_MIN, coastVessels, destination, mergeArea, metersAfter, shipCategory, thin } from '../../shared/domain/ais.ts';
 import { distanceM, insideGeofence } from '../../shared/domain/geo.ts';
 import { syncArea } from '../ais/area.ts';
 import { LATEST_URL, TOKEN_URL, resetTokenCache, type AisPosition } from '../ais/barentswatch.ts';
@@ -152,6 +152,24 @@ describe('trafikkbildet rundt kaia', () => {
     expect(s).toBeLessThan(62.47918);
     const view = await api('/ais');
     expect(view.json.area).toEqual([expect.objectContaining({ mmsi: '257999000', name: 'NABOBÅT', ship_type: 30 })]);
+  });
+
+  it('plukker ut fartøy langs kysten innenfor kartutsnittet', async () => {
+    const now = new Date('2026-10-18T12:00:00Z');
+    const ago = (min: number) => new Date(now.getTime() - min * 60_000).toISOString();
+    const all = [
+      { mmsi: 257000001, name: 'BERGEN', latitude: 60.39, longitude: 5.32, msgtime: ago(2) },
+      { mmsi: 257000002, name: 'TROMSØ', latitude: 69.65, longitude: 18.96, msgtime: ago(5) },
+      { mmsi: 257000003, name: 'GAMMEL', latitude: 60.4, longitude: 5.3, msgtime: ago(STALE_MIN + 5) },
+      { mmsi: 257000004, name: 'UTEN POSISJON', msgtime: ago(1) },
+    ];
+    const v = coastVessels(all, [4, 58, 8, 63], now, 100);
+    expect(v.map(x => x.name)).toEqual(['BERGEN']);
+    expect(v[0].trail).toEqual([]);
+    expect(coastVessels(all, [0, 50, 30, 72], now, 1)).toHaveLength(1);
+
+    expect((await api('/ais/coast?bbox=1,2,3')).status).toBe(400);
+    expect((await api('/ais/coast?bbox=4,58,8,63')).json).toEqual({ vessels: [], error: 'AIS er ikke satt opp.' });
   });
 
   it('beregner punkt langs kursen og tynner ut spor', () => {

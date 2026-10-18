@@ -61,7 +61,7 @@ export function Chat({ callId, chips = [], variant = 'panel' }: { callId: string
 
       <div style={{ position: 'relative' }}>
         {suggestions.length > 0 && (
-          <div role="listbox" aria-label="Tagg person" className="glass" style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6, padding: 6, borderRadius: 18, display: 'flex', flexDirection: 'column', background: 'rgba(32,42,36,.95)' }}>
+          <div role="listbox" aria-label="Tagg person" className="glass" style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6, padding: 6, borderRadius: 18, display: 'flex', flexDirection: 'column', background: 'rgba(var(--glass-rgb), .95)' }}>
             {suggestions.map(u => (
               <button key={u.id} type="button" role="option" aria-selected="false" className="tab" style={{ justifyContent: 'flex-start', textAlign: 'left' }} onClick={() => insert(u.short_name)}>
                 @{u.short_name} <span className="muted" style={{ fontSize: 12 }}>· {u.title ?? u.roles.join(', ')}</span>

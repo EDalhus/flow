@@ -15,6 +15,7 @@ import { STATUS_STYLE, addDays, dayShort, nb, isOwnQuay, osloTime, timeRange, to
 import { useMe, usePortCalls, useSavePrefs, useQuays, useSettings, useSummary } from '../lib/queries.ts';
 import { VesselLayer } from '../map/Vessels.tsx';
 import { useNow } from '../lib/useNow.ts';
+import { useT } from '../lib/i18n.ts';
 import './kart.css';
 
 const FALLBACK = { lat: 62.47918, lon: 6.19292 };
@@ -42,6 +43,7 @@ export function KartPage() {
   const selected = selectedId ? list.find(c => c.id === selectedId) : undefined;
   const fence = settings.data?.geofence ?? { ...FALLBACK, radius_m: 300, label: '' };
   const t = useTraffic(list, selected?.boat.id ?? null, fence);
+  const tr = useT();
   const { vessels, traffic, hot, shipSel, setShipSel, selShip, layers, setZoomNames, trackError } = t;
   const select = (id: string, t?: DetailTab) => {
     setShipSel(null);
@@ -105,7 +107,7 @@ export function KartPage() {
     return (
       <>
         {quayPt && (
-          <span title="Vår kai" aria-label="Vår kai" style={{ position: 'absolute', left: quayPt[0], top: quayPt[1], transform: 'translate(-50%, -50%)', width: 26, height: 26, borderRadius: '50%', background: '#1A231E', color: 'var(--fg)', border: '2px solid rgba(242,245,243,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <span title="Vår kai" aria-label="Vår kai" style={{ position: 'absolute', left: quayPt[0], top: quayPt[1], transform: 'translate(-50%, -50%)', width: 26, height: 26, borderRadius: '50%', background: '#1A231E', color: '#F2F5F3', border: '2px solid rgba(242,245,243,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <Anchor size={13} />
           </span>
         )}
@@ -134,7 +136,7 @@ export function KartPage() {
         {settings.isSuccess && (
           <FlowMap ref={mapRef} center={focus ? [focus.lon, focus.lat] : [fence.lon - 0.06, fence.lat + 0.004]} zoom={focus ? 12.5 : 11.4}
             padding={{ top: 120, bottom: 160, left: 120, right: 320 }} geofence={fence} overlays={overlays} basemap={basemap}
-            traffic={layers} onShipClick={pickShip} onZoomNames={setZoomNames} />
+            traffic={layers} onShipClick={pickShip} onZoomNames={setZoomNames} onBounds={t.onBounds} />
         )}
         <span className="kart-attr ov-hide">{attribution(basemap)}</span>
       </div>
@@ -146,10 +148,10 @@ export function KartPage() {
       {!selected && !shipSel && <MainStats />}
 
       <div className="ov kart-zoom">
-        <div role="group" aria-label="Kartvisning" className="pill seg" style={{ backdropFilter: 'blur(16px)', background: 'rgba(32,42,36,.7)', marginRight: 8 }}>
+        <div role="group" aria-label="Kartvisning" className="pill seg" style={{ backdropFilter: 'blur(16px)', background: 'rgba(var(--glass-rgb), .7)', marginRight: 8 }}>
           {BASEMAPS.map(b => (
             <button key={b.value} type="button" className="tab" aria-pressed={basemap === b.value} onClick={() => pickBasemap(b.value)}
-              style={{ minHeight: 32, padding: '0 12px', fontSize: 13 }}>{b.label}</button>
+              style={{ minHeight: 32, padding: '0 12px', fontSize: 13 }}>{tr(b.key)}</button>
           ))}
         </div>
         <button type="button" className="zoom-btn" onClick={() => mapRef.current?.zoomIn()} aria-label="Zoom inn"><Plus size={16} /></button>
@@ -157,7 +159,7 @@ export function KartPage() {
         <button type="button" className="zoom-btn solid" onClick={() => mapRef.current?.flyTo(fence.lon, fence.lat, 14)} aria-label="Sentrer på kaia"><Target size={17} /></button>
       </div>
 
-      <TrafficLegend showOthers={t.showOthers} setShowOthers={t.setShowOthers} colorOthers={t.colorOthers} setColorOthers={t.setColorOthers} />
+      <TrafficLegend s={t} />
 
       <Timeline today={today} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} open={tlOpen} onToggle={toggleTl} />
 
@@ -315,7 +317,7 @@ function Timeline({ today, selected, onSelect, now, quays, open, onToggle }: {
                       <button key={c.id} type="button" onClick={() => onSelect(c.id)} title={`${c.boat.name} · ${dayShort(c.service_date)} ${timeRange(c)}`}
                         aria-label={`${c.boat.name}, ${dayShort(c.service_date)} ${timeRange(c)}, ${st.label}`}
                         style={{ position: 'absolute', top: 4, bottom: 4, left: `${pct(a)}%`, width: `max(6px, ${pct(b) - pct(a)}%)`, borderRadius: 9, padding: '0 8px', fontSize: 12, cursor: 'pointer', textAlign: 'left', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: 'var(--fg)',
-                          background: c.time_known ? `color-mix(in srgb, ${st.c} 26%, rgba(20,27,23,.6))` : 'rgba(var(--tint), .04)', opacity: c.status === 'ferdig' ? .55 : 1,
+                          background: c.time_known ? `color-mix(in srgb, ${st.c} 26%, rgba(var(--chrome-rgb), .6))` : 'rgba(var(--tint), .04)', opacity: c.status === 'ferdig' ? .55 : 1,
                           border: `1.5px ${c.time_known ? 'solid' : 'dashed'} ${selected === c.id ? 'var(--aqua)' : `color-mix(in srgb, ${st.c} 65%, transparent)`}` }}>
                         {c.boat.name}{!c.time_known && <span style={{ color: 'var(--fg-45)' }}> · tid ikke satt</span>}
                       </button>

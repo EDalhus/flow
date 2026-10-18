@@ -114,6 +114,14 @@ export function mergeArea(prev: AreaVessel[], fresh: AreaInput[], now: Date): Ar
   return out;
 }
 
+/** Fartøy innenfor [vest, sør, øst, nord] som har meldt seg siste STALE_MIN minutter, uten spor. Maks `max`. */
+export function coastVessels(all: AreaInput[], [w, s, e, n]: number[], now: Date, max: number): AreaVessel[] {
+  const from = now.getTime() - STALE_MIN * 60_000;
+  const inside = all.filter(v => typeof v.latitude === 'number' && typeof v.longitude === 'number'
+    && v.longitude >= w && v.longitude <= e && v.latitude >= s && v.latitude <= n && !!v.msgtime && Date.parse(v.msgtime) >= from);
+  return mergeArea([], inside, now).slice(0, max).map(v => ({ ...v, trail: [] }));
+}
+
 /** Tynner ut et langt spor til maks `max` punkter (første og siste beholdes). */
 export function thin<T>(points: T[], max: number): T[] {
   if (points.length <= max) return points;

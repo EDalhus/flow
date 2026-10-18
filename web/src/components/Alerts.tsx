@@ -77,7 +77,7 @@ export function AlertsPanel({ onClose, style }: { onClose: () => void; style?: R
 
   return (
     <div className="glass scroll" role="dialog" aria-label="Varsler"
-      style={{ width: 360, maxHeight: 600, padding: 14, zIndex: 30, background: 'rgba(32,42,36,.88)', ...style }}>
+      style={{ width: 360, maxHeight: 600, padding: 14, zIndex: 30, background: 'rgba(var(--glass-rgb), .88)', ...style }}>
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 40, padding: '0 2px 0 6px' }}>
           <span style={{ fontSize: 18 }}>Varsler</span>

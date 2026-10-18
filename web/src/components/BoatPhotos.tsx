@@ -104,7 +104,7 @@ export function BoatPhotos({ boat }: { boat: BoatDetail }) {
             <button key={p.id} type="button" onClick={() => setOpen(i)} aria-label={`${PHOTO_CATEGORY_LABEL[p.category]}${p.caption ? `: ${p.caption}` : ''} – åpne bildet`}
               style={{ position: 'relative', aspectRatio: '4 / 3', padding: 0, border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', background: 'rgba(var(--tint), .05)' }}>
               <img src={p.thumb_url ?? p.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              <span style={{ position: 'absolute', left: 4, bottom: 4, fontSize: 10.5, padding: '1px 7px', borderRadius: 999, background: 'rgba(20,27,23,.8)', color: 'var(--fg)' }}>
+              <span style={{ position: 'absolute', left: 4, bottom: 4, fontSize: 10.5, padding: '1px 7px', borderRadius: 999, background: 'rgba(var(--chrome-rgb), .8)', color: 'var(--fg)' }}>
                 {PHOTO_CATEGORY_LABEL[p.category]}
               </span>
             </button>

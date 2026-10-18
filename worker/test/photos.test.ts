@@ -117,4 +117,12 @@ describe('brukervalg', () => {
     expect((await api('/me', { as: 'ola' })).json.prefs).toEqual({});
     expect((await api('/me/prefs', { method: 'PUT', as: 'kari', body: { timeline_days: 5 } })).status).toBe(400);
   });
+
+  it('lagrer tema og språk sammen med de andre valgene', async () => {
+    await api('/me/prefs', { method: 'PUT', as: 'kari', body: { timeline_days: 14 } });
+    const put = await api('/me/prefs', { method: 'PUT', as: 'kari', body: { theme: 'lys', lang: 'lt' } });
+    expect(put.json.prefs).toEqual({ timeline_days: 14, theme: 'lys', lang: 'lt' });
+    expect((await api('/me/prefs', { method: 'PUT', as: 'kari', body: { lang: 'de' } })).status).toBe(400);
+    expect((await api('/me/prefs', { method: 'PUT', as: 'kari', body: { theme: 'blå' } })).status).toBe(400);
+  });
 });

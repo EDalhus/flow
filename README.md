@@ -13,7 +13,7 @@ Internt logistikksystem for kaia på Flatholmen i Ålesund. Menyen har fire hove
 
 Mannskap på anløp er valgfritt. Det ligger sammenfoldet på anløpet, og roller og personer kan legges til eller fjernes ved behov.
 
-Rapporter og administrasjon ligger nederst i menyen. `/hjullaster` er en fullskjermvisning for nettbrettet i hjullasteren: behov i traktene, hvilke biler som har bestilt (sjåfør og tonn per kvalitet) og begge siloene. Skjermen er bare til visning. Knappen «Demo: påfylling av silo» viser hvordan siloene tømmes og fylles i produksjon, uten å lagre noe.
+Rapporter og **Innstillinger** ligger nederst i menyen. Under Innstillinger → **Preferanser** velger hver bruker tema (mørkt, lyst eller som maskinen), språk og hvor langt fram kaiplanen viser. Språk er en demo (norsk, engelsk, litauisk, dansk, svensk og islandsk): menyer, faner, søk, innstillinger og kartet er oversatt, resten er på norsk. Kaier og brukere ligger på samme side for admin. `/hjullaster` er en fullskjermvisning for nettbrettet i hjullasteren: behov i traktene, hvilke biler som har bestilt (sjåfør og tonn per kvalitet) og begge siloene. Skjermen er bare til visning. Knappen «Demo: påfylling av silo» viser hvordan siloene tømmes og fylles i produksjon, uten å lagre noe.
 
 **Klokkeslett på anløp er valgfritt.** Tidene er sjelden kjent før ca. en time før båten kommer, så et anløp kan legges inn med bare dag. Tiden settes på anløpet («Sett tid») når den er kjent. Anløp uten tid er utenfor kollisjonssjekken og kaibelegget til tiden er satt.
 
@@ -117,7 +117,7 @@ Nye verdier gjelder fra neste forespørsel; ny deploy trengs ikke.
 
 ## 4. Brukere
 
-Gå til **Admin** i menyen; den vises bare for admin. Under **Brukere** legger du til alle som skal bruke Flow:
+Gå til **Innstillinger** i menyen. Fanene **Kaier** og **Brukere** vises bare for admin. Under **Brukere** legger du til alle som skal bruke Flow:
 
 - **E-post:** med Access må den være den samme som i Access-policyen.
 - **Roller:** se tabellen under.
@@ -152,7 +152,7 @@ Cron-jobben kjører hvert minutt:
 
 På kartet vises trafikken som i Kystverkets kart:
 
-- Skipene er farget etter type (fiske, last, tank, passasjer osv.). Våre båter er turkise med navnet i fet skrift; klikk på en båt med anløp hos oss åpner anløpet. Andre båter kan skjules eller gjøres grå med knappene i fargeforklaringen.
+- Skipene er farget etter type (fiske, last, tank, passasjer osv.). Våre båter er turkise med navnet i fet skrift; klikk på en båt med anløp hos oss åpner anløpet. Andre båter kan skjules eller gjøres grå med knappene i fargeforklaringen. Trykk på en type (f.eks. Tank eller Fritid) for å skjule den. Slideren **Område** begrenser andre båter til 5–75 km fra kaia; **Hele kysten** viser alle fartøy i Kystverkets AIS-dekning innenfor kartutsnittet (`GET /api/ais/coast`, hentes hvert minutt mens valget er på, uten spor).
 - Stiplet linje er sporet de siste 12 minuttene. Hvit linje viser hvor fartøyet er om 6 minutter med farten og kursen det holder nå.
 - Klikk på et skip for stevning, kurs, fart, destinasjon, posisjon og når det sist meldte seg. Kortet viser også distanse og omtrentlig tid til vår kai langs sjøveien (korteste vei over vann, beregnet i nettleseren fra kartdataene; luftlinje hvis ingen vei finnes), og ringer for hvor langt skipet kommer på 6, 12, 24, 36, 48 og 60 minutter og 3 timer.
 - Sporet for det siste døgnet hentes fra BarentsWatch sitt historikk-API når et skip velges. Det bruker samme nøkler.
