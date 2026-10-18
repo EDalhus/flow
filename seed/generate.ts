@@ -188,7 +188,30 @@ type Call = {
   source: 'app' | 'import';
   /** Klokkeslett ikke kjent ennå: lagres som hele dagen. */
   untimed?: boolean;
+  /** Salgsordrene (SO) på anløpet, i lasterekkefølge: kunde og indekser i goods. Standard: én SO med alle varene. */
+  orders?: { customer: string; goods: number[] }[];
 };
+
+// ---------------------------------------------------------------- salgsordre (SO fra Dynamics 365)
+
+const CUSTOMERS = ['Hessa Seafood', 'Vartdal Fisk', 'Fjordlaks', 'Ålesund Fiskemottak', 'Brødrene Sperre', 'Nordic Salt Trading', 'Sunnmøre Sild', 'Kystfisk AS', 'Nergård Sjømat', 'Myklebust Sjømat'];
+const usedSo = new Set<string>();
+/** Tilfeldig, unikt SO-nummer: 20 + fem siffer. */
+function soNumber() {
+  for (;;) { const n = `20${String(int(10000, 99999))}`; if (!usedSo.has(n)) { usedSo.add(n); return n; } }
+}
+/** Legger inn en SO med linjer (på anløpet callId, eller uten båt). */
+function addOrder(o: { customer: string; seller: string | null; date: string; goods: Goods[]; callId: string | null; seq?: number; source: 'app' | 'import'; createdAt: string; by: string }) {
+  const soId = id('so');
+  const so = soNumber();
+  add('sales_orders', { id: soId, so_number: so, customer: o.customer, seller_id: o.seller ? U(o.seller) : null, wanted_date: o.date, source: o.source, created_by: U(o.by), created_at: o.createdAt, updated_at: o.createdAt });
+  o.goods.forEach((g, i) => add('order_lines', { id: id('ol'), sales_order_id: soId, port_call_id: o.callId, sku_id: g.sku.id, quantity: g.qty, direction: g.dir, sort: i }));
+  if (o.callId) add('port_call_orders', { port_call_id: o.callId, sales_order_id: soId, load_seq: o.seq ?? 1 });
+  if (o.source === 'app') {
+    add('order_log', { sales_order_id: soId, port_call_id: o.callId, user_id: U(o.by), kind: 'created', data: JSON.stringify({ so_number: so }), at: o.createdAt });
+  }
+  return { soId, so };
+}
 
 function addCall(c: Call) {
   const eta = at(c.date, c.untimed ? 0 : c.start), etd = at(c.date, c.untimed ? 23 * 60 + 59 : c.end);
@@ -204,9 +227,12 @@ function addCall(c: Call) {
     arrived_at: arrived, departed_at: departed, completed_at: c.completedAt ?? null, source: c.source,
     created_at: plusMin(at(c.date, 0), -60 * 24 * int(2, 10)),
   });
-  c.goods.forEach((g, i) => add('port_call_goods', { id: id('g'), port_call_id: c.id, sku_id: g.sku.id, quantity: g.qty, direction: g.dir, sort: i }));
+  const createdAt = plusMin(at(c.date, 0), -60 * 24 * int(2, 10));
+  const by = c.source === 'import' ? 'mari' : (c.seller ?? 'kari');
+  const groups = c.orders ?? [{ customer: pick(CUSTOMERS), goods: c.goods.map((_, i) => i) }];
+  const orders = groups.map((o, n) => addOrder({ customer: o.customer, seller: c.seller, date: c.date, goods: o.goods.map(i => c.goods[i]), callId: c.id, seq: n + 1, source: c.source, createdAt, by }));
   slots.forEach(([role, who], i) => add('crew_slots', { id: id('cs'), port_call_id: c.id, crew_role: role, user_id: who ? U(who) : null, sort: i }));
-  return { eta, etd, departed };
+  return { eta, etd, departed, orders };
 }
 
 const CATEGORY = { forsinkelse: 'Forsinkelse', utstyr_kran: 'Utstyr / kran', skade_gods: 'Skade på gods', mannskap_hms: 'Mannskap / HMS', annet: 'Annet' };
@@ -386,18 +412,21 @@ for (const year of [2025, 2026]) {
 const importCompleted = 'UPDATE port_calls SET completed_at = departed_at WHERE source = \'import\';';
 
 // ---- Dagens og kommende anløp (Anløp-tavla). a0 (Fjordvik) er allerede lagt inn som ferdig over.
-type Planned = { key: string; day: number; boat: string; type: 'levering' | 'henting'; kai: 'Kai 1' | 'Kai 2'; start: string; end: string; goods: Goods[]; crew: [CrewRole, string | null][]; ans?: string; seller: string; crane?: boolean; arrived?: number };
+type Planned = { orders?: Call['orders']; key: string; day: number; boat: string; type: 'levering' | 'henting'; kai: 'Kai 1' | 'Kai 2'; start: string; end: string; goods: Goods[]; crew: [CrewRole, string | null][]; ans?: string; seller: string; crane?: boolean; arrived?: number };
 const T = 'truck', A = 'anhuker', K = 'kaikran';
 const PLANNED: Planned[] = [
   { key: 'a1', day: 0, boat: 'havbris', type: 'henting', kai: 'Kai 2', start: '07:30', end: '11:00', seller: 'kari', ans: 'per', arrived: 4,
+    orders: [{ customer: 'Hessa Seafood', goods: [0] }, { customer: 'Vartdal Fisk', goods: [1] }],
     goods: [{ sku: S('Hav salt', 'pall', 'europall'), qty: 120, dir: 'ut' }, { sku: S('Sukker salt 1:2', 'pall', 'srs'), qty: 60, dir: 'ut' }],
     crew: [[T, 'lars'], [T, 'per'], [A, 'stian'], [K, 'morten']] },
   { key: 'a2', day: 0, boat: 'kystlast', type: 'levering', kai: 'Kai 1', start: '09:15', end: '12:30', seller: 'henrik', crane: true,
     goods: [{ sku: S('Hav salt', 'BB'), qty: 300, dir: 'inn' }], crew: [[T, 'ola']] },
   { key: 'a3', day: 0, boat: 'polarstrand', type: 'henting', kai: 'Kai 1', start: '11:45', end: '14:30', seller: 'kari',
+    orders: [{ customer: 'Fjordlaks', goods: [1] }, { customer: 'Brødrene Sperre', goods: [0] }],
     goods: [{ sku: S('Blandet salt', 'BB'), qty: 80, dir: 'ut' }, { sku: S('Fint Rafinert salt', 'pall', 'europall'), qty: 40, dir: 'ut' }],
     crew: [[T, 'per'], [T, null], [A, 'anders'], [A, null], [K, 'morten']] },
   { key: 'a4', day: 0, boat: 'senja', type: 'levering', kai: 'Kai 2', start: '15:45', end: '19:00', seller: 'henrik', ans: 'lars',
+    orders: [{ customer: 'Nordic Salt Trading', goods: [0] }, { customer: 'Nordic Salt Trading', goods: [1] }],
     goods: [{ sku: S('Marsel Hav salt', 'BB'), qty: 200, dir: 'inn' }, { sku: S('Nitrite', 'pall', 'srs'), qty: 20, dir: 'inn' }],
     crew: [[T, 'lars'], [A, 'stian'], [K, 'morten']] },
   { key: 'a5', day: 1, boat: 'nordkyn', type: 'henting', kai: 'Kai 1', start: '06:00', end: '09:00', seller: 'kari',
@@ -410,17 +439,39 @@ const PLANNED: Planned[] = [
     goods: [{ sku: S('Sukker', 'BB'), qty: 60, dir: 'inn' }], crew: [[T, null], [A, null], [K, null]] },
 ];
 const plannedIds: Record<string, string> = { a0: explicitCallIds.fjordvik };
+const plannedOrders: Record<string, { soId: string; so: string }[]> = {};
 for (const p of PLANNED) {
   const callId = `pc_${p.key}`;
   plannedIds[p.key] = callId;
   const toMin = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3));
-  addCall({
+  plannedOrders[p.key] = addCall({
     id: callId, boat: p.boat, type: p.type, quay: QUAY[p.kai], date: addDays(TODAY, p.day), start: toMin(p.start), end: toMin(p.end),
-    seller: p.seller, crane: p.crane, responsible: p.ans ?? null, crew: p.crew, goods: p.goods,
+    seller: p.seller, crane: p.crane, responsible: p.ans ?? null, crew: p.crew, goods: p.goods, orders: p.orders,
     arrivedDelay: p.arrived ?? null, departed: false, completedAt: null, source: 'app',
     // Tidene er sjelden kjent mer enn et døgn frem.
     untimed: p.day >= 2,
-  });
+  }).orders;
+}
+
+// Eksempler i endringsloggen: båt byttet i siste liten, ny ETA og endret vare.
+const logAt = (offset: number, hm: string) => at(addDays(TODAY, offset), Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3)));
+const call = (boat: string, offset: number, hm: string | null, quay: string) =>
+  ({ boat, eta: hm ? logAt(offset, hm) : at(addDays(TODAY, offset), 0), time_known: !!hm, quay });
+const DEMO_LOG: [string, number, string, string, string, unknown][] = [
+  ['a2', -1, '16:40', 'henrik', 'boat_changed', { from: 'MS Nordkyn', to: 'MS Kystlast' }],
+  ['a2', 0, '06:55', 'henrik', 'eta_changed', { from: { eta: logAt(0, '08:55'), etd: logAt(0, '12:10'), time_known: true }, to: { eta: logAt(0, '09:15'), etd: logAt(0, '12:30'), time_known: true } }],
+  ['a1', -1, '14:02', 'kari', 'line_changed', { from: '100 pall Hav salt · 25 kg × 40 · Europall', to: '120 pall Hav salt · 25 kg × 40 · Europall' }],
+  ['a5', -1, '10:15', 'kari', 'moved', { from: call('Lyngøy', 2, null, 'Ytre'), to: call('MS Nordkyn', 1, '06:00', 'Ytre') }],
+];
+for (const [key, offset, hm, by, kind, data] of DEMO_LOG) {
+  add('order_log', { sales_order_id: plannedOrders[key][0].soId, port_call_id: plannedIds[key], user_id: U(by), kind, data: JSON.stringify(data), at: logAt(offset, hm) });
+}
+// SO-er som venter på båt: registrert i Dynamics, båten er ikke kjent ennå.
+for (const [customer, offset, goods, seller] of [
+  ['Sunnmøre Sild', 3, [{ sku: S('Hav salt', 'BB'), qty: 180, dir: 'ut' }], 'kari'],
+  ['Kystfisk AS', 6, [{ sku: S('Blandet salt', 'BB'), qty: 60, dir: 'ut' }, { sku: S('Hav salt', 'pall', 'europall'), qty: 40, dir: 'ut' }], 'henrik'],
+] as [string, number, Goods[], string][]) {
+  addOrder({ customer, seller, date: addDays(TODAY, offset), goods, callId: null, source: 'app', createdAt: logAt(-1, '13:30'), by: seller });
 }
 
 // ---------------------------------------------------------------- chat og varsler
@@ -525,7 +576,7 @@ const CLEAR = [
   // Kvaliteter (bulk_qualities) og pakkelinjer (packing_lines) er faste rader fra migrasjonen og beholdes.
   'bulk_order_steps', 'bulk_orders', 'silo_fills', 'production_orders', 'truck_order_goods', 'truck_orders',
   'boat_photos', 'ais_area', 'audit_log', 'ais_track', 'ais_positions', 'quay_log_photos', 'quay_log_categories', 'quay_logs', 'notifications',
-  'message_mentions', 'messages', 'crew_slots', 'port_call_goods', 'port_calls', 'quays', 'skus', 'products', 'boats',
+  'message_mentions', 'messages', 'crew_slots', 'order_log', 'port_call_orders', 'order_lines', 'sales_orders', 'port_calls', 'quays', 'skus', 'products', 'boats',
   'agents', 'settings', 'shifts', 'crew_skills', 'user_roles', 'users',
 ];
 const lines: string[] = [

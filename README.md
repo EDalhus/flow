@@ -11,6 +11,10 @@ Internt logistikksystem for kaia på Flatholmen i Ålesund. Menyen har fire hove
 
 **Søk øverst på alle sider** finner sider, båter, anløp, biler, bulkbiler og folk i Flow. Med BarentsWatch-nøklene på plass søker det også i AIS (Kystverkets data) på navn, MMSI, IMO eller kallesignal – også båter som ikke er i båtregisteret. Fra treffet kan båten legges til i båtregisteret, og «Vis i kartet» viser hvor den er nå. BarentsWatch kan ikke søke på navn, så Flow henter alle fartøy de har sett siste 24 timer i norske farvann og filtrerer selv (listen holdes i minnet i tre minutter). Båter som ikke har vært i området det siste døgnet, blir ikke funnet.
 
+**Salgsordre (SO) er sannheten; anløpet er båten.** SO-nummeret kommer fra Dynamics 365 (20 + fem siffer, f.eks. 2043644) og tastes inn under **Anløp → Ny SO**. Varene ligger på SO-en, ikke på båten. Et anløp (én båt, én kai, én ETA) kan ha mange SO-er, og de har en **lasterekkefølge** som endres med pilene på anløpet (det som skal først på eller av båten øverst). En SO kan ligge uten båt («venter på båt»), legges på en planlagt båt eller en ny båt, flyttes til en annen båt i siste liten, eller deles på to båter (delt levering). Bytter rederiet båt for hele anløpet, brukes **Bytt båt** på anløpet; da følger alle SO-ene med. Avlyses et anløp, går SO-ene tilbake til «venter på båt». Når kaiboka leveres, blir SO-ene ferdige.
+
+**Endringslogg:** Hver SO har sin egen logg over hvem som gjorde hva og når: opprettet, varer lagt til, endret eller fjernet, ny båt, ny ETA, ny kai, flyttet, lasterekkefølge, kansellert og ferdig. Endringer på anløpet (båt, ETA, kai) føres hos hver SO som ligger på det, og selgeren får varsel i bjella når noen andre endrer. Anløpet har fanen **Endringer** som samler alt for båten. Søket finner SO-er på nummer og kunde.
+
 Mannskap på anløp er valgfritt. Det ligger sammenfoldet på anløpet, og roller og personer kan legges til eller fjernes ved behov.
 
 Rapporter og **Innstillinger** ligger nederst i menyen. Under Innstillinger → **Preferanser** velger hver bruker tema (mørkt, lyst eller som maskinen), språk og hvor langt fram kaiplanen viser. Hele grensesnittet finnes på norsk, engelsk, litauisk, dansk, svensk og islandsk, også varsler, feilmeldinger og tekster fra serveren. Navn på båter, kunder, varer og kaier, og det folk skriver i chatten, vises som det er lagt inn. Kaier og brukere ligger på samme side for admin. `/hjullaster` er en fullskjermvisning for nettbrettet i hjullasteren: behov i traktene, hvilke biler som har bestilt (sjåfør og tonn per kvalitet) og begge siloene. Skjermen er bare til visning. Knappen «Demo: påfylling av silo» viser hvordan siloene tømmes og fylles i produksjon, uten å lagre noe.
@@ -127,9 +131,9 @@ Uten Access velger hver person seg selv i lista bak avataren. Med Access logger 
 
 | Rolle | Kan |
 |---|---|
-| Salg | Opprette og endre anløp, sette antall roller, redigere båter |
+| Salg | Opprette og endre SO-er og anløp, sette antall roller, redigere båter |
 | Produksjon | Alt salg kan, pluss sette navn og ansvarlig, overstyre flagg og levere kaibok |
-| Kaiarbeider | Se alt, bruke chatten, levere kaibok med bilder |
+| Kaiarbeider | Se alt, bruke chatten, levere kaibok med bilder, opprette og endre SO-er og anløp (alle med tilgang kan endre ordre) |
 | Admin | Alt, inkludert brukere, kaier (egne og nabo) og innstillinger |
 
 Eksempeldataene (`SEED_DEMO`) inneholder testbrukere på `@flow.example`. De kan ikke logge inn, men vises i lister og chat. Deaktiver dem under **Brukere** når dere tar systemet i bruk.

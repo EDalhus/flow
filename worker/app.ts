@@ -15,6 +15,7 @@ import { deliver, quayLogs } from './routes/quayLogs.ts';
 import reports from './routes/reports.ts';
 import search from './routes/search.ts';
 import type { AppEnv } from './types.ts';
+import orders from './routes/orders.ts';
 
 export const app = new Hono<AppEnv>().basePath('/api');
 
@@ -25,6 +26,7 @@ app.use('*', requireUser);
 
 app.route('/', catalog);
 app.route('/port-calls', portCalls);
+app.route('/orders', orders);
 app.route('/port-calls', messages);
 app.route('/port-calls', deliver);
 app.route('/port-calls', upload);

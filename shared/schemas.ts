@@ -15,12 +15,6 @@ export const flag = z.enum(FLAGS);
 
 // ---------------------------------------------------------------- anløp
 
-export const goodsLine = z.object({
-  sku_id: id,
-  quantity: z.int().min(1).max(100_000),
-  /** Utelates → inn ved levering, ut ved henting. */
-  direction: z.enum(['inn', 'ut']).optional(),
-});
 
 export const crewSlot = z.object({
   crew_role: crewRole,
@@ -38,7 +32,6 @@ const portCallFields = {
   seller_id: id.nullable().optional(),
   boat_crane: z.boolean().optional(),
   notes: optionalText(2000),
-  goods: z.array(goodsLine).max(20),
   crew: z.array(crewSlot).max(20),
   responsible_user_id: id.nullable().optional(),
 };
@@ -46,8 +39,9 @@ const portCallFields = {
 const etdAfterEta = (d: { eta?: string; etd?: string }) => !d.eta || !d.etd || Date.parse(d.etd) > Date.parse(d.eta);
 const etdMessage = { message: 'ETD må være etter ETA.', path: ['etd'] };
 
+/** Nytt anløp. `orders`: SO-er som skal med (linjene som venter på båt flyttes hit). */
 export const portCallCreate = z
-  .object({ ...portCallFields, goods: portCallFields.goods.default([]), crew: portCallFields.crew.default([]) })
+  .object({ ...portCallFields, crew: portCallFields.crew.default([]), orders: z.array(id).max(50).default([]) })
   .refine(etdAfterEta, etdMessage);
 export type PortCallCreate = z.infer<typeof portCallCreate>;
 /** Det klienten sender (før standardverdier og transformasjoner). */
@@ -70,6 +64,74 @@ export const crewPut = z.object({
   responsible_user_id: id.nullable().optional(),
 });
 export type CrewPut = z.infer<typeof crewPut>;
+
+// ---------------------------------------------------------------- salgsordre (SO fra Dynamics 365)
+
+/** SO-nummer: 20 og fem siffer, f.eks. 2043644. */
+export const soNumber = z.string().trim().regex(/^20\d{5}$/, 'SO-nummeret må være 20 og fem siffer, f.eks. 2043644.');
+
+export const orderLine = z.object({
+  /** Eksisterende linje (ved endring). */
+  id: id.optional(),
+  sku_id: id,
+  quantity: z.int().min(1).max(100_000),
+  direction: z.enum(['inn', 'ut']),
+});
+export type OrderLineInput = z.infer<typeof orderLine>;
+
+/** Nytt anløp laget fra en SO (båt, kai og tid). */
+export const newCall = z
+  .object({
+    boat_id: id, quay_id: id, eta: dateTime, etd: dateTime, time_known: z.boolean().optional(), boat_crane: z.boolean().optional(),
+    crew: z.array(crewSlot).max(20).default([]),
+  })
+  .refine(etdAfterEta, etdMessage);
+export type NewCall = z.infer<typeof newCall>;
+
+/** Hvor SO-en (eller linjene) skal: ingen båt ennå, et eksisterende anløp, eller et nytt anløp. */
+export const placement = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }),
+  z.object({ kind: z.literal('call'), port_call_id: id }),
+  z.object({ kind: z.literal('new'), call: newCall }),
+]);
+export type Placement = z.infer<typeof placement>;
+
+export const orderCreate = z.object({
+  so_number: soNumber,
+  customer: text(200).min(1, 'Skriv inn kunde.'),
+  seller_id: id.nullable().optional(),
+  wanted_date: date.nullable().optional(),
+  notes: optionalText(2000),
+  lines: z.array(orderLine).min(1, 'Legg til minst én vare.').max(30),
+  placement: placement.default({ kind: 'none' }),
+});
+export type OrderCreateInput = z.input<typeof orderCreate>;
+
+export const orderPatch = z.object({
+  version: z.int().min(1),
+  customer: text(200).min(1, 'Skriv inn kunde.').optional(),
+  seller_id: id.nullable().optional(),
+  wanted_date: date.nullable().optional(),
+  notes: optionalText(2000),
+  lines: z.array(orderLine).min(1, 'Legg til minst én vare.').max(30).optional(),
+});
+export type OrderPatchInput = z.input<typeof orderPatch>;
+
+/**
+ * Flytt SO-en til et anløp (eller ta den av båten). Uten `lines` flyttes alle linjene som ikke er levert.
+ * Med `lines` flyttes bare de linjene og antallene – en linje deles hvis antallet er mindre enn hele linjen.
+ */
+export const orderAssign = z.object({
+  version: z.int().min(1),
+  placement,
+  lines: z.array(z.object({ line_id: id, quantity: z.int().min(1).max(100_000) })).min(1).max(30).optional(),
+});
+export type OrderAssignInput = z.input<typeof orderAssign>;
+
+export const orderCancel = z.object({ version: z.int().min(1), reason: text(500).min(3, 'Skriv en kort begrunnelse.') });
+
+/** Lasterekkefølge på et anløp: SO-ene i den rekkefølgen de skal lastes eller losses. */
+export const loadOrderPut = z.object({ order_ids: z.array(id).min(1).max(50) });
 
 export const portCallCancel = z.object({ reason: text(500).min(3, 'Skriv en kort begrunnelse.') });
 

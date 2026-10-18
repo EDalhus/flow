@@ -50,7 +50,21 @@ export const at = (date: string, hm: string) => new Date(`${date}T${hm}:00+01:00
 
 export function call(date: string, from: string, to: string, extra: Record<string, unknown> = {}) {
   return {
-    boat_id: 'b_a', type: 'levering', quay_id: 'q_kai1', eta: at(date, from), etd: at(date, to),
-    goods: [{ sku_id: 's_hav_bb', quantity: 100 }], crew: [], ...extra,
+    boat_id: 'b_a', type: 'levering', quay_id: 'q_kai1', eta: at(date, from), etd: at(date, to), crew: [], ...extra,
   };
+}
+
+let so = 0;
+/** Unikt SO-nummer for testene: 20 + fem siffer. */
+export const soNumber = () => `20${String(10000 + (so++ * 37) % 90000).padStart(5, '0')}`;
+
+/** Setter inn varer direkte i databasen (én SO per anløp), for tester som lager anløp med SQL. */
+export function goodsSql(db: D1Database, rows: [id: string, callId: string, sku: string, qty: number, dir: 'inn' | 'ut'][]) {
+  const calls = [...new Set(rows.map(r => r[1]))];
+  return [
+    ...calls.map(c => db.prepare(`INSERT INTO sales_orders (id, so_number, customer, source) VALUES (?, ?, 'Testkunde', 'import')`).bind(`so_${c}`, soNumber())),
+    ...rows.map(([id, c, sku, qty, dir]) => db.prepare(`INSERT INTO order_lines (id, sales_order_id, port_call_id, sku_id, quantity, direction) VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind(id, `so_${c}`, c, sku, qty, dir)),
+    ...calls.map(c => db.prepare(`INSERT INTO port_call_orders (port_call_id, sales_order_id) VALUES (?, ?)`).bind(c, `so_${c}`)),
+  ];
 }

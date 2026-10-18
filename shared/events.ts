@@ -7,4 +7,5 @@ export type FlowEvent =
   | { type: 'ais.updated' }
   | { type: 'trucks.changed' }
   | { type: 'bulk.changed' }
-  | { type: 'production.changed' };
+  | { type: 'production.changed' }
+  | { type: 'orders.changed' };

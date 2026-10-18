@@ -3,16 +3,18 @@ import { BoatPhotos } from './BoatPhotos.tsx';
 import type { CollisionView, PortCallView, UserView } from '../../../shared/api.ts';
 import { CREW_ROLE_LABEL, CREW_ROLES, type CrewRole } from '../../../shared/domain/types.ts';
 import { errorText } from '../lib/api.ts';
-import { dayRelative, ddmm, fr, goodsParts, hmFromIso, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
+import { dayRelative, ddmm, fr, hmFromIso, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
 import { osloToUtc } from '../../../shared/time.ts';
-import { useBoat, useMe, usePatchPortCall, usePutCrew, useUsers } from '../lib/queries.ts';
+import { useAssignOrder, useBoat, useBoats, useCallLog, useLoadOrder, useMe, useOrders, usePatchPortCall, usePutCrew, useUsers } from '../lib/queries.ts';
+import { useNavigate } from 'react-router';
+import { CallOrders, OrderLog } from './Orders.tsx';
 import { canCrew, canPlan, canQuayLog } from '../lib/roles.ts';
 import { Chat } from './Chat.tsx';
 import { Check, Chevron, Close, Phone, Plus } from './Icons.tsx';
-import { BigNumber, FlagBadge, QuayMark, Rating, RatingBars, Segmented } from './ui.tsx';
+import { BigNumber, FlagBadge, Loading, QuayMark, Rating, RatingBars, Segmented } from './ui.tsx';
 import { tr, tx } from '../lib/i18n.ts';
 
-export type DetailTab = 'oversikt' | 'chat' | 'profil';
+export type DetailTab = 'oversikt' | 'chat' | 'profil' | 'logg';
 
 export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClose, extra }: {
   call: PortCallView; tab: DetailTab; onTab: (t: DetailTab) => void; onOpenKaibok: () => void; onOpenAlerts: () => void; onClose?: () => void;
@@ -22,6 +24,9 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
   const boat = useBoat(call.boat.id);
   const users = useUsers();
   const me = useMe();
+  const nav = useNavigate();
+  const loadOrder = useLoadOrder(call.id);
+  const editable = canPlan(me.data) && call.status !== 'ferdig' && call.status !== 'avlyst' && !call.has_quay_log;
   const chips = [...new Set([call.seller?.short_name, call.responsible?.short_name,
     ...(users.data ?? []).filter(u => u.roles.includes('produksjon')).map(u => u.short_name)])]
     .filter((s): s is string => !!s && s !== me.data?.short_name).slice(0, 4);
@@ -49,26 +54,23 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
       </div>
 
       <Segmented<DetailTab> label={tr('Anløpsdetaljer')} value={tab} onChange={onTab} stretch
-        options={[{ value: 'oversikt', label: tr('Oversikt') }, { value: 'chat', label: `${tr('Chat')} · ${call.message_count}` }, { value: 'profil', label: tr('Båtprofil') }]} />
+        options={[{ value: 'oversikt', label: tr('Oversikt') }, { value: 'chat', label: `${tr('Chat')} · ${call.message_count}` }, { value: 'profil', label: tr('Båtprofil') }, { value: 'logg', label: tr('Endringer') }]} />
 
       {tab === 'oversikt' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {canPlan(me.data) && call.status !== 'ferdig' && call.status !== 'avlyst' && !call.has_quay_log && <TimeEditor call={call} />}
+          {canPlan(me.data) && call.status !== 'ferdig' && call.status !== 'avlyst' && !call.has_quay_log && <><BoatEditor call={call} /><TimeEditor call={call} /></>}
           {call.collisions.length > 0 && <ClashButton collisions={call.collisions} onClick={onOpenAlerts} />}
           <CrewEditor call={call} users={users.data ?? []} />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <h3 style={{ margin: '0 6px', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>{tr('Varer')}</h3>
-            {call.goods.map(g => {
-              const [q, d] = goodsParts(g);
-              return (
-                <div key={g.id} style={{ display: 'flex', gap: 12, alignItems: 'baseline', padding: '6px', borderBottom: '1px solid rgba(var(--tint), .06)' }}>
-                  <span className="n" style={{ fontSize: 15, minWidth: 70 }}>{q}</span>
-                  <span style={{ fontSize: 14, color: 'rgba(var(--tint), .8)' }}>{d}</span>
-                </div>
-              );
-            })}
-            {!call.goods.length && <span className="muted" style={{ padding: 6, fontSize: 14 }}>{tr('Ingen varer registrert.')}</span>}
+            <h3 style={{ margin: '0 6px', fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>
+              {call.orders.length > 1 ? tr('Salgsordre · lasterekkefølge') : tr('Salgsordre')}
+            </h3>
+            <CallOrders call={call} busy={loadOrder.isPending} onOpen={so => nav(`/anlop?so=${so}`)}
+              onReorder={editable ? ids => loadOrder.mutate(ids) : undefined}>
+              {editable && <AddOrder call={call} />}
+            </CallOrders>
+            {loadOrder.isError && <div className="error-box">{errorText(loadOrder.error)}</div>}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
@@ -99,6 +101,8 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
       )}
 
       {tab === 'chat' && <Chat callId={call.id} chips={chips} />}
+
+      {tab === 'logg' && <CallLog callId={call.id} onSo={so => nav(`/anlop?so=${so}`)} />}
 
       {tab === 'profil' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -236,6 +240,76 @@ function CrewEditor({ call, users }: { call: PortCallView; users: UserView[] }) 
       {open && call.boat_crane && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .6)' }}>+ {tr('Båtens egen kran brukes')}</span>}
       {open && !editable && <span style={{ margin: '2px 6px 0', fontSize: 12, color: 'rgba(var(--tint), .55)' }}>{tr('Mannskap settes av produksjonen.')}</span>}
       {error && <div className="error-box" role="alert">{error}</div>}
+    </div>
+  );
+}
+
+/** Bytt båt på anløpet (rederiet sender en annen båt). Alle SO-ene følger med, og det føres i loggen deres. */
+function BoatEditor({ call }: { call: PortCallView }) {
+  const patch = usePatchPortCall();
+  const boats = useBoats();
+  const [open, setOpen] = useState(false);
+  const [boatId, setBoatId] = useState(call.boat.id);
+  const list = [...(boats.data ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'nb'));
+  if (!open) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 16, background: 'rgba(var(--tint), .05)' }}>
+        <span style={{ fontSize: 14 }}><span className="sub">{tr('Båt')} </span>{call.boat.name}</span>
+        <button type="button" className="btn" onClick={() => { setBoatId(call.boat.id); setOpen(true); }} style={{ minHeight: 34, fontSize: 13 }}>{tr('Bytt båt')}</button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: 16, background: 'rgba(var(--tint), .05)' }}>
+      <span style={{ fontSize: 13, color: 'var(--fg-75)' }}>{tr('Alle SO-ene på anløpet følger med til den nye båten. Skal bare én SO over på en annen båt, flytt den fra SO-en.')}</span>
+      <select className="inp" aria-label={tr('Ny båt')} value={boatId} onChange={e => setBoatId(e.target.value)}>
+        {list.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+      </select>
+      {patch.isError && <div className="error-box">{errorText(patch.error)}</div>}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" className="btn btn-w" disabled={boatId === call.boat.id || patch.isPending} style={{ minHeight: 38 }}
+          onClick={() => patch.mutate({ id: call.id, version: call.version, boat_id: boatId }, { onSuccess: () => setOpen(false) })}>{tr('Lagre')}</button>
+        <button type="button" className="btn" onClick={() => setOpen(false)} style={{ minHeight: 38 }}>{tr('Avbryt')}</button>
+      </div>
+    </div>
+  );
+}
+
+/** Legg en SO som venter på båt på dette anløpet, eller lag en ny SO til det. */
+function AddOrder({ call }: { call: PortCallView }) {
+  const orders = useOrders();
+  const assign = useAssignOrder();
+  const nav = useNavigate();
+  const [pick, setPick] = useState('');
+  const waiting = (orders.data ?? []).filter(o => o.status === 'venter' || o.status === 'delvis');
+  const chosen = waiting.find(o => o.id === pick);
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '6px 0' }}>
+      {waiting.length > 0 && (
+        <>
+          <select className="sel" aria-label={tr('SO som venter på båt')} value={pick} onChange={e => setPick(e.target.value)} style={{ flex: '1 1 180px' }}>
+            <option value="">{tr('Legg til SO som venter på båt …')}</option>
+            {waiting.map(o => <option key={o.id} value={o.id}>SO {o.so_number} · {o.customer}{o.wanted_date ? ` · ${dayRelative(o.wanted_date)}` : ''}</option>)}
+          </select>
+          <button type="button" className="btn" disabled={!chosen || assign.isPending} style={{ minHeight: 38, fontSize: 13 }}
+            onClick={() => chosen && assign.mutate({ id: chosen.id, version: chosen.version, placement: { kind: 'call', port_call_id: call.id } }, { onSuccess: () => setPick('') })}>
+            {tr('Legg på båten')}
+          </button>
+        </>
+      )}
+      <button type="button" className="btn" style={{ minHeight: 38, fontSize: 13 }} onClick={() => nav(`/anlop?ny=1&anlop=${call.id}`)}>+ {tr('Ny SO')}</button>
+      {assign.isError && <div className="error-box" style={{ width: '100%' }}>{errorText(assign.error)}</div>}
+    </div>
+  );
+}
+
+function CallLog({ callId, onSo }: { callId: string; onSo: (so: string) => void }) {
+  const log = useCallLog(callId);
+  if (log.isPending) return <Loading />;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 6px' }}>
+      <span className="sub">{tr('Alt som er endret på salgsordrene mens de lå på denne båten.')}</span>
+      <OrderLog entries={log.data ?? []} showSo onSo={onSo} />
     </div>
   );
 }

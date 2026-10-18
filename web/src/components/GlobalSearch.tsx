@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import type { BoatDetail, ExternalVessel, SearchResult } from '../../../shared/api.ts';
 import { api, errorText } from '../lib/api.ts';
-import { FLAG_STYLE, STATUS_STYLE, addDays, dayRelative, fr, osloTime, telHref, titleCase, todayOslo } from '../lib/format.ts';
+import { FLAG_STYLE, STATUS_STYLE, addDays, dayRelative, fr, osloTime, telHref, titleCase, todayOslo, typeLabel } from '../lib/format.ts';
 import { tr, tx } from '../lib/i18n.ts';
 import { useMe } from '../lib/queries.ts';
 import { canBoats } from '../lib/roles.ts';
@@ -15,8 +15,10 @@ import { ArrowLeft, Close, Search } from './Icons.tsx';
 /** Bulkbil-status (norsk; vises med tr()). */
 export const BULK_STATUS: Record<string, string> = { bestilt: 'Bestilt', lastes: 'Lastes', ferdig: 'Ferdig', avlyst: 'Fjernet' };
 
+const ORDER_STATUS: Record<string, string> = { venter: 'Venter på båt', planlagt: 'På båt', delvis: 'Delvis på båt', ferdig: 'Ferdig', kansellert: 'Kansellert' };
+
 const PAGES = [
-  { label: 'Kart', to: '/' }, { label: 'Anløp', to: '/anlop' }, { label: 'Kaibok', to: '/kaibok' }, { label: 'Båtregister', to: '/baater' },
+  { label: 'Kart', to: '/' }, { label: 'Anløp', to: '/anlop' }, { label: 'Kaibok', to: '/kaibok' }, { label: 'Salgsordre', to: '/anlop?vis=ordre' }, { label: 'Båtregister', to: '/baater' },
   { label: 'Biler', to: '/biler' }, { label: 'Bulkbil', to: '/bulk' }, { label: 'Produksjon', to: '/produksjon' },
   { label: 'Hjullasterskjerm', to: '/hjullaster' }, { label: 'Rapporter', to: '/rapporter' }, { label: 'Innstillinger', to: '/innstillinger' }, { label: 'Preferanser', to: '/innstillinger' },
 ];
@@ -60,7 +62,7 @@ export function GlobalSearch() {
   const needle = q.trim().toLowerCase();
   const pages = needle ? PAGES.filter(p => p.label.toLowerCase().includes(needle) || tr(p.label).toLowerCase().includes(needle)) : [];
   const d = term.length >= 2 ? res.data : undefined;
-  const count = pages.length + (d ? d.boats.length + d.calls.length + d.trucks.length + d.bulk.length + d.users.length + d.vessels.length : 0);
+  const count = pages.length + (d ? d.orders.length + d.boats.length + d.calls.length + d.trucks.length + d.bulk.length + d.users.length + d.vessels.length : 0);
 
   return (
     <div ref={box} style={{ position: 'relative', width: 'min(460px, 100%)' }}>
@@ -85,11 +87,19 @@ export function GlobalSearch() {
                   {d.boats.map(b => <Item key={b.id} title={b.name} sub={[b.mmsi && `MMSI ${b.mmsi}`, b.flag !== 'none' && b.flag !== 'green' && FLAG_STYLE[b.flag].label].filter(Boolean).join(' · ')} onClick={() => go(`/baater?id=${b.id}`)} />)}
                 </Group>
               )}
+              {d && d.orders.length > 0 && (
+                <Group title={tr('Salgsordre')}>
+                  {d.orders.map(o => (
+                    <Item key={o.id} title={`SO ${o.so_number} · ${o.customer}`} onClick={() => go(`/anlop?so=${o.so_number}`)}
+                      sub={[o.boat_name ?? tr('Venter på båt'), o.service_date && dayRelative(o.service_date), tr(ORDER_STATUS[o.status])].filter(Boolean).join(' · ')} />
+                  ))}
+                </Group>
+              )}
               {d && d.calls.length > 0 && (
                 <Group title={tr('Anløp')}>
                   {d.calls.map(c => (
                     <Item key={c.id} title={c.boat_name} onClick={() => go(c.service_date === today || c.service_date === addDays(today, 1) ? `/?id=${c.id}` : `/anlop?q=${encodeURIComponent(c.boat_name)}`)}
-                      sub={`${dayRelative(c.service_date)}${c.time_known ? ` ${osloTime(c.eta)}` : ''} · ${c.type === 'levering' ? tr('Levering') : tr('Henting')} · ${STATUS_STYLE[c.status].label}`} />
+                      sub={`${dayRelative(c.service_date)}${c.time_known ? ` ${osloTime(c.eta)}` : ''} · ${typeLabel(c.type)} · ${STATUS_STYLE[c.status].label}`} />
                   ))}
                 </Group>
               )}

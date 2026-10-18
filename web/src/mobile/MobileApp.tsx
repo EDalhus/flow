@@ -221,16 +221,32 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
             </div>
           </div>
 
-          <div style={{ borderRadius: 22, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)', padding: '4px 16px' }}>
-            {c.goods.map(g => {
-              const [q, d] = goodsParts(g);
-              return (
-                <div key={g.id} style={{ display: 'flex', gap: 12, alignItems: 'baseline', padding: '12px 0', borderBottom: '1px solid rgba(var(--tint), .06)' }}>
-                  <span className="n" style={{ minWidth: 74 }}>{q}</span>
-                  <span style={{ color: 'rgba(var(--tint), .8)', fontSize: 15 }}>{d}</span>
+          {/* Salgsordrene i lasterekkefølge: det som skal først på eller av båten står øverst. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <h3 style={{ margin: '0 4px', fontSize: 14, fontWeight: 400, color: 'var(--fg-62)' }}>
+              {c.orders.length > 1 ? tr('Salgsordre · lasterekkefølge') : tr('Salgsordre')}
+            </h3>
+            {c.orders.map(o => (
+              <div key={o.id} style={{ borderRadius: 22, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)', padding: '10px 16px 4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="n" style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(128,239,222,.16)', color: 'var(--aqua)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flex: 'none' }}>{o.load_seq}</span>
+                  <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+                    <span className="n" style={{ fontWeight: 500 }}>SO {o.so_number}</span>
+                    <span style={{ fontSize: 13, color: 'rgba(var(--tint), .65)' }}>{o.customer}</span>
+                  </span>
                 </div>
-              );
-            })}
+                {o.goods.map(g => {
+                  const [q, d] = goodsParts(g);
+                  return (
+                    <div key={g.id} style={{ display: 'flex', gap: 12, alignItems: 'baseline', padding: '10px 0', borderTop: '1px solid rgba(var(--tint), .06)', marginTop: 8 }}>
+                      <span className="n" style={{ minWidth: 74 }}>{q}</span>
+                      <span style={{ color: 'rgba(var(--tint), .8)', fontSize: 15 }}>{d} <span style={{ fontSize: 12, color: 'rgba(var(--tint), .55)' }}>· {g.direction === 'inn' ? tr('Levering') : tr('Henting')}</span></span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {!c.orders.length && <span style={{ margin: '0 4px', fontSize: 14, color: 'var(--fg-55)' }}>{tr('Ingen salgsordre på båten ennå.')}</span>}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

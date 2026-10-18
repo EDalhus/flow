@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { describe, expect, it, vi } from 'vitest';
-import { api, at, call } from './fixtures.ts';
+import { api, at, call, goodsSql, soNumber } from './fixtures.ts';
 
 describe('innlogging og tilgang', () => {
   it('helsesjekk krever ikke innlogging', async () => {
@@ -22,9 +22,9 @@ describe('innlogging og tilgang', () => {
     expect(boss.json.roles).toEqual(['admin']);
   });
 
-  it('kaiarbeidere kan ikke opprette anløp', async () => {
+  it('alle med tilgang kan opprette anløp, også kaiarbeidere', async () => {
     const res = await api('/port-calls', { as: 'ola', body: call('2030-03-01', '08:00', '10:00') });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
   });
 
   it('svarer med JSON på ukjente ruter', async () => {
@@ -39,9 +39,8 @@ describe('anløp', () => {
     expect(res.status).toBe(400);
     expect(res.json.issues).toContainEqual({ path: 'etd', message: 'ETD må være etter ETA.' });
 
-    const bad = await api('/port-calls', { body: { ...call('2030-03-02', '08:00', '09:00'), goods: [{ sku_id: 's_hav_bb', quantity: -1 }] } });
-    expect(bad.status).toBe(400);
-    expect(bad.json.issues[0].path).toBe('goods.0.quantity');
+    const bad = await api('/port-calls', { body: { ...call('2030-03-02', '08:00', '09:00'), orders: ['so_finnes_ikke'] } });
+    expect(bad).toMatchObject({ status: 400, json: { field: 'orders' } });
 
     const unknownBoat = await api('/port-calls', { body: call('2030-03-02', '08:00', '09:00', { boat_id: 'b_finnes_ikke' }) });
     expect(unknownBoat).toMatchObject({ status: 400, json: { field: 'boat_id' } });
@@ -59,7 +58,13 @@ describe('anløp', () => {
     expect(ok.status).toBe(201);
     expect(ok.json).toMatchObject({ status: 'planlagt', seller: { id: 'u_kari' }, responsible: null, responsible_auto: false });
     expect(ok.json.crew).toHaveLength(2);
-    expect(ok.json.goods[0]).toMatchObject({ direction: 'inn', tonnes: 100, label: '100 BB Hav salt' });
+    expect(ok.json.orders).toEqual([]);
+
+    // En SO som venter på båt kan legges på et nytt anløp med en gang.
+    const so = await api('/orders', { as: 'kari', body: { so_number: soNumber(), customer: 'Hessa Seafood', lines: [{ sku_id: 's_hav_bb', quantity: 100, direction: 'inn' }] } });
+    const withOrder = await api('/port-calls', { as: 'kari', body: call('2030-03-03', '11:00', '12:00', { boat_id: 'b_b', orders: [so.json.id] }) });
+    expect(withOrder.json.goods[0]).toMatchObject({ direction: 'inn', tonnes: 100, label: '100 BB Hav salt', sales_order_id: so.json.id });
+    expect(withOrder.json.orders).toEqual([expect.objectContaining({ so_number: so.json.so_number, customer: 'Hessa Seafood', load_seq: 1, tonnes: 100 })]);
   });
 
   it('gjør eneste person til ansvarlig automatisk', async () => {
@@ -144,10 +149,7 @@ describe('anløp', () => {
     const stale = await api(`/port-calls/${id}`, { method: 'PATCH', body: { version: 1, notes: 'gammel' } });
     expect(stale.status).toBe(409);
 
-    const flipped = await api(`/port-calls/${id}`, { method: 'PATCH', body: { version: 2, type: 'henting' } });
-    expect(flipped.json.goods[0].direction).toBe('ut');
-
-    const bad = await api(`/port-calls/${id}`, { method: 'PATCH', body: { version: 3, etd: at('2030-03-07', '07:00') } });
+    const bad = await api(`/port-calls/${id}`, { method: 'PATCH', body: { version: 2, etd: at('2030-03-07', '07:00') } });
     expect(bad.status).toBe(400);
   });
 
@@ -305,8 +307,7 @@ describe('rapporter', () => {
       env.DB.prepare(`INSERT INTO port_calls (id, boat_id, type, quay_id, eta, etd, service_date, source, completed_at)
                       VALUES ('r1', 'b_a', 'levering', 'q_kai1', '2029-03-06T08:00:00Z', '2029-03-06T10:00:00Z', '2029-03-06', 'import', '2029-03-06T10:00:00Z'),
                              ('r2', 'b_b', 'henting', 'q_kai2', '2029-03-07T08:00:00Z', '2029-03-07T10:00:00Z', '2029-03-07', 'import', '2029-03-07T10:00:00Z')`),
-      env.DB.prepare(`INSERT INTO port_call_goods (id, port_call_id, sku_id, quantity, direction) VALUES
-                      ('rg1', 'r1', 's_hav_bb', 100, 'inn'), ('rg2', 'r2', 's_stein_bb', 40, 'ut'), ('rg3', 'r2', 's_hav_eur', 20, 'ut')`),
+      ...goodsSql(env.DB, [['rg1', 'r1', 's_hav_bb', 100, 'inn'], ['rg2', 'r2', 's_stein_bb', 40, 'ut'], ['rg3', 'r2', 's_hav_eur', 20, 'ut']]),
     ]);
     const all = await api('/reports/weekly?year=2030');
     expect(all.status).toBe(200);
@@ -331,8 +332,7 @@ describe('rapporter', () => {
         ('s2', 'b_b', 'levering', 'q_kai2', ?1, ?5, ?2, 'import', ?5),
         ('s3', 'b_a', 'henting', 'q_kai1', ?3, ?6, ?4, 'import', ?6)`)
         .bind(`${day(2)}T08:00:00Z`, day(2), `${day(10)}T08:00:00Z`, day(10), `${day(2)}T10:00:00Z`, `${day(10)}T10:00:00Z`),
-      env.DB.prepare(`INSERT INTO port_call_goods (id, port_call_id, sku_id, quantity, direction) VALUES
-        ('sg1', 's1', 's_hav_bb', 300, 'ut'), ('sg2', 's2', 's_stein_bb', 120, 'inn'), ('sg3', 's3', 's_hav_bb', 200, 'ut')`),
+      ...goodsSql(env.DB, [['sg1', 's1', 's_hav_bb', 300, 'ut'], ['sg2', 's2', 's_stein_bb', 120, 'inn'], ['sg3', 's3', 's_hav_bb', 200, 'ut']]),
     ]);
     const week = await api('/reports/summary?days=7');
     expect(week.json).toMatchObject({ days: 7, out: { tonnes: 300, calls: 1 }, in: { tonnes: 120, calls: 1 }, calls: 2 });

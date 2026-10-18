@@ -90,7 +90,7 @@ export const goodsParts = (g: GoodsView): [string, string] => [
 /** "07:30–11:00", eller "Tid ikke satt" når bare dagen er kjent. */
 export const timeRange = (c: Pick<PortCallView, 'eta' | 'etd'> & { time_known?: boolean }) =>
   c.time_known === false ? tr('Tid ikke satt') : `${osloTime(c.eta)}–${osloTime(c.etd)}`;
-export const typeLabel = (t: string) => (t === 'levering' ? tr('Levering') : tr('Henting'));
+export const typeLabel = (t: string) => (t === 'levering' ? tr('Levering') : t === 'begge' ? tr('Levering + henting') : tr('Henting'));
 
 export const telHref = (phone: string) => `tel:${phone.replace(/\s/g, '')}`;
 export const telShort = (phone: string) => phone.replace(/^\+47\s?/, '');

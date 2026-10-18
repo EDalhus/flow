@@ -1,10 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  AisView, BoatDetail, BoatView, BulkOrderView, BulkQuality, CollisionView, Me, MessageView, NotificationView, PackingLineView,
+  AisView, BoatDetail, BoatView, BulkOrderView, OrderDetail, OrderLogEntry, OrderView, BulkQuality, CollisionView, Me, MessageView, NotificationView, PackingLineView,
   PortCallView, ProductReport, QualityReport, Quay, QuayLogView, TruckOrderView, UserPrefs, UserView, WeeklyReport,
 } from '../../../shared/api.ts';
 import type { Settings } from '../../../shared/domain/types.ts';
-import type { BulkOrderCreateInput, CrewPut, PortCallCreateInput, PortCallPatchInput, QuayLogCreateInput, TruckOrderCreateInput } from '../../../shared/schemas.ts';
+import type { BulkOrderCreateInput, CrewPut, OrderAssignInput, OrderCreateInput, OrderPatchInput, PortCallCreateInput, PortCallPatchInput, QuayLogCreateInput, TruckOrderCreateInput } from '../../../shared/schemas.ts';
 import { api } from './api.ts';
 
 export type { Quay };
@@ -69,14 +69,69 @@ export const useQualityReport = () =>
 
 // ---------------------------------------------------------------- endringer
 
-/** Etter en endring på et anløp: hent lister, detaljer og båter på nytt. */
+/** Etter en endring på et anløp: hent lister, detaljer, ordre og båter på nytt. */
 function useInvalidateCalls() {
   const qc = useQueryClient();
   return (id?: string) => {
     qc.invalidateQueries({ queryKey: ['port-calls'] });
     if (id) qc.invalidateQueries({ queryKey: ['port-call', id] });
+    if (id) qc.invalidateQueries({ queryKey: ['call-log', id] });
+    qc.invalidateQueries({ queryKey: ['orders'] });
+    qc.invalidateQueries({ queryKey: ['order'] });
     qc.invalidateQueries({ queryKey: ['boats'] });
   };
+}
+
+// ---------------------------------------------------------------- salgsordre
+
+export const useOrders = () => useQuery({ queryKey: ['orders'], queryFn: () => api<OrderView[]>('/orders'), refetchInterval: 60_000 });
+/** Én SO med logg. `key` er id eller SO-nummer. */
+export const useOrder = (key: string | null) =>
+  useQuery({ queryKey: ['order', key], queryFn: () => api<OrderDetail>(`/orders/${key}`), enabled: !!key, retry: false });
+export const useCallLog = (callId: string | null) =>
+  useQuery({ queryKey: ['call-log', callId], queryFn: () => api<OrderLogEntry[]>(`/port-calls/${callId}/log`), enabled: !!callId });
+
+/** Svaret etter endring av en SO: ordren, og anløp som ble tomme (klienten spør om de skal avlyses). */
+export type OrderChange = { order: OrderDetail; emptied: { id: string; boat_name: string }[] };
+
+export function useCreateOrder() {
+  const inv = useInvalidateCalls();
+  return useMutation({ mutationFn: (body: OrderCreateInput) => api<OrderDetail>('/orders', { body }), onSuccess: o => inv(o.calls[0]?.id) });
+}
+export function usePatchOrder() {
+  const inv = useInvalidateCalls();
+  return useMutation({
+    mutationFn: ({ id, ...body }: OrderPatchInput & { id: string }) => api<OrderChange>(`/orders/${id}`, { method: 'PATCH', body }),
+    onSuccess: r => inv(r.order.calls[0]?.id), onError: () => inv(),
+  });
+}
+export function useAssignOrder() {
+  const inv = useInvalidateCalls();
+  return useMutation({
+    mutationFn: ({ id, ...body }: OrderAssignInput & { id: string }) => api<OrderChange>(`/orders/${id}/assign`, { body }),
+    onSuccess: r => inv(r.order.calls[0]?.id), onError: () => inv(),
+  });
+}
+export function useCancelOrder() {
+  const inv = useInvalidateCalls();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; version: number; reason: string }) => api<OrderChange>(`/orders/${id}/cancel`, { body }),
+    onSuccess: () => inv(), onError: () => inv(),
+  });
+}
+export function useLoadOrder(callId: string) {
+  const inv = useInvalidateCalls();
+  return useMutation({
+    mutationFn: (orderIds: string[]) => api<PortCallView>(`/port-calls/${callId}/load-order`, { method: 'PUT', body: { order_ids: orderIds } }),
+    onSuccess: () => inv(callId), onError: () => inv(callId),
+  });
+}
+export function useCancelPortCall() {
+  const inv = useInvalidateCalls();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => api<PortCallView>(`/port-calls/${id}/cancel`, { body: { reason } }),
+    onSuccess: v => inv(v.id),
+  });
 }
 
 export function useCreatePortCall() {

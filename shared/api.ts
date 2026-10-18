@@ -66,6 +66,8 @@ export interface GoodsView {
   tonnes: number;
   /** "120 pall Hav salt · 25 kg × 40 · Europall" */
   label: string;
+  /** Salgsordren linjen hører til. */
+  sales_order_id: string;
 }
 
 export interface CrewSlotView {
@@ -107,9 +109,24 @@ export interface Quay {
 /** Kai på anløp/kaibok. */
 export type QuayRef = { id: string; name: string; nickname: string | null; company: string | null };
 
+/** En SO på et anløp, i lasterekkefølge. */
+export interface CallOrder {
+  id: string;
+  so_number: string;
+  customer: string;
+  /** 1 = lastes/losses først. */
+  load_seq: number;
+  tonnes: number;
+  /** Linjene i denne SO-en som skal med dette anløpet. */
+  goods: GoodsView[];
+  /** SO-en har også linjer på andre anløp (delt levering) eller som venter på båt. */
+  split: boolean;
+}
+
 export interface PortCallView {
   id: string;
-  type: CallType;
+  /** Utledet av varene: «begge» når anløpet både leverer og henter. */
+  type: CallType | 'begge';
   eta: string;
   etd: string;
   service_date: string;
@@ -125,6 +142,8 @@ export interface PortCallView {
   /** true når anløpet har én rolle, og ansvarlig derfor er satt automatisk. */
   responsible_auto: boolean;
   goods: GoodsView[];
+  /** Salgsordrene på anløpet, i lasterekkefølge. */
+  orders: CallOrder[];
   tonnes_in: number;
   tonnes_out: number;
   crew: CrewSlotView[];
@@ -139,6 +158,70 @@ export interface PortCallView {
   collisions: CollisionView[];
 }
 
+// ---------------------------------------------------------------- salgsordre
+
+export type OrderStatus = 'venter' | 'planlagt' | 'delvis' | 'ferdig' | 'kansellert';
+
+/** Kort beskrivelse av et anløp, slik det vises på en SO og i loggen. */
+export interface CallRef {
+  id: string;
+  boat_id: string;
+  boat_name: string;
+  quay: QuayRef;
+  eta: string;
+  etd: string;
+  time_known: boolean;
+  service_date: string;
+  status: CallStatus;
+  load_seq: number;
+}
+
+export interface OrderLine extends GoodsView {
+  /** Anløpet linjen skal med, eller null (venter på båt). */
+  port_call_id: string | null;
+}
+
+export interface OrderView {
+  id: string;
+  so_number: string;
+  customer: string;
+  seller: UserRef | null;
+  wanted_date: string | null;
+  notes: string | null;
+  status: OrderStatus;
+  version: number;
+  lines: OrderLine[];
+  tonnes: number;
+  /** Anløpene SO-en ligger på (vanligvis ett). */
+  calls: CallRef[];
+  cancelled_at: string | null;
+  created_at: string;
+}
+
+/** Beskrivelse av et anløp i loggen, lagret slik det var da endringen skjedde. */
+export interface LogCall { boat: string; eta: string; time_known: boolean; quay: string }
+
+export type OrderLogKind =
+  | 'created' | 'line_added' | 'line_removed' | 'line_changed' | 'customer' | 'seller' | 'wanted_date' | 'notes'
+  | 'assigned' | 'moved' | 'unassigned' | 'boat_changed' | 'eta_changed' | 'quay_changed' | 'load_order'
+  | 'cancelled' | 'completed';
+
+export interface OrderLogEntry {
+  id: number;
+  at: string;
+  user: UserRef | null;
+  kind: OrderLogKind;
+  /** Fra–til og annet, avhengig av kind. Tekstene settes sammen i nettleseren, på brukerens språk. */
+  data: Record<string, unknown>;
+  port_call_id: string | null;
+  sales_order_id: string | null;
+  so_number: string | null;
+}
+
+export interface OrderDetail extends OrderView {
+  log: OrderLogEntry[];
+}
+
 export interface MessageView {
   id: string;
   port_call_id: string;
@@ -151,7 +234,7 @@ export interface MessageView {
 
 export interface NotificationView {
   id: string;
-  kind: 'mention' | 'assigned' | 'collision' | 'quay_log';
+  kind: 'mention' | 'assigned' | 'collision' | 'quay_log' | 'order';
   text: string;
   port_call_id: string | null;
   message_id: string | null;
@@ -427,7 +510,8 @@ export interface ExternalVessel {
 export interface SearchResult {
   q: string;
   boats: { id: string; name: string; mmsi: string | null; flag: Flag }[];
-  calls: { id: string; boat_name: string; service_date: string; eta: string; time_known: boolean; type: CallType; status: CallStatus }[];
+  calls: { id: string; boat_name: string; service_date: string; eta: string; time_known: boolean; type: CallType | 'begge'; status: CallStatus }[];
+  orders: { id: string; so_number: string; customer: string; status: OrderStatus; boat_name: string | null; service_date: string | null }[];
   trucks: { id: string; customer: string; expected_date: string; reg_no: string | null; picked_up: boolean }[];
   bulk: { id: string; truck: string; destination: string | null; status: string }[];
   users: { id: string; name: string; title: string | null; phone: string | null }[];

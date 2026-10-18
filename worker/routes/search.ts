@@ -6,6 +6,7 @@ import { shipTypeLabel } from '../../shared/domain/shiptype.ts';
 import type { Flag } from '../../shared/domain/types.ts';
 import { addDays, todayOslo } from '../../shared/time.ts';
 import { fetchAllLatest, matchVessels, type AisVesselInfo } from '../ais/barentswatch.ts';
+import { loadOrders } from '../db/orders.ts';
 import { loadCalls } from '../db/portCalls.ts';
 import { query } from '../lib/http.ts';
 import { loadSettings } from '../lib/settings.ts';
@@ -35,7 +36,7 @@ app.get('/', query(z.object({ q: z.string().trim().min(1).max(80) })), async c =
   const like = `%${q.replace(/[%_]/g, '')}%`;
   const today = todayOslo();
 
-  const [boats, callIds, trucks, bulk, users, mmsiRows] = await db.batch([
+  const [boats, callIds, trucks, bulk, users, mmsiRows, orderIds] = await db.batch([
     db.prepare(`SELECT id, name, mmsi, flag_auto, flag_override FROM boats
                 WHERE active = 1 AND (name LIKE ?1 OR mmsi LIKE ?1 OR callsign LIKE ?1 OR imo LIKE ?1) ORDER BY name LIMIT ${LIMIT}`).bind(like),
     db.prepare(`SELECT pc.id FROM port_calls pc JOIN boats b ON b.id = pc.boat_id
@@ -50,7 +51,11 @@ app.get('/', query(z.object({ q: z.string().trim().min(1).max(80) })), async c =
     db.prepare(`SELECT id, name, title, phone FROM users WHERE active = 1 AND (name LIKE ?1 OR short_name LIKE ?1 OR title LIKE ?1)
                 ORDER BY name LIMIT ${LIMIT}`).bind(like),
     db.prepare(`SELECT id, mmsi FROM boats WHERE mmsi IS NOT NULL`),
+    // Salgsordre: SO-nummer (også delvis, f.eks. «4364») eller kunde.
+    db.prepare(`SELECT so.id FROM sales_orders so WHERE so.source = 'app' AND (so.so_number LIKE ?1 OR so.customer LIKE ?1)
+                ORDER BY so.cancelled_at IS NOT NULL, so.so_number = ?2 DESC, so.created_at DESC LIMIT ${LIMIT}`).bind(like, q),
   ]);
+  const orders = await loadOrders(db, { ids: (orderIds.results as { id: string }[]).map(r => r.id) });
 
   const settings = await loadSettings(db);
   const ids = (callIds.results as { id: string }[]).map(r => r.id);
@@ -78,6 +83,10 @@ app.get('/', query(z.object({ q: z.string().trim().min(1).max(80) })), async c =
   return c.json({
     q,
     boats: (boats.results as BoatRow[]).map(b => ({ id: b.id, name: b.name, mmsi: b.mmsi, flag: effectiveFlag(b) })),
+    orders: orders.map(o => ({
+      id: o.id, so_number: o.so_number, customer: o.customer, status: o.status, boat_name: o.calls[0]?.boat_name ?? null,
+      service_date: o.calls[0]?.service_date ?? o.wanted_date,
+    })),
     calls: calls.map(x => ({ id: x.id, boat_name: x.boat.name, service_date: x.service_date, eta: x.eta, time_known: x.time_known, type: x.type, status: x.status })),
     trucks: (trucks.results as { id: string; customer: string; expected_date: string; reg_no: string | null; picked_up_at: string | null }[])
       .map(t => ({ id: t.id, customer: t.customer, expected_date: t.expected_date, reg_no: t.reg_no, picked_up: !!t.picked_up_at })),

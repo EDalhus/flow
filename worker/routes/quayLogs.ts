@@ -9,6 +9,7 @@ import { body, fail, isConstraintError, newId, nowIso, query } from '../lib/http
 import { publish } from '../lib/realtime.ts';
 import { loadSettings } from '../lib/settings.ts';
 import type { AppEnv } from '../types.ts';
+import { logStatement, ordersOnCall } from '../db/orders.ts';
 
 const fr = (n: number) => n.toFixed(1).replace('.', ',');
 
@@ -48,6 +49,8 @@ deliver.post('/:id/quay-log', requireRole(...CAN.quayLog), body(quayLogCreate), 
   const systemText = `Kaibok levert av ${user.short_name} · ${summary} · ${fr(avg)} av 5. Anløpet er satt til Ferdig.`;
   const notify = [...new Set([call.seller_id, call.responsible_user_id])].filter((u): u is string => !!u && u !== user.id);
   const messageId = newId('m');
+  // SO-ene på anløpet blir ferdige (det står i loggen deres).
+  const orders = await ordersOnCall(db, callId);
 
   try {
     await db.batch([
@@ -66,6 +69,7 @@ deliver.post('/:id/quay-log', requireRole(...CAN.quayLog), body(quayLogCreate), 
           .bind(newId('n'), u, callId, messageId, `Kaibok levert · ${call.boat}${input.had_deviation ? ' · avvik' : ''}`, at)),
       db.prepare(`INSERT INTO audit_log (user_id, entity, entity_id, action, diff) VALUES (?, 'quay_log', ?, 'create', ?)`)
         .bind(user.id, logId, JSON.stringify(input)),
+      ...orders.map(o => logStatement(db, { orderId: o.id, callId, userId: user.id, kind: 'completed', data: { boat: call.boat }, at })),
     ]);
   } catch (e) {
     // To samtidige innsendinger: UNIQUE(port_call_id) stopper den andre.

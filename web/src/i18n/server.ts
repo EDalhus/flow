@@ -18,6 +18,14 @@ export const SERVER_TEXTS = [
   '{n} pall {produkt} · 25 kg × {sekker} · Europall', '{n} pall {produkt} · 25 kg × {sekker} · SRS-pall',
   'Flyttet {båt} til {kai} (fra varsel om kollisjon).', 'Utsatt {båt} til {tid} (fra varsel om kollisjon).',
   'Tid ikke satt',
+  'På båt', 'Delvis på båt', 'Kansellert',
+
+  // Salgsordre
+  'Fant ikke salgsordren.', 'Salgsordren er endret av noen andre. Last inn på nytt og prøv igjen.', 'Salgsordren er kansellert.',
+  'SO {so} finnes allerede ({kunde}).', 'SO {so} finnes allerede.', 'Ukjent salgsordre.', 'SO {so} er kansellert.',
+  'SO {so} har ingen varer som venter på båt.', 'Ukjent varelinje.', 'Varer som er levert kan ikke endres.', 'Varer som er levert kan ikke flyttes.',
+  'Kan ikke flytte mer enn det som står på linjen.', 'Ingen varer å flytte – alt på ordren er levert.', 'Varene ligger allerede der.',
+  'Lasterekkefølgen må inneholde alle SO-ene på anløpet.', 'SO {so} på {båt} er endret av {navn}',
 
   // Etiketter i shared/domain
   'Trucksjåfør', 'Anhuker', 'Kaikran', 'trucksjåfører', 'anhukere', 'kaikraner',

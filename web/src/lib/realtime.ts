@@ -24,6 +24,9 @@ export function useRealtime(): Connection {
         case 'port_call.changed':
           qc.invalidateQueries({ queryKey: ['port-calls'] });
           qc.invalidateQueries({ queryKey: ['port-call', e.id] });
+          qc.invalidateQueries({ queryKey: ['call-log', e.id] });
+          qc.invalidateQueries({ queryKey: ['orders'] });
+          qc.invalidateQueries({ queryKey: ['order'] });
           qc.invalidateQueries({ queryKey: ['boats'] });
           break;
         case 'message.created':
@@ -44,6 +47,10 @@ export function useRealtime(): Connection {
           break;
         case 'bulk.changed':
           qc.invalidateQueries({ queryKey: ['bulk'] });
+          break;
+        case 'orders.changed':
+          qc.invalidateQueries({ queryKey: ['orders'] });
+          qc.invalidateQueries({ queryKey: ['order'] });
           break;
         case 'production.changed':
           qc.invalidateQueries({ queryKey: ['production'] });

@@ -1,44 +1,52 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
-import type { CollisionView, PortCallView } from '../../../shared/api.ts';
-import { CREW_ROLES, CREW_ROLE_LABEL, FLAG_LABEL, type CrewRole } from '../../../shared/domain/types.ts';
-import type { PortCallCreateInput } from '../../../shared/schemas.ts';
-import { isoWeek, osloToUtc } from '../../../shared/time.ts';
-import { Close, Minus, Plus } from '../components/Icons.tsx';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import type { OrderView, PortCallView } from '../../../shared/api.ts';
+import { isoWeek } from '../../../shared/time.ts';
+import { Plus } from '../components/Icons.tsx';
+import { NewOrderDrawer, OrderPanel, OrderStatusBadge, SoNo } from '../components/Orders.tsx';
 import { Page } from '../components/Topbar.tsx';
 import { CallIssues, Loading, QuayMark, SearchBox, Segmented, StatusBadge } from '../components/ui.tsx';
-import { api, errorText } from '../lib/api.ts';
-import { FLAG_STYLE, addDays, dayHeading, dayShort, fr, goodsShort, hmFromIso, nb, quayLabel, quayTitle, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
-import { useBoats, useCreatePortCall, useMe, usePortCalls, useProducts, useQuays, useUsers, type Sku } from '../lib/queries.ts';
-import { canPlan } from '../lib/roles.ts';
-import './anlop.css';
+import { addDays, dayHeading, dayShort, fr, goodsShort, timeRange, todayOslo, typeLabel } from '../lib/format.ts';
 import { tr, tx } from '../lib/i18n.ts';
+import { useOrders, usePortCalls } from '../lib/queries.ts';
+import './anlop.css';
 
 type Filter = 'idag' | 'uke' | 'kollisjon';
+type View = 'anlop' | 'ordre';
 
+/**
+ * Anløp og salgsordre. SO-en (fra Dynamics 365) er det som er solgt; anløpet er båten som henter eller leverer.
+ * «Båter» viser anløpene med SO-ene i lasterekkefølge; «Salgsordre» viser alle åpne SO-er, også de som venter på båt.
+ */
 export function AnlopPage() {
   const today = todayOslo();
+  const nav = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [q, setQ] = useState('');
+  const view: View = params.get('vis') === 'ordre' ? 'ordre' : 'anlop';
+  const setView = (v: View) => setParams(p => { if (v === 'ordre') p.set('vis', 'ordre'); else p.delete('vis'); return p; }, { replace: true });
   // Med søk vises de neste 60 dagene, ellers en uke.
   const calls = usePortCalls(today, addDays(today, q.trim() ? 60 : 7));
-  const me = useMe();
+  const orders = useOrders();
   const [filter, setFilter] = useState<Filter>('uke');
-  const [params] = useSearchParams();
   const [showNew, setShowNew] = useState(params.get('ny') === '1');
-  // Fra det globale søket: /anlop?q=båtnavn
+  // Fra det globale søket: /anlop?q=båtnavn, /anlop?so=2043644
   const urlQ = params.get('q');
   useEffect(() => { if (urlQ) { setQ(urlQ); setFilter('uke'); } }, [urlQ]);
-  const [fresh, setFresh] = useState<string | null>(null);
+  const soKey = params.get('so');
+  const openSo = (key: string | null) => { setShowNew(false); setParams(p => { if (key) p.set('so', key); else p.delete('so'); return p; }, { replace: true }); };
 
   const list = calls.data?.calls ?? [];
   const needle = q.trim().toLowerCase();
+  const matchCall = (c: PortCallView) => !needle || c.boat.name.toLowerCase().includes(needle)
+    || c.orders.some(o => o.so_number.includes(needle) || o.customer.toLowerCase().includes(needle));
   // Ferdige anløp (kaibok levert) ligger i Kaibok, ikke her.
   const done = list.filter(c => c.status === 'ferdig').length;
-  const visible = list.filter(c => c.status !== 'ferdig' &&
-    (!needle || c.boat.name.toLowerCase().includes(needle)) &&
+  const visible = list.filter(c => c.status !== 'ferdig' && matchCall(c) &&
     (filter === 'uke' || (filter === 'idag' && c.service_date === today) || (filter === 'kollisjon' && c.collisions.length > 0)));
   const days = [...new Set(visible.map(c => c.service_date))].sort();
   const left = list.filter(c => c.service_date === today && c.status !== 'ferdig').length;
+  const waiting = (orders.data ?? []).filter(o => o.status === 'venter' || o.status === 'delvis').length;
 
   return (
     <Page>
@@ -46,69 +54,88 @@ export function AnlopPage() {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h1 className="page-title">{tr('Anløp')}</h1>
-            <span className="muted">Flatholmen · {tr('uke {n}', { n: isoWeek(today).week })} · {tr('{n} gjenstår i dag', { n: left })}</span>
+            <span className="muted">
+              Flatholmen · {tr('uke {n}', { n: isoWeek(today).week })} · {tr('{n} gjenstår i dag', { n: left })}
+              {waiting > 0 && <> · <button type="button" onClick={() => setView('ordre')} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--warn-fg)', cursor: 'pointer' }}>{tr('{n} SO venter på båt', { n: waiting })}</button></>}
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <Segmented<Filter> label={tr('Periode')} value={filter} onChange={setFilter}
-              options={[{ value: 'idag', label: tr('I dag') }, { value: 'uke', label: tr('Neste 7 dager') }, { value: 'kollisjon', label: tr('Kollisjoner') }]} />
-            <SearchBox value={q} onChange={setQ} placeholder={tr('Søk båt')} label={tr('Søk etter båt')} />
-            {canPlan(me.data) && (
-              <button type="button" className="btn btn-w" onClick={() => setShowNew(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 46 }}>
-                <Plus size={16} strokeWidth={2.2} />{tr('Nytt anløp')}
-              </button>
+            <Segmented<View> label={tr('Visning')} value={view} onChange={setView} options={[{ value: 'anlop', label: tr('Båter') }, { value: 'ordre', label: tr('Salgsordre') }]} />
+            {view === 'anlop' && (
+              <Segmented<Filter> label={tr('Periode')} value={filter} onChange={setFilter}
+                options={[{ value: 'idag', label: tr('I dag') }, { value: 'uke', label: tr('Neste 7 dager') }, { value: 'kollisjon', label: tr('Kollisjoner') }]} />
             )}
+            <SearchBox value={q} onChange={setQ} placeholder={tr('Båt, SO eller kunde')} label={tr('Søk etter båt, SO-nummer eller kunde')} />
+            <button type="button" className="btn btn-w" onClick={() => { openSo(null); setShowNew(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 46 }}>
+              <Plus size={16} strokeWidth={2.2} />{tr('Ny SO')}
+            </button>
           </div>
         </div>
 
-        {calls.isPending && <Loading />}
-        {/* Én boks per dag, som på Biler. Anløp uten klokkeslett står sist i dagen. */}
-        {days.map(d => {
-          const items = visible.filter(c => c.service_date === d)
-            .sort((x, y) => Number(!x.time_known) - Number(!y.time_known) || x.eta.localeCompare(y.eta));
-          const tonnes = items.reduce((t, c) => t + c.tonnes_in + c.tonnes_out, 0);
-          return (
-            <section key={d} aria-label={dayHeading(d, today)} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-                <span className="eyebrow">{dayHeading(d, today)}</span>
-                <span className="muted n" style={{ fontSize: 13 }}>{tr('{n} anløp', { n: items.length })} · {fr(tonnes)} t</span>
-              </div>
-              <div className="panel-light" style={{ overflowX: 'auto', overflowY: 'hidden' }}>
-                <div className="arow-list">
-                  {items.map((c, i) => <Row key={c.id} call={c} fresh={c.id === fresh} first={i === 0} />)}
-                </div>
-              </div>
-            </section>
-          );
-        })}
-        {calls.isSuccess && !days.length && <p className="empty">{needle ? tr('Ingen anløp matcher søket.') : tr('Ingen kommende anløp.')}</p>}
-        {done > 0 && (
-          <Link to="/kaibok" className="muted" style={{ fontSize: 13 }}>{tr('{n} ferdige anløp i perioden ligger i Kaibok →', { n: done })}</Link>
+        {view === 'ordre' ? (
+          <OrderList orders={orders.data} loading={orders.isPending} needle={needle} selected={soKey} onOpen={openSo} />
+        ) : (
+          <>
+            {calls.isPending && <Loading />}
+            {/* Én boks per dag, som på Biler. Anløp uten klokkeslett står sist i dagen. */}
+            {days.map(d => {
+              const items = visible.filter(c => c.service_date === d)
+                .sort((x, y) => Number(!x.time_known) - Number(!y.time_known) || x.eta.localeCompare(y.eta));
+              const tonnes = items.reduce((t, c) => t + c.tonnes_in + c.tonnes_out, 0);
+              return (
+                <section key={d} aria-label={dayHeading(d, today)} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                    <span className="eyebrow">{dayHeading(d, today)}</span>
+                    <span className="muted n" style={{ fontSize: 13 }}>{tr('{n} anløp', { n: items.length })} · {fr(tonnes)} t</span>
+                  </div>
+                  <div className="panel-light" style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+                    <div className="arow-list">
+                      {items.map((c, i) => <Row key={c.id} call={c} first={i === 0} onSo={openSo} onOpen={() => nav(`/?id=${c.id}`)} />)}
+                    </div>
+                  </div>
+                </section>
+              );
+            })}
+            {calls.isSuccess && !days.length && <p className="empty">{needle ? tr('Ingen anløp matcher søket.') : tr('Ingen kommende anløp.')}</p>}
+            {done > 0 && (
+              <Link to="/kaibok" className="muted" style={{ fontSize: 13 }}>{tr('{n} ferdige anløp i perioden ligger i Kaibok →', { n: done })}</Link>
+            )}
+          </>
         )}
       </div>
 
-      {showNew && (
-        <NewCallDrawer onClose={() => setShowNew(false)} existing={list}
-          onCreated={c => { setShowNew(false); setFilter('uke'); setFresh(c.id); }} />
+      {soKey ? (
+        <OrderPanel id={soKey} onClose={() => openSo(null)} onOpenCall={id => nav(`/?id=${id}`)} />
+      ) : showNew && (
+        <NewOrderDrawer initialCall={params.get('anlop') ?? undefined} onClose={() => setShowNew(false)} onCreated={o => { setShowNew(false); openSo(o.so_number); }} />
       )}
     </Page>
   );
 }
 
-function Row({ call: c, fresh, first }: { call: PortCallView; fresh: boolean; first: boolean }) {
+function Row({ call: c, first, onSo, onOpen }: { call: PortCallView; first: boolean; onSo: (so: string) => void; onOpen: () => void }) {
   return (
-    <Link to={`/?id=${c.id}`} className="arow arow-link" aria-label={`${c.boat.name}, ${timeRange(c)} – ${tr('åpne i kartet')}`}
-      style={{ borderTop: first ? 'none' : '1px solid rgba(var(--tint), .06)', ...(fresh ? { background: 'rgba(128,239,222,.1)' } : c.status === 'ferdig' ? { opacity: .5 } : {}) }}>
+    <div className="arow arow-link" onClick={onOpen} style={{ cursor: 'pointer', borderTop: first ? 'none' : '1px solid rgba(var(--tint), .06)' }}>
       <span className="n" style={c.time_known ? { fontSize: 15 } : { fontSize: 13, color: 'var(--fg-45)' }}>{timeRange(c)}</span>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{ fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          {c.boat.name}
-          {fresh && <span style={{ fontSize: 11, borderRadius: 999, padding: '1px 8px', background: '#80EFDE', color: '#1A231E' }}>{tr('Ny')}</span>}
-        </span>
+        <Link to={`/?id=${c.id}`} onClick={e => e.stopPropagation()} aria-label={`${c.boat.name}, ${timeRange(c)} – ${tr('åpne i kartet')}`}
+          style={{ fontSize: 16, color: 'inherit', textDecoration: 'none' }}>{c.boat.name}</Link>
         <span style={{ fontSize: 13, color: 'var(--fg-55)', display: 'flex', gap: 6, alignItems: 'center' }}>
           {typeLabel(c.type)}<span aria-hidden="true">·</span><QuayMark quay={c.quay} compact />
         </span>
       </span>
-      <span style={{ fontSize: 14, color: 'var(--fg-75)' }}>{goodsShort(c.goods) || '–'}</span>
+      {/* SO-ene i lasterekkefølge. */}
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+        {c.orders.map(o => (
+          <span key={o.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 14, minWidth: 0 }}>
+            {c.orders.length > 1 && <span className="n" style={{ fontSize: 11, color: 'var(--fg-45)', width: 12 }}>{o.load_seq}.</span>}
+            <button type="button" onClick={e => { e.stopPropagation(); onSo(o.so_number); }}
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--teal)', font: 'inherit', flex: 'none' }}><SoNo n={o.so_number} /></button>
+            <span style={{ color: 'var(--fg-75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customer} · {goodsShort(o.goods)}</span>
+          </span>
+        ))}
+        {!c.orders.length && <span style={{ fontSize: 13, color: 'var(--fg-45)' }}>{tr('Ingen salgsordre ennå')}</span>}
+      </span>
       <span style={{ fontSize: 14, color: 'var(--fg-75)' }}>
         {c.responsible && <>{c.responsible.short_name}<span style={{ color: 'var(--fg-45)' }}> · </span></>}
         <span style={{ color: c.responsible ? 'var(--fg-45)' : undefined }}>{c.crew.length === 1 ? tr('1 rolle') : tr('{n} roller', { n: c.crew.length })}</span>
@@ -117,254 +144,50 @@ function Row({ call: c, fresh, first }: { call: PortCallView; fresh: boolean; fi
         <StatusBadge status={c.status} basis={c.status_basis} />
         <CallIssues call={c} />
       </span>
-    </Link>
-  );
-}
-
-// ---------------------------------------------------------------- nytt anløp
-
-type Line = { sku_id: string; quantity: string };
-
-const skuLabel = (name: string, s: Sku) =>
-  s.unit === 'BB' ? `${name} – BB` : `${name} – 25 kg × ${s.bags_per_unit} · ${s.pallet_type === 'srs' ? tr('SRS-pall') : tr('Europall')}`;
-
-function NewCallDrawer({ onClose, onCreated, existing }: { onClose: () => void; onCreated: (c: PortCallView) => void; existing: PortCallView[] }) {
-  const me = useMe();
-  const boats = useBoats();
-  const quays = useQuays();
-  const products = useProducts();
-  const users = useUsers();
-  const create = useCreatePortCall();
-  const today = todayOslo();
-
-  const sellers = (users.data ?? []).filter(u => u.roles.includes('salg'));
-  const [boatId, setBoatId] = useState('');
-  const [type, setType] = useState<'levering' | 'henting'>('levering');
-  const [quayId, setQuayId] = useState('');
-  const [date, setDate] = useState(today);
-  // Klokkeslett er sjelden kjent ved planlegging – som regel først ca. en time før båten kommer.
-  const [timeKnown, setTimeKnown] = useState(false);
-  const [eta, setEta] = useState('12:00');
-  const [etd, setEtd] = useState('15:00');
-  const [lines, setLines] = useState<Line[]>([{ sku_id: '', quantity: '200' }]);
-  const [roles, setRoles] = useState<Record<CrewRole, number>>({ truck: 0, anhuker: 0, kaikran: 0 });
-  const [crane, setCrane] = useState(true);
-  const [sellerId, setSellerId] = useState('');
-  const [check, setCheck] = useState<{ collisions: CollisionView[] } | null>(null);
-  const [checkError, setCheckError] = useState<string | null>(null);
-
-  // Standardvalg når oppslagene er lastet.
-  const boatList = useMemo(() => [...(boats.data ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'nb')), [boats.data]);
-  const boat = boatList.find(b => b.id === boatId) ?? boatList[0];
-  const quayList = quays.data ?? [];
-  const ownQuays = quayList.filter(q => !q.company);
-  const partnerQuays = quayList.filter(q => q.company);
-  const quay = quayId || quayList[0]?.id || '';
-  const seller = sellerId || (me.data?.roles.includes('salg') ? me.data.id : sellers[0]?.id ?? '');
-  const allSkus = (products.data ?? []).flatMap(p => p.skus.map(s => ({ ...s, name: p.name })));
-  const goods = lines.map(l => ({ sku: allSkus.find(s => s.id === (l.sku_id || allSkus[0]?.id)), qty: Number(l.quantity) || 0 }));
-
-  const etaIso = timeKnown ? osloToUtc(date, eta || '00:00') : osloToUtc(date, 0);
-  const etdIso = timeKnown ? osloToUtc(date, etd || '00:00') : osloToUtc(date, 23 * 60 + 59);
-  const timesOk = !timeKnown || (/^\d{2}:\d{2}$/.test(eta) && /^\d{2}:\d{2}$/.test(etd) && etdIso > etaIso);
-  const crew = CREW_ROLES.flatMap(r => Array.from({ length: roles[r] }, () => ({ crew_role: r })));
-  const total = crew.length;
-
-  const draft: PortCallCreateInput | null = boat && quay && timesOk ? {
-    boat_id: boat.id, type, quay_id: quay, eta: etaIso, etd: etdIso, time_known: timeKnown, boat_crane: crane, seller_id: seller || null,
-    goods: goods.filter(g => g.sku && g.qty > 0).map(g => ({ sku_id: g.sku!.id, quantity: g.qty })),
-    crew: crew.map(s => ({ ...s, user_id: null })),
-  } : null;
-
-  // Kollisjonssjekk mot API-et mens skjemaet fylles ut.
-  const key = JSON.stringify(draft && { ...draft, goods: [] });
-  useEffect(() => {
-    if (!draft) { setCheck(null); return; }
-    const t = setTimeout(() => {
-      api<{ collisions: CollisionView[] }>('/port-calls/check', { body: draft })
-        .then(r => { setCheck(r); setCheckError(null); })
-        .catch(e => setCheckError(errorText(e)));
-    }, 350);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-
-  const applySuggestion = (s: CollisionView['suggestions'][number]) => {
-    if (s.kind === 'move_quay') setQuayId(s.quay_id);
-    else { setTimeKnown(true); setEta(hmFromIso(s.eta)); setEtd(hmFromIso(s.etd)); }
-  };
-
-  const tonnes = goods.reduce((sum, g) => sum + (g.sku ? (g.qty * g.sku.kg_per_unit) / 1000 : 0), 0);
-  const canSave = !!draft && (draft.goods?.length ?? 0) > 0 && !create.isPending;
-  const save = () => draft && canSave && create.mutate(draft, { onSuccess: onCreated });
-
-  const f = boat ? FLAG_STYLE[boat.flag] : null;
-  const dates = Array.from({ length: 21 }, (_, i) => addDays(today, i));
-  const boatsById = new Map(existing.map(c => [c.id, c.boat.name]));
-
-  return (
-    <aside className="glass scroll drawer" aria-labelledby="new-h"
-      style={{ flex: '1 1 380px', maxWidth: 420, padding: 20, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 'calc(100vh - 120px)', marginTop: 4, position: 'sticky', top: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 id="new-h" style={{ margin: 0, fontSize: 24, fontWeight: 300 }}>{tr('Nytt anløp')}</h2>
-        <button type="button" className="icon-btn pill" onClick={onClose} aria-label={tr('Lukk skjema')} style={{ width: 40, height: 40 }}><Close size={16} /></button>
-      </div>
-
-      <label className="field"><span>{tr('Båt')}</span>
-        <select className="inp" value={boat?.id ?? ''} onChange={e => setBoatId(e.target.value)}>
-          {boatList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-      </label>
-      {boat && f && (
-        <div className={boat.flag === 'red' ? 'alert-red' : boat.flag === 'yellow' ? 'alert-yellow' : ''}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, borderRadius: 16, padding: '10px 12px', ...(boat.flag === 'green' || boat.flag === 'none' ? { background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)' } : {}) }}>
-          <span className="dot" style={{ width: 8, height: 8, background: f.dot }} />
-          <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.35, fontSize: 13 }}>
-            <span>{tx(FLAG_LABEL[boat.flag])}{boat.rating_count ? ` · ${tr('{snitt} av 5', { snitt: fr(boat.avg_total) })} · ${tr('{n} kaibøker', { n: boat.rating_count })}` : ''}</span>
-            <span style={{ color: 'rgba(var(--tint), .65)' }}>{boat.note ?? tx(boat.flag_reason)}</span>
-          </span>
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-        <div className="field"><span>{tr('Type')}</span>
-          <Segmented label={tr('Type')} value={type} onChange={setType} stretch options={[{ value: 'levering', label: tr('Levering') }, { value: 'henting', label: tr('Henting') }]} />
-        </div>
-        <div className="field"><span>{tr('Kai')}</span>
-          {partnerQuays.length === 0 ? (
-            <Segmented label={tr('Kai')} value={quay} onChange={setQuayId} stretch
-              options={ownQuays.map(qy => ({ value: qy.id, label: quayTitle(qy) }))} />
-          ) : (
-            <select className="inp" value={quay} onChange={e => setQuayId(e.target.value)} aria-label={tr('Kai')}>
-              <optgroup label={tr('Våre kaier')}>
-                {ownQuays.map(qy => <option key={qy.id} value={qy.id}>{quayTitle(qy)}</option>)}
-              </optgroup>
-              <optgroup label={tr('Nabo – samarbeid')}>
-                {partnerQuays.map(qy => <option key={qy.id} value={qy.id}>{quayLabel(qy)}</option>)}
-              </optgroup>
-            </select>
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <label className="field"><span>{tr('Dag')}</span>
-          <select className="inp" value={date} onChange={e => setDate(e.target.value)}>
-            {dates.map(d => <option key={d} value={d}>{dayShort(d)}</option>)}
-          </select>
-        </label>
-        <div className="field"><span>{tr('Klokkeslett')}</span>
-          <Segmented label={tr('Klokkeslett')} value={timeKnown ? 'ja' : 'nei'} onChange={v => setTimeKnown(v === 'ja')} stretch
-            options={[{ value: 'nei', label: tr('Ikke kjent') }, { value: 'ja', label: tr('Kjent') }]} />
-        </div>
-      </div>
-      {timeKnown ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <label className="field"><span>ETA</span><input className="inp n" type="time" value={eta} onChange={e => setEta(e.target.value)} /></label>
-          <label className="field"><span>ETD</span><input className="inp n" type="time" value={etd} onChange={e => setEtd(e.target.value)} /></label>
-        </div>
-      ) : (
-        <span className="sub" style={{ marginTop: -6 }}>{tr('Tiden kan settes på anløpet når den er kjent. Kollisjoner sjekkes da.')}</span>
-      )}
-
-      <div className="field"><span>{tr('Varer')}</span>
-        {lines.map((l, i) => {
-          const g = goods[i];
-          return (
-            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <label style={{ flex: 1 }}><span className="sr">{tr('Produkt')}</span>
-                  <select className="inp" value={l.sku_id || allSkus[0]?.id || ''} onChange={e => setLines(lines.map((x, j) => (j === i ? { ...x, sku_id: e.target.value } : x)))}>
-                    <optgroup label={tr('Bigbag (BB) 1000 kg')}>
-                      {allSkus.filter(s => s.unit === 'BB').map(s => <option key={s.id} value={s.id}>{skuLabel(s.name, s)}</option>)}
-                    </optgroup>
-                    <optgroup label={tr('Sekk på pall')}>
-                      {allSkus.filter(s => s.unit === 'pall').map(s => <option key={s.id} value={s.id}>{skuLabel(s.name, s)}</option>)}
-                    </optgroup>
-                  </select>
-                </label>
-                {lines.length > 1 && (
-                  <button type="button" className="icon-btn pill" aria-label={tr('Fjern varelinje')} onClick={() => setLines(lines.filter((_, j) => j !== i))} style={{ width: 44, height: 44 }}><Close size={14} /></button>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <label style={{ width: 120 }}><span className="sr">{tr('Antall')}</span>
-                  <input className="inp n" type="number" min={1} inputMode="numeric" value={l.quantity} placeholder={tr('Antall')}
-                    onChange={e => setLines(lines.map((x, j) => (j === i ? { ...x, quantity: e.target.value } : x)))} />
-                </label>
-                <span style={{ fontSize: 14, color: 'rgba(var(--tint), .7)' }}>
-                  {g.sku?.unit === 'pall' ? tr('paller') : 'BB'}{g.sku && g.qty ? ` = ${tr('{n} tonn', { n: nb((g.qty * g.sku.kg_per_unit) / 1000) })}` : ''}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-        <button type="button" className="btn" onClick={() => setLines([...lines, { sku_id: '', quantity: '' }])} style={{ alignSelf: 'flex-start', minHeight: 38, fontSize: 13 }}>
-          + {tr('Legg til vare')}{lines.length > 1 ? ` · ${tr('totalt {n} t', { n: nb(tonnes) })}` : ''}
-        </button>
-      </div>
-
-      <div className="field"><span>{tr('Mannskap (valgfritt – kan legges til senere)')}</span>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {CREW_ROLES.map(r => (
-            <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 48, padding: '2px 4px 2px 14px', borderRadius: 16, background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .06)' }}>
-              <span style={{ flex: 1 }}>{tx(CREW_ROLE_LABEL[r])}</span>
-              <button type="button" className="icon-btn pill" onClick={() => setRoles({ ...roles, [r]: Math.max(0, roles[r] - 1) })} aria-label={tr('Én {rolle} mindre', { rolle: tx(CREW_ROLE_LABEL[r]).toLowerCase() })} style={{ width: 40, height: 40 }}><Minus size={14} strokeWidth={2} /></button>
-              <span className="n" style={{ width: 22, textAlign: 'center', fontSize: 17 }} aria-live="polite">{roles[r]}</span>
-              <button type="button" className="icon-btn pill" onClick={() => setRoles({ ...roles, [r]: Math.min(10, roles[r] + 1) })} aria-label={tr('Én {rolle} til', { rolle: tx(CREW_ROLE_LABEL[r]).toLowerCase() })} style={{ width: 40, height: 40 }}><Plus size={14} strokeWidth={2} /></button>
-            </div>
-          ))}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, padding: '0 6px', fontSize: 14, cursor: 'pointer' }}>
-            <input type="checkbox" checked={crane} onChange={e => setCrane(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#F2F5F3' }} />
-            {tr('Båtens egen kran brukes')}
-          </label>
-          <span style={{ fontSize: 12, color: 'var(--fg-55)', padding: '0 6px' }}>
-            {total === 1 ? tr('Én rolle: personen som settes på blir automatisk ansvarlig.') : total > 1 ? tr('Navn og ansvarlig settes av produksjonen.') : tr('Legg til minst én rolle.')}
-          </span>
-        </div>
-      </div>
-
-      <label className="field"><span>{tr('Selger')}</span>
-        <select className="inp" value={seller} onChange={e => setSellerId(e.target.value)}>
-          {sellers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-        </select>
-      </label>
-
-      <CheckBox timesOk={timesOk} check={check} error={checkError} boats={boatsById} onApply={applySuggestion} />
-      {create.isError && <div className="error-box" role="alert">{errorText(create.error)}</div>}
-
-      <button type="button" className="btn btn-w" onClick={save} disabled={!canSave} style={{ minHeight: 52 }}>
-        {create.isPending ? tr('Legger inn …') : tr('Legg inn anløp')}
-      </button>
-    </aside>
-  );
-}
-
-function CheckBox({ timesOk, check, error, boats, onApply }: {
-  timesOk: boolean; check: { collisions: CollisionView[] } | null; error: string | null; boats: Map<string, string>;
-  onApply: (s: CollisionView['suggestions'][number]) => void;
-}) {
-  let cls = 'alert-ok', title = tr('Ingen kollisjoner – kai og mannskap er ledig');
-  if (!timesOk) { cls = 'alert-yellow'; title = tr('ETD må være etter ETA'); }
-  else if (error) { cls = 'alert-yellow'; title = error; }
-  else if (!check) { cls = ''; title = tr('Sjekker kai og mannskap …'); }
-  else if (check.collisions.length) { cls = 'alert-red'; title = tr('Kolliderer med eksisterende anløp'); }
-  const suggestions = timesOk && check ? check.collisions.flatMap(c => c.suggestions.filter(s => s.call_id === 'draft')) : [];
-  const unique = suggestions.filter((s, i) => suggestions.findIndex(x => x.text === s.text) === i);
-  return (
-    <div role="status" className={cls}
-      style={{ borderRadius: 16, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14, ...(cls ? {} : { background: 'rgba(var(--tint), .04)', border: '1px solid rgba(var(--tint), .07)' }) }}>
-      <span>{title}</span>
-      {timesOk && check?.collisions.map((c, i) => (
-        <span key={i} style={{ fontSize: 13, color: 'rgba(var(--tint), .72)' }}>
-          {c.with.map(w => w.boat_name || boats.get(w.id)).filter(Boolean).join(', ') || tr('Kapasitet')}: {tx(c.text)}
-        </span>
-      ))}
-      {unique.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-          {unique.map(s => <button key={s.text} type="button" className="btn" onClick={() => onApply(s)} style={{ minHeight: 36, fontSize: 13, padding: '0 12px' }}>{tx(s.text)}</button>)}
-        </div>
-      )}
     </div>
+  );
+}
+
+/** Alle åpne SO-er: først de som venter på båt, så de som er på båt (etter dag), så nylig ferdige/kansellerte. */
+function OrderList({ orders, loading, needle, selected, onOpen }: {
+  orders: OrderView[] | undefined; loading: boolean; needle: string; selected: string | null; onOpen: (so: string) => void;
+}) {
+  const all = (orders ?? []).filter(o => !needle || o.so_number.includes(needle) || o.customer.toLowerCase().includes(needle)
+    || o.calls.some(c => c.boat_name.toLowerCase().includes(needle)));
+  const day = (o: OrderView) => o.calls[0]?.service_date ?? o.wanted_date ?? '9999';
+  const groups: [string, OrderView[]][] = [
+    [tr('Venter på båt'), all.filter(o => o.status === 'venter' || o.status === 'delvis')],
+    [tr('På båt'), all.filter(o => o.status === 'planlagt').sort((a, b) => day(a).localeCompare(day(b)))],
+    [tr('Ferdig eller kansellert siste 14 dager'), all.filter(o => o.status === 'ferdig' || o.status === 'kansellert')],
+  ];
+  if (loading) return <Loading />;
+  if (!all.length) return <p className="empty">{needle ? tr('Ingen SO-er matcher søket.') : tr('Ingen åpne salgsordre.')}</p>;
+  return (
+    <>
+      {groups.filter(([, l]) => l.length).map(([title, l]) => (
+        <section key={title} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span className="eyebrow">{title} · {l.length}</span>
+          <div className="panel-light" style={{ overflow: 'hidden' }}>
+            {l.map((o, i) => (
+              <button key={o.id} type="button" className="orow" onClick={() => onOpen(o.so_number)} aria-pressed={selected === o.so_number || selected === o.id}
+                style={{ borderTop: i ? '1px solid rgba(var(--tint), .06)' : 'none', ...(selected === o.so_number ? { background: 'rgba(128,239,222,.12)' } : {}) }}>
+                <SoNo n={o.so_number} style={{ fontSize: 15 }} />
+                <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span style={{ fontSize: 15 }}>{o.customer}</span>
+                  <span style={{ fontSize: 13, color: 'var(--fg-55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.lines.map(x => tx(x.label)).join(' · ')}</span>
+                </span>
+                <span style={{ fontSize: 14, color: 'var(--fg-75)' }}>
+                  {o.calls.length
+                    ? o.calls.map(c => <span key={c.id} style={{ display: 'block' }}>{c.boat_name} · {dayShort(c.service_date)} {c.time_known ? timeRange(c) : ''}</span>)
+                    : <span style={{ color: 'var(--fg-55)' }}>{o.wanted_date ? tr('Ønsket {dag}', { dag: dayShort(o.wanted_date) }) : '–'}</span>}
+                </span>
+                <span className="n hide-s" style={{ fontSize: 14 }}>{fr(o.tonnes)} t</span>
+                <OrderStatusBadge status={o.status} />
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
   );
 }

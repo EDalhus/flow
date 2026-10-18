@@ -123,7 +123,7 @@ export const requireRole = (...roles: UserRole[]) =>
 
 // Hvem kan gjøre hva.
 export const CAN = {
-  plan: ['salg', 'produksjon'] as UserRole[],        // opprette/endre/avlyse anløp
+  plan: ['salg', 'produksjon', 'kaiarbeider'] as UserRole[], // opprette/endre/avlyse anløp og ordre (alle med tilgang)
   crew: ['produksjon'] as UserRole[],                 // sette navn og ansvarlig, vakter
   quayLog: ['kaiarbeider', 'produksjon'] as UserRole[], // levere kaibok
   boats: ['salg', 'produksjon'] as UserRole[],        // redigere båter og agenter

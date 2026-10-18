@@ -1,4 +1,4 @@
-import type { CollisionView, GoodsView, PortCallView, SuggestionView, UserRef } from '../../shared/api.ts';
+import type { CallOrder, CollisionView, GoodsView, PortCallView, SuggestionView, UserRef } from '../../shared/api.ts';
 import {
   collisionsFor, describeCollision, findCollisions, suggest,
   type CapacityFor, type Collision, type CollisionCall, type Suggestion,
@@ -22,9 +22,10 @@ type CallRow = {
   ais_fetched_at: string | null; ais_sog: number | null; ais_in_geofence: number | null;
 };
 type GoodsRow = {
-  id: string; port_call_id: string; sku_id: string; product_id: string; product_name: string; unit: 'BB' | 'pall';
+  id: string; port_call_id: string; sales_order_id: string; sku_id: string; product_id: string; product_name: string; unit: 'BB' | 'pall';
   pallet_type: 'europall' | 'srs' | null; bags_per_unit: number | null; kg_per_unit: number; quantity: number; direction: Direction;
 };
+type OrderRow = { port_call_id: string; sales_order_id: string; so_number: string; customer: string; load_seq: number; split: number };
 type CrewRow = { id: string; port_call_id: string; crew_role: CrewRole; user_id: string | null; name: string | null; short_name: string | null; initials: string | null };
 
 /** Filter for hvilke anløp som lastes. Importert historikk vises aldri i planleggingen. */
@@ -44,10 +45,18 @@ export function goodsLabel(g: Pick<GoodsRow, 'quantity' | 'unit' | 'product_name
   return `${base} · 25 kg × ${g.bags_per_unit} · ${g.pallet_type === 'srs' ? 'SRS-pall' : 'Europall'}`;
 }
 
-/** Laster anløp med varer, mannskap og status. Kollisjoner fylles inn av withCollisions(). */
+/** Varelinje fra databasen til visning. */
+export const goodsView = (x: GoodsRow): GoodsView => ({
+  id: x.id, sku_id: x.sku_id, product_id: x.product_id, product_name: x.product_name, unit: x.unit,
+  pallet_type: x.pallet_type, bags_per_unit: x.bags_per_unit, quantity: x.quantity, direction: x.direction,
+  tonnes: (x.quantity * x.kg_per_unit) / 1000, label: goodsLabel(x), sales_order_id: x.sales_order_id,
+});
+export type { GoodsRow };
+
+/** Laster anløp med salgsordre, varer, mannskap og status. Kollisjoner fylles inn av withCollisions(). */
 export async function loadCalls(db: D1Database, filter: CallFilter, settings: Settings, now = new Date()): Promise<PortCallView[]> {
   const w = where(filter);
-  const [calls, goods, crew] = await db.batch([
+  const [calls, goods, crew, orders] = await db.batch([
     db.prepare(`
       SELECT pc.id, pc.type, pc.eta, pc.etd, pc.time_known, pc.service_date, pc.boat_crane, pc.notes, pc.version,
              pc.arrived_at, pc.departed_at, pc.completed_at, pc.cancelled_at,
@@ -68,9 +77,9 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
       WHERE ${w.sql}
       ORDER BY pc.eta`).bind(...w.params),
     db.prepare(`
-      SELECT g.id, g.port_call_id, g.sku_id, s.product_id, p.name AS product_name, s.unit, s.pallet_type, s.bags_per_unit,
+      SELECT g.id, g.port_call_id, g.sales_order_id, g.sku_id, s.product_id, p.name AS product_name, s.unit, s.pallet_type, s.bags_per_unit,
              s.kg_per_unit, g.quantity, g.direction
-      FROM port_call_goods g JOIN skus s ON s.id = g.sku_id JOIN products p ON p.id = s.product_id
+      FROM order_lines g JOIN skus s ON s.id = g.sku_id JOIN products p ON p.id = s.product_id
       WHERE g.port_call_id IN (SELECT pc.id FROM port_calls pc WHERE ${w.sql})
       ORDER BY g.sort`).bind(...w.params),
     db.prepare(`
@@ -78,17 +87,32 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
       FROM crew_slots cs LEFT JOIN users u ON u.id = cs.user_id
       WHERE cs.port_call_id IN (SELECT pc.id FROM port_calls pc WHERE ${w.sql})
       ORDER BY cs.sort`).bind(...w.params),
+    db.prepare(`
+      SELECT o.port_call_id, o.sales_order_id, so.so_number, so.customer, o.load_seq,
+             EXISTS (SELECT 1 FROM order_lines l WHERE l.sales_order_id = o.sales_order_id AND l.port_call_id IS NOT o.port_call_id) AS split
+      FROM port_call_orders o JOIN sales_orders so ON so.id = o.sales_order_id
+      WHERE o.port_call_id IN (SELECT pc.id FROM port_calls pc WHERE ${w.sql})
+      ORDER BY o.load_seq, so.so_number`).bind(...w.params),
   ]);
 
   const goodsBy = Map.groupBy(goods.results as GoodsRow[], g => g.port_call_id);
   const crewBy = Map.groupBy(crew.results as CrewRow[], s => s.port_call_id);
+  const ordersBy = Map.groupBy(orders.results as OrderRow[], o => o.port_call_id);
 
   return (calls.results as CallRow[]).map(r => {
-    const g: GoodsView[] = (goodsBy.get(r.id) ?? []).map(x => ({
-      id: x.id, sku_id: x.sku_id, product_id: x.product_id, product_name: x.product_name, unit: x.unit,
-      pallet_type: x.pallet_type, bags_per_unit: x.bags_per_unit, quantity: x.quantity, direction: x.direction,
-      tonnes: (x.quantity * x.kg_per_unit) / 1000, label: goodsLabel(x),
-    }));
+    const g: GoodsView[] = (goodsBy.get(r.id) ?? []).map(goodsView);
+    // Lasterekkefølge: SO-ene i rekkefølge, nummerert 1, 2, 3 … uansett hull i load_seq.
+    const callOrders: CallOrder[] = (ordersBy.get(r.id) ?? []).map((o, i) => {
+      const og = g.filter(x => x.sales_order_id === o.sales_order_id);
+      return {
+        id: o.sales_order_id, so_number: o.so_number, customer: o.customer, load_seq: i + 1,
+        tonnes: og.reduce((s, x) => s + x.tonnes, 0), goods: og, split: !!o.split,
+      };
+    });
+    // Goods i lasterekkefølge.
+    const seq = new Map(callOrders.map(o => [o.id, o.load_seq]));
+    g.sort((a, b) => (seq.get(a.sales_order_id) ?? 99) - (seq.get(b.sales_order_id) ?? 99));
+    const dirs = new Set(g.map(x => x.direction));
     const slots = crewBy.get(r.id) ?? [];
     const st = deriveStatus(
       {
@@ -102,7 +126,7 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
     );
     const flag = effectiveFlag(r);
     return {
-      id: r.id, type: r.type, eta: r.eta, etd: r.etd, time_known: !!r.time_known, service_date: r.service_date, boat_crane: !!r.boat_crane,
+      id: r.id, type: dirs.size > 1 ? 'begge' : dirs.has('ut') ? 'henting' : dirs.has('inn') ? 'levering' : r.type, eta: r.eta, etd: r.etd, time_known: !!r.time_known, service_date: r.service_date, boat_crane: !!r.boat_crane,
       notes: r.notes, version: r.version,
       boat: {
         id: r.boat_id, name: r.boat_name, flag, flag_reason: r.flag_override ? r.flag_override_reason : r.flag_auto_reason,
@@ -113,6 +137,7 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
       responsible: ref(r.resp_id, r.resp_name, r.resp_short, r.resp_initials),
       responsible_auto: slots.length === 1,
       goods: g,
+      orders: callOrders,
       tonnes_in: g.filter(x => x.direction === 'inn').reduce((s, x) => s + x.tonnes, 0),
       tonnes_out: g.filter(x => x.direction === 'ut').reduce((s, x) => s + x.tonnes, 0),
       crew: slots.map(s => ({ id: s.id, crew_role: s.crew_role, user: ref(s.user_id, s.name, s.short_name, s.initials) })),
