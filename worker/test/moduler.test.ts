@@ -50,9 +50,17 @@ describe('produksjon: beregnet silo', () => {
 
 describe('API: biler, bulk og produksjon', () => {
   it('biler: opprett, marker hentet og angre', async () => {
-    const res = await api('/trucks', { as: 'kari', body: { customer: 'Fiskebruket AS', carrier: 'Tafjord Transport', expected_date: '2030-04-02', goods: [{ sku_id: 's_hav_eur', quantity: 24 }] } });
+    const truck = { customer: 'Fiskebruket AS', carrier: 'Tafjord Transport', expected_date: '2030-04-02', goods: [{ sku_id: 's_hav_eur', quantity: 24 }] };
+    expect((await api('/trucks', { as: 'kari', body: truck })).status).toBe(400);
+    expect((await api('/trucks', { as: 'kari', body: { ...truck, so_number: '40245' } })).status).toBe(400);
+    const res = await api('/trucks', { as: 'kari', body: { ...truck, so_number: '2040245' } });
     expect(res.status).toBe(201);
-    expect(res.json).toMatchObject({ customer: 'Fiskebruket AS', tonnes: 24, picked_up_at: null });
+    expect(res.json).toMatchObject({ customer: 'Fiskebruket AS', so_number: '2040245', tonnes: 24, picked_up_at: null });
+    // SO-nummeret brukes bare én gang, på bil eller båt.
+    expect((await api('/trucks', { as: 'kari', body: { ...truck, so_number: '2040245' } })).status).toBe(409);
+    const boat = await api('/orders', { body: { so_number: '2040245', customer: 'Y', lines: [{ sku_id: 's_hav_bb', quantity: 1, direction: 'ut' }] } });
+    expect(boat).toMatchObject({ status: 409, json: { error: 'SO 2040245 finnes allerede (Fiskebruket AS).' } });
+    expect((await api('/search?q=2040245')).json.trucks[0].so_number).toBe('2040245');
     const picked = await api(`/trucks/${res.json.id}/pickup`, { as: 'ola', body: {} });
     expect(picked.json.picked_up_by.id).toBe('u_ola');
     expect((await api(`/trucks/${res.json.id}/pickup`, { as: 'ola', body: { undo: true } })).json.picked_up_at).toBeNull();

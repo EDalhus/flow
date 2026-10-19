@@ -9,6 +9,7 @@ import { useCreateTruckOrder, useMe, usePickupTruck, useProducts, useTruckOrders
 import { canPlan, canQuayLog } from '../lib/roles.ts';
 import './moduler.css';
 import { tr, tx } from '../lib/i18n.ts';
+import { SoNo } from '../components/Orders.tsx';
 
 type Filter = 'aapne' | 'alle';
 
@@ -39,9 +40,11 @@ export function BilerPage() {
         {list.map(o => (
           <div key={o.id} className="mrow" style={o.picked_up_at ? { opacity: .55 } : undefined}>
             <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              <span style={{ fontSize: 17 }}>{o.customer}</span>
+              <span style={{ fontSize: 17, display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+                <SoNo n={o.so_number} style={{ color: 'var(--teal)', fontSize: 15 }} />{o.customer}
+              </span>
               <span style={{ fontSize: 13, color: 'var(--fg-55)' }}>
-                {[o.carrier, o.reg_no, o.reference && tr('Ordre {nr}', { nr: o.reference })].filter(Boolean).join(' · ') || tr('Transportør ikke satt')}
+                {[o.carrier, o.reg_no].filter(Boolean).join(' · ') || tr('Transportør ikke satt')}
               </span>
             </span>
             <span style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 14 }}>
@@ -113,7 +116,7 @@ function NewTruckDrawer({ onClose }: { onClose: () => void }) {
   const [customer, setCustomer] = useState('');
   const [carrier, setCarrier] = useState('');
   const [regNo, setRegNo] = useState('');
-  const [reference, setReference] = useState('');
+  const [so, setSo] = useState('');
   const [date, setDate] = useState(today);
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<Line[]>([{ sku_id: '', quantity: '24' }]);
@@ -122,10 +125,11 @@ function NewTruckDrawer({ onClose }: { onClose: () => void }) {
   const label = (s: (typeof skus)[number]) => (s.unit === 'BB' ? `${s.name} – BB` : `${s.name} – ${tr('pall')} ${s.bags_per_unit} × ${s.bag_kg} kg`);
   const goods = lines.map(l => ({ sku: skus.find(s => s.id === (l.sku_id || skus[0]?.id)), qty: Number(l.quantity) || 0 }));
   const tonnes = goods.reduce((t, g) => t + (g.sku ? (g.qty * g.sku.kg_per_unit) / 1000 : 0), 0);
-  const valid = customer.trim() && goods.some(g => g.sku && g.qty > 0);
+  const soOk = /^20\d{5}$/.test(so);
+  const valid = soOk && customer.trim() && goods.some(g => g.sku && g.qty > 0);
 
   const save = () => valid && create.mutate({
-    customer: customer.trim(), carrier: carrier || null, reg_no: regNo || null, reference: reference || null, expected_date: date, notes: notes || null,
+    customer: customer.trim(), carrier: carrier || null, reg_no: regNo || null, so_number: so, expected_date: date, notes: notes || null,
     goods: goods.filter(g => g.sku && g.qty > 0).map(g => ({ sku_id: g.sku!.id, quantity: g.qty })),
   }, { onSuccess: onClose });
 
@@ -136,19 +140,23 @@ function NewTruckDrawer({ onClose }: { onClose: () => void }) {
         <h2 id="truck-h" style={{ margin: 0, fontSize: 24, fontWeight: 300 }}>{tr('Ny henting')}</h2>
         <button type="button" className="icon-btn pill" onClick={onClose} aria-label={tr('Lukk skjema')} style={{ width: 40, height: 40 }}><Close size={16} /></button>
       </div>
-      <label className="field"><span>{tr('Kunde')}</span><input className="inp" value={customer} onChange={e => setCustomer(e.target.value)} autoFocus /></label>
+      <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10 }}>
+        <label className="field"><span>{tr('SO-nummer')}</span>
+          <input className="inp n" value={so} onChange={e => setSo(e.target.value.replace(/\D/g, '').slice(0, 7))} inputMode="numeric" placeholder="20XXXXX" autoFocus
+            aria-invalid={!!so && !soOk} style={so && !soOk ? { borderColor: 'var(--bad-fg)' } : undefined} />
+        </label>
+        <label className="field"><span>{tr('Kunde')}</span><input className="inp" value={customer} onChange={e => setCustomer(e.target.value)} /></label>
+      </div>
+      {so && !soOk && <span className="sub" style={{ marginTop: -8, color: 'var(--bad-fg)' }}>{tr('SO-nummeret må være 20 og fem siffer, f.eks. 2043644.')}</span>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <label className="field"><span>{tr('Transportør')}</span><input className="inp" value={carrier} onChange={e => setCarrier(e.target.value)} /></label>
         <label className="field"><span>{tr('Reg.nr.')}</span><input className="inp" value={regNo} onChange={e => setRegNo(e.target.value.toUpperCase())} /></label>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10 }}>
-        <label className="field"><span>{tr('Forventet dag')}</span>
-          <select className="inp" value={date} onChange={e => setDate(e.target.value)}>
-            {Array.from({ length: 30 }, (_, i) => addDays(today, i)).map(d => <option key={d} value={d}>{dayShort(d)}</option>)}
-          </select>
-        </label>
-        <label className="field"><span>{tr('Ordrenr.')}</span><input className="inp" value={reference} onChange={e => setReference(e.target.value)} /></label>
-      </div>
+      <label className="field"><span>{tr('Forventet dag')}</span>
+        <select className="inp" value={date} onChange={e => setDate(e.target.value)}>
+          {Array.from({ length: 30 }, (_, i) => addDays(today, i)).map(d => <option key={d} value={d}>{dayShort(d)}</option>)}
+        </select>
+      </label>
       <div className="field"><span>{tr('Varer')}</span>
         {lines.map((l, i) => (
           <div key={i} style={{ display: 'flex', gap: 6 }}>

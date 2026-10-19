@@ -105,7 +105,7 @@ export function GlobalSearch() {
               )}
               {d && d.trucks.length > 0 && (
                 <Group title={tr('Biler')}>
-                  {d.trucks.map(t => <Item key={t.id} title={t.customer} sub={`${dayRelative(t.expected_date)}${t.reg_no ? ` · ${t.reg_no}` : ''}${t.picked_up ? ` · ${tr('hentet')}` : ''}`} onClick={() => go('/biler')} />)}
+                  {d.trucks.map(t => <Item key={t.id} title={`SO ${t.so_number} · ${t.customer}`} sub={`${dayRelative(t.expected_date)}${t.reg_no ? ` · ${t.reg_no}` : ''}${t.picked_up ? ` · ${tr('hentet')}` : ''}`} onClick={() => go('/biler')} />)}
                 </Group>
               )}
               {d && d.bulk.length > 0 && (

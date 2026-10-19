@@ -428,7 +428,8 @@ export interface TruckOrderView {
   customer: string;
   carrier: string | null;
   reg_no: string | null;
-  reference: string | null;
+  /** SO-nummer fra Dynamics 365. */
+  so_number: string;
   expected_date: string;
   notes: string | null;
   goods: { id: string; sku_id: string; product_name: string; unit: 'BB' | 'pall'; quantity: number; tonnes: number; label: string }[];
@@ -512,7 +513,7 @@ export interface SearchResult {
   boats: { id: string; name: string; mmsi: string | null; flag: Flag }[];
   calls: { id: string; boat_name: string; service_date: string; eta: string; time_known: boolean; type: CallType | 'begge'; status: CallStatus }[];
   orders: { id: string; so_number: string; customer: string; status: OrderStatus; boat_name: string | null; service_date: string | null }[];
-  trucks: { id: string; customer: string; expected_date: string; reg_no: string | null; picked_up: boolean }[];
+  trucks: { id: string; so_number: string; customer: string; expected_date: string; reg_no: string | null; picked_up: boolean }[];
   bulk: { id: string; truck: string; destination: string | null; status: string }[];
   users: { id: string; name: string; title: string | null; phone: string | null }[];
   vessels: ExternalVessel[];

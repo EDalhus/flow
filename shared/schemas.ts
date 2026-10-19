@@ -242,7 +242,8 @@ export const truckOrderCreate = z.object({
   customer: text(120).min(1, 'Skriv inn kunde.'),
   carrier: optionalText(120),
   reg_no: optionalText(16),
-  reference: optionalText(60),
+  /** SO-nummer fra Dynamics 365. */
+  so_number: soNumber,
   expected_date: date,
   notes: optionalText(1000),
   goods: z.array(z.object({ sku_id: id, quantity: z.int().min(1).max(100_000) })).min(1, 'Legg til minst én vare.').max(20),

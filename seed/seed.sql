@@ -4901,16 +4901,16 @@ INSERT INTO notifications (id, user_id, kind, port_call_id, message_id, text, cr
   ('n_00002', 'u_jonas', 'mention', 'pc_a2', 'm_00007', 'Henrik M. nevnte deg · MS Kystlast', '2026-10-16T05:58:00.000Z', NULL),
   ('n_00003', 'u_ola', 'mention', 'pc_a2', 'm_00008', 'Jonas B. nevnte deg · MS Kystlast', '2026-10-16T06:04:00.000Z', NULL),
   ('n_00004', 'u_kari', 'mention', 'pc_a3', 'm_00010', 'Mari L. nevnte deg · Polarstrand', '2026-10-16T05:40:00.000Z', NULL);
-INSERT INTO truck_orders (id, customer, carrier, reg_no, reference, expected_date, notes, created_by, picked_up_at, picked_up_by, cancelled_at, created_at) VALUES
-  ('to_00001', 'Brødrene Sperre', 'Tide Transport', 'SU 41 220', '40290', '2026-10-15', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-12T08:00:00.000Z'),
-  ('to_00002', 'Nergård Sjømat', 'Bring Cargo', 'ZT 88 103', '40549', '2026-10-16', NULL, 'u_kari', '2026-10-16T06:40:00.000Z', 'u_ola', NULL, '2026-10-13T08:00:00.000Z'),
-  ('to_00003', 'Ålesund Fiskeindustri', 'Eget kjøretøy', NULL, '40232', '2026-10-16', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
-  ('to_00004', 'Vartdal Fisk', 'Tide Transport', NULL, '40335', '2026-10-16', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
-  ('to_00005', 'Fjordlaks', 'PostNord', 'EL 12 908', '40742', '2026-10-17', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
-  ('to_00006', 'Myklebust Sjømat', NULL, NULL, '40649', '2026-10-17', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
-  ('to_00007', 'Hessa Seafood', 'Bring Cargo', NULL, '40872', '2026-10-18', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
-  ('to_00008', 'Nergård Sjømat', 'Bring Cargo', NULL, '40129', '2026-10-20', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
-  ('to_00009', 'Brødrene Sperre', 'Tide Transport', NULL, '40500', '2026-10-23', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z');
+INSERT INTO truck_orders (id, customer, carrier, reg_no, so_number, expected_date, notes, created_by, picked_up_at, picked_up_by, cancelled_at, created_at) VALUES
+  ('to_00001', 'Brødrene Sperre', 'Tide Transport', 'SU 41 220', '2029013', '2026-10-15', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-12T08:00:00.000Z'),
+  ('to_00002', 'Nergård Sjømat', 'Bring Cargo', 'ZT 88 103', '2054938', '2026-10-16', NULL, 'u_kari', '2026-10-16T06:40:00.000Z', 'u_ola', NULL, '2026-10-13T08:00:00.000Z'),
+  ('to_00003', 'Ålesund Fiskeindustri', 'Eget kjøretøy', NULL, '2023243', '2026-10-16', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
+  ('to_00004', 'Vartdal Fisk', 'Tide Transport', NULL, '2033530', '2026-10-16', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
+  ('to_00005', 'Fjordlaks', 'PostNord', 'EL 12 908', '2074284', '2026-10-17', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
+  ('to_00006', 'Myklebust Sjømat', NULL, NULL, '2064993', '2026-10-17', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
+  ('to_00007', 'Hessa Seafood', 'Bring Cargo', NULL, '2087294', '2026-10-18', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
+  ('to_00008', 'Nergård Sjømat', 'Bring Cargo', NULL, '2012916', '2026-10-20', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z'),
+  ('to_00009', 'Brødrene Sperre', 'Tide Transport', NULL, '2050031', '2026-10-23', NULL, 'u_kari', NULL, NULL, NULL, '2026-10-13T08:00:00.000Z');
 INSERT INTO truck_order_goods (id, order_id, sku_id, quantity, sort) VALUES
   ('tg_00001', 'to_00001', 's_1_europall', 22, 0),
   ('tg_00002', 'to_00002', 's_1_bb', 24, 0),

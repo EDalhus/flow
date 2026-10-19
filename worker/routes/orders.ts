@@ -7,6 +7,7 @@ import { body, fail, isConstraintError, newId, nowIso } from '../lib/http.ts';
 import { publish } from '../lib/realtime.ts';
 import type { AppEnv, AuthUser } from '../types.ts';
 import { newCallStatements, validateRefs } from './portCalls.ts';
+import { assertFreeSo } from './trucks.ts';
 
 // Salgsordre (SO) fra Dynamics 365. SO-en er sannheten for hva som skal over kaia; anløpet er båten.
 // Alle innloggede kan opprette og endre ordre. Alt føres i ordrens endringslogg.
@@ -102,6 +103,7 @@ app.post('/', body(orderCreate), async c => {
   const db = c.env.DB;
   const dup = await db.prepare('SELECT id, customer FROM sales_orders WHERE so_number = ?').bind(i.so_number).first<{ id: string; customer: string }>();
   if (dup) throw fail(409, `SO ${i.so_number} finnes allerede (${dup.customer}).`, { field: 'so_number', existing: dup.id });
+  await assertFreeSo(db, i.so_number);
   const seller = i.seller_id !== undefined ? i.seller_id : user.roles.includes('salg') ? user.id : null;
   await validateRefs(db, { seller_id: seller, skus: i.lines.map(l => l.sku_id) });
 

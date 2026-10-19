@@ -43,8 +43,8 @@ app.get('/', query(z.object({ q: z.string().trim().min(1).max(80) })), async c =
                 WHERE pc.source = 'app' AND pc.cancelled_at IS NULL AND pc.service_date BETWEEN ? AND ? AND b.name LIKE ?
                 ORDER BY pc.service_date >= ? DESC, abs(julianday(pc.service_date) - julianday(?)) LIMIT ${LIMIT}`)
       .bind(addDays(today, -14), addDays(today, 60), like, today, today),
-    db.prepare(`SELECT id, customer, expected_date, reg_no, picked_up_at FROM truck_orders
-                WHERE cancelled_at IS NULL AND (customer LIKE ?1 OR carrier LIKE ?1 OR reg_no LIKE ?1 OR reference LIKE ?1)
+    db.prepare(`SELECT id, so_number, customer, expected_date, reg_no, picked_up_at FROM truck_orders
+                WHERE cancelled_at IS NULL AND (customer LIKE ?1 OR carrier LIKE ?1 OR reg_no LIKE ?1 OR so_number LIKE ?1)
                 ORDER BY picked_up_at IS NOT NULL, expected_date DESC LIMIT ${LIMIT}`).bind(like),
     db.prepare(`SELECT id, truck, destination, status FROM bulk_orders WHERE truck LIKE ?1 OR destination LIKE ?1
                 ORDER BY created_at DESC LIMIT ${LIMIT}`).bind(like),
@@ -88,8 +88,8 @@ app.get('/', query(z.object({ q: z.string().trim().min(1).max(80) })), async c =
       service_date: o.calls[0]?.service_date ?? o.wanted_date,
     })),
     calls: calls.map(x => ({ id: x.id, boat_name: x.boat.name, service_date: x.service_date, eta: x.eta, time_known: x.time_known, type: x.type, status: x.status })),
-    trucks: (trucks.results as { id: string; customer: string; expected_date: string; reg_no: string | null; picked_up_at: string | null }[])
-      .map(t => ({ id: t.id, customer: t.customer, expected_date: t.expected_date, reg_no: t.reg_no, picked_up: !!t.picked_up_at })),
+    trucks: (trucks.results as { id: string; so_number: string; customer: string; expected_date: string; reg_no: string | null; picked_up_at: string | null }[])
+      .map(t => ({ id: t.id, so_number: t.so_number, customer: t.customer, expected_date: t.expected_date, reg_no: t.reg_no, picked_up: !!t.picked_up_at })),
     bulk: bulk.results as SearchResult['bulk'],
     users: users.results as SearchResult['users'],
     vessels,

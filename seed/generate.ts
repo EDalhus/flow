@@ -522,7 +522,7 @@ for (const [offset, customer, carrier, reg, goods, picked] of TRUCKS) {
   const tid = id('to');
   const date = addDays(TODAY, offset);
   add('truck_orders', {
-    id: tid, customer, carrier, reg_no: reg, reference: String(int(40100, 40999)), expected_date: date, notes: null, created_by: U('kari'),
+    id: tid, customer, carrier, reg_no: reg, so_number: soNumber(), expected_date: date, notes: null, created_by: U('kari'),
     picked_up_at: picked ? at(TODAY, 8 * 60 + 40) : null, picked_up_by: picked ? U('ola') : null, cancelled_at: null,
     created_at: at(addDays(TODAY, Math.min(offset, 0) - 3), 10 * 60),
   });

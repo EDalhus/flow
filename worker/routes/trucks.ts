@@ -13,7 +13,7 @@ import type { AppEnv } from '../types.ts';
 const app = new Hono<AppEnv>();
 
 type Row = {
-  id: string; customer: string; carrier: string | null; reg_no: string | null; reference: string | null; expected_date: string;
+  id: string; customer: string; carrier: string | null; reg_no: string | null; so_number: string; expected_date: string;
   notes: string | null; picked_up_at: string | null; cancelled_at: string | null; created_at: string;
   pu_id: string | null; pu_name: string | null; pu_short: string | null; pu_initials: string | null;
 };
@@ -35,11 +35,18 @@ async function load(db: D1Database, where: string, params: unknown[]): Promise<T
     }));
     const pu: UserRef | null = o.pu_id ? { id: o.pu_id, name: o.pu_name ?? '', short_name: o.pu_short ?? '', initials: o.pu_initials ?? '' } : null;
     return {
-      id: o.id, customer: o.customer, carrier: o.carrier, reg_no: o.reg_no, reference: o.reference, expected_date: o.expected_date,
+      id: o.id, customer: o.customer, carrier: o.carrier, reg_no: o.reg_no, so_number: o.so_number, expected_date: o.expected_date,
       notes: o.notes, goods: g, tonnes: g.reduce((s, x) => s + x.tonnes, 0), picked_up_at: o.picked_up_at, picked_up_by: pu,
       cancelled_at: o.cancelled_at, created_at: o.created_at,
     };
   });
+}
+/** Et SO-nummer brukes bare én gang i Flow – på en bil eller på et anløp. */
+export async function assertFreeSo(db: D1Database, so: string, truckId?: string) {
+  const hit = await db.prepare(`SELECT 'bil' AS kind, customer FROM truck_orders WHERE so_number = ?1 AND id IS NOT ?2
+                                UNION ALL SELECT 'båt', customer FROM sales_orders WHERE so_number = ?1 LIMIT 1`)
+    .bind(so, truckId ?? null).first<{ kind: string; customer: string }>();
+  if (hit) throw fail(409, `SO ${so} finnes allerede (${hit.customer}).`, { field: 'so_number' });
 }
 const loadOne = async (db: D1Database, id: string) => (await load(db, 'o.id = ?', [id]))[0];
 
@@ -58,9 +65,10 @@ app.post('/', requireRole(...CAN.plan), body(truckOrderCreate), async c => {
   const skus = await db.prepare('SELECT count(*) AS n FROM skus WHERE active = 1 AND id IN (SELECT value FROM json_each(?))')
     .bind(JSON.stringify([...new Set(i.goods.map(g => g.sku_id))])).first<{ n: number }>();
   if ((skus?.n ?? 0) !== new Set(i.goods.map(g => g.sku_id)).size) throw fail(400, 'Ukjent vare.', { field: 'goods' });
+  await assertFreeSo(db, i.so_number);
   await db.batch([
-    db.prepare(`INSERT INTO truck_orders (id, customer, carrier, reg_no, reference, expected_date, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, i.customer, i.carrier, i.reg_no, i.reference, i.expected_date, i.notes, c.get('user').id),
+    db.prepare(`INSERT INTO truck_orders (id, customer, carrier, reg_no, so_number, expected_date, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, i.customer, i.carrier, i.reg_no, i.so_number, i.expected_date, i.notes, c.get('user').id),
     ...i.goods.map((g, n) => db.prepare('INSERT INTO truck_order_goods (id, order_id, sku_id, quantity, sort) VALUES (?, ?, ?, ?, ?)').bind(newId('tg'), id, g.sku_id, g.quantity, n)),
   ]);
   publish(c, { type: 'trucks.changed' });
@@ -72,6 +80,7 @@ app.patch('/:id', requireRole(...CAN.plan), body(truckOrderPatch), async c => {
   const db = c.env.DB;
   const id = c.req.param('id');
   const cols = Object.entries(fields).filter(([, v]) => v !== undefined);
+  if (fields.so_number) await assertFreeSo(db, fields.so_number, id);
   const res = await db.batch([
     db.prepare(`UPDATE truck_orders SET ${[...cols.map(([k]) => `${k} = ?`), 'updated_at = ?'].join(', ')} WHERE id = ?`).bind(...cols.map(([, v]) => v ?? null), nowIso(), id),
     ...(goods ? [

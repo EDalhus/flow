@@ -5,7 +5,7 @@ Internt logistikksystem for kaia på Flatholmen i Ålesund. Menyen har fire hove
 | Seksjon | Innhold |
 |---|---|
 | **Båter** | Kart med AIS, anløp, kaibok og båtregister (underfaner øverst). Kartet kan vises som mørkt, lyst, satellitt eller hybrid; valget huskes per nettleser. |
-| **Biler** | Kundebiler som henter pall og BB, sortert på forventet dag (ikke klokkeslett). Markeres «Hentet» når de har vært her. |
+| **Biler** | Kundebiler som henter pall og BB på en SO fra Dynamics 365 (SO-nummer 20XXXXX, påkrevd), sortert på forventet dag (ikke klokkeslett). Markeres «Hentet» når de har vært her. |
 | **Bulkbil** | Egne biler som henter salt i bulk. Sjåføren bestiller kvalitet (havsalt, steinsalt, blandet salt, veisalt) og tonn på bilen, og kan legge til henger som et ekstra steg med pause (min:sek) imellom. Kontoret ser køen og kan fjerne en bestilling som ble feil eller ikke hentes; lastingen startes ikke fra Flow. |
 | **Produksjon** | To pakkelinjer med 30 t silo hver. Viser hva som pakkes i bigbags nå, hva som er neste inn i siloen (med varsel ved kvalitetsbytte), beregnet nivå i siloen og når hjullasteren skal fylle eller stoppe. |
 
