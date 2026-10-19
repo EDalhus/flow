@@ -404,3 +404,11 @@ input::placeholder, textarea::placeholder { color: rgba(var(--tint), .45); }
   padding: 18px; border-radius: 22px; display: flex; flex-direction: column; gap: 12px; background: rgba(var(--glass-rgb), .96);
   border-color: rgba(128, 239, 222, .35); box-shadow: 0 24px 60px -20px rgba(0, 0, 0, .55); }
 @media (max-width: 900px) { .brief { right: 16px; bottom: calc(var(--bottomnav, 62px) + 16px); } }
+
+/* «Spør Flow» som eget vindu. */
+.ask-sheet-bg { position: fixed; inset: 0; z-index: 80; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.ask-sheet { width: min(640px, 100%); max-height: min(86vh, 900px); padding: 14px; border-radius: 24px; background: rgba(var(--glass-rgb), .97); }
+@media (max-width: 900px) {
+  .ask-sheet-bg { padding: 0; align-items: stretch; }
+  .ask-sheet { width: 100%; max-height: none; height: 100%; border-radius: 0; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }
+}

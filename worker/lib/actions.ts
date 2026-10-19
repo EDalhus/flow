@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AskAction } from '../../shared/api.ts';
 import {
-  boatCreate, bulkOrderCreate, messageCreate, orderAssign, orderCancel, orderCreate, portCallCancel, portCallPatch, productionOrderCreate, truckOrderCreate,
+  boatCreate, bulkOrderCreate, messageCreate, quayLogCreate, orderAssign, orderCancel, orderCreate, portCallCancel, portCallPatch, productionOrderCreate, truckOrderCreate,
 } from '../../shared/schemas.ts';
 import { nowIso } from './http.ts';
 
@@ -160,6 +160,37 @@ export const ACTIONS = {
       return { method: 'POST', path: `/port-calls/${i.port_call_id}/messages`, body: check(messageCreate, { body: i.tekst }) };
     },
   }),
+  lever_kaibok: action({
+    description: 'Ferdigstill et anløp og lever kaiboka (etter at du har intervjuet brukeren). Avvik ja/nei, kategorier (skade_gods, utstyr_kran, mannskap_hms, forsinkelse, annet), en utfyllende rapport som beskrivelse, karakterer 1–5 og ev. notat til båtprofilen. Bilder som allerede er lastet opp på anløpet tas med.',
+    input: z.object({
+      port_call_id: id, had_deviation: z.boolean(), categories: z.array(z.enum(['skade_gods', 'utstyr_kran', 'mannskap_hms', 'forsinkelse', 'annet'])).default([]),
+      description: z.string().max(4000).default(''), r_punctuality: z.number().int().min(1).max(5), r_cooperation: z.number().int().min(1).max(5),
+      r_equipment: z.number().int().min(1).max(5), boat_note: z.string().max(1000).optional(),
+    }),
+    schema: {
+      ...str({
+        port_call_id: { type: 'string' }, had_deviation: { type: 'boolean' },
+        categories: { type: 'array', items: { type: 'string', enum: ['skade_gods', 'utstyr_kran', 'mannskap_hms', 'forsinkelse', 'annet'] } },
+        description: { type: 'string', description: 'Rapporten (se reglene for kaibok i systemteksten)' },
+        r_punctuality: { type: 'integer' }, r_cooperation: { type: 'integer' }, r_equipment: { type: 'integer' }, boat_note: { type: 'string' },
+      }), required: ['port_call_id', 'had_deviation', 'r_punctuality', 'r_cooperation', 'r_equipment'],
+    },
+    build: async (db, i) => {
+      const c = await db.prepare(`SELECT cancelled_at, completed_at, source FROM port_calls WHERE id = ?`).bind(i.port_call_id)
+        .first<{ cancelled_at: string | null; completed_at: string | null; source: string }>();
+      if (!c || c.source !== 'app') throw new Error('Fant ikke anløpet.');
+      if (c.cancelled_at) throw new Error('Anløpet er avlyst.');
+      if (c.completed_at) throw new Error('Kaibok er allerede levert for dette anløpet.');
+      const photos = await db.prepare('SELECT id FROM quay_log_photos WHERE port_call_id = ? AND quay_log_id IS NULL').bind(i.port_call_id).all<{ id: string }>();
+      const body = {
+        had_deviation: i.had_deviation, categories: i.had_deviation ? i.categories : [], description: i.had_deviation ? i.description : '',
+        ratings: { punctuality: i.r_punctuality, cooperation: i.r_cooperation, equipment: i.r_equipment },
+        boat_note: i.boat_note?.trim() || (!i.had_deviation && i.description.trim() ? i.description.trim().slice(0, 1000) : null),
+        photo_ids: i.had_deviation ? photos.results.map(p => p.id) : [],
+      };
+      return { method: 'POST', path: `/port-calls/${i.port_call_id}/quay-log`, body: check(quayLogCreate, body) };
+    },
+  }),
   ny_produksjonsordre: action({
     description: 'Ny produksjonsordre på en pakkelinje (line_id og product_id fra oppslag) med tonn.',
     input: z.object({ line_id: id, product_id: id, tonnes: z.number().gt(0).max(2000), notes: z.string().max(500).optional() }),
@@ -193,6 +224,7 @@ export function linkFor(kind: string, result: Record<string, unknown>, path: str
   const callId = /\/port-calls\/([^/]+)/.exec(path)?.[1];
   if (kind === 'flytt_anlop' && callId) return `/?id=${callId}`;
   if (kind === 'send_melding' && callId) return `/?id=${callId}&tab=chat`;
+  if (kind === 'lever_kaibok') return '/kaibok';
   const so = (body as { so_number?: string })?.so_number;
   if (kind === 'ny_salgsordre' && so) return `/anlop?so=${so}`;
   if (kind === 'ny_bat') return result.id ? `/baater?id=${result.id}` : '/baater';

@@ -73,7 +73,7 @@ describe('Spør Flow', () => {
     expect(await runTool(env, 'salg', { from: 'i fjor', to: '2030-01-01' })).toMatchObject({ feil: 'Ugyldige parametere' });
     expect(await runTool(env, 'salg', { from: '2030-01-01', to: '2029-01-01' })).toMatchObject({ feil: expect.stringMatching(/to må være/) });
     expect(await runTool(env, 'slett_alt', {})).toMatchObject({ feil: expect.stringMatching(/Ukjent/) });
-    expect(Object.keys(TOOLS)).toHaveLength(9);
+    expect(Object.keys(TOOLS)).toHaveLength(10);
     expect(await runTool(env, 'hjelp', {})).toMatchObject({ handbok: expect.stringContaining('Ny sjåfør') });
   });
 
@@ -199,5 +199,27 @@ describe('Claude: før båten kommer, rapport og hjelp', () => {
     expect(await periodReport({ ...env, ANTHROPIC_API_KEY: 'k' }, '2030-01-01', '2030-01-31', 'nb', fetcher)).toMatch(/Hovedtall/);
     expect(asked).toHaveLength(2);
     expect(JSON.parse(asked[0])).toHaveProperty('sum_tonn');
+  });
+});
+
+describe('Spør Flow: ferdigstill og kaibok i chatten', () => {
+  it('henter fakta om anløpet, og leverer kaiboka med rapporten når brukeren bekrefter', async () => {
+    const c = (await api('/port-calls', { body: call('2030-06-10', '08:00', '12:00') })).json;
+    await api(`/port-calls/${c.id}/messages`, { body: { body: 'Kranen på båten hakker' } });
+    const g = await runTool(env, 'kaibok_grunnlag', { port_call_id: c.id }) as { anlop: { bat: string; kaibok_levert: boolean }; siste_chat: { tekst: string }[] };
+    expect(g.anlop).toMatchObject({ bat: 'Alfa', kaibok_levert: false });
+    expect(g.siste_chat.map(m => m.tekst)).toContain('Kranen på båten hakker');
+
+    const report = 'Hendelse: Båtkrana stoppet under lossing kl. 09:40.\nOmfang: 3 paller havsalt skadet (ca. 3 t).\nTiltak: Lossing fortsatte med truck fra kaia.\nOppfølging: Rederiet varslet.';
+    const p = await propose(env.DB, 'u_jonas', { handling: 'lever_kaibok', oppsummering: 'Ferdigstill Alfa med avvik (utstyr/kran)', parametere: {
+      port_call_id: c.id, had_deviation: true, categories: ['utstyr_kran', 'skade_gods'], description: report, r_punctuality: 4, r_cooperation: 3, r_equipment: 2, boat_note: 'Sjekk krana før lossing.',
+    } });
+    if (!p.ok) throw new Error(p.feil);
+    expect((await api(`/ask/actions/${p.action.id}/confirm`, { body: {} })).json).toMatchObject({ status: 'utfort', link: '/kaibok' });
+    const after = (await api(`/port-calls/${c.id}`)).json;
+    expect(after).toMatchObject({ status: 'ferdig', has_quay_log: true });
+    // Kan ikke leveres to ganger.
+    expect(await propose(env.DB, 'u_jonas', { handling: 'lever_kaibok', oppsummering: 'Igjen', parametere: { port_call_id: c.id, had_deviation: false, r_punctuality: 5, r_cooperation: 5, r_equipment: 5 } }))
+      .toMatchObject({ ok: false, feil: expect.stringMatching(/allerede levert/) });
   });
 });

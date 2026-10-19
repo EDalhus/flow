@@ -6,7 +6,7 @@ import { looksLikeQuestion, parseActions, parseDay, parseScope, type SearchActio
 import { api, errorText } from '../lib/api.ts';
 import { FLAG_STYLE, STATUS_STYLE, addDays, dayRelative, ddmm, fr, osloTime, telHref, titleCase, todayOslo, typeLabel } from '../lib/format.ts';
 import { tr, tx } from '../lib/i18n.ts';
-import { useMe } from '../lib/queries.ts';
+import { useMe, usePortCalls } from '../lib/queries.ts';
 import { canBoats } from '../lib/roles.ts';
 import { AskFlow } from './AskFlow.tsx';
 import { ArrowLeft, Close, Message, Phone, Search, Sparkle, StarLine } from './Icons.tsx';
@@ -70,6 +70,7 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [vessel, setVessel] = useState<ExternalVessel | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
+  const [askContext, setAskContext] = useState<string | undefined>(undefined);
   const [active, setActive] = useState(0);
   const [pins, setPins] = useState<Saved[]>(() => readList(PINS));
   const [recent, setRecent] = useState<Saved[]>(() => readList(RECENT));
@@ -93,9 +94,15 @@ export function GlobalSearch() {
       const typing = (e.target as HTMLElement)?.closest('input, textarea, select');
       if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) { e.preventDefault(); input.current?.focus(); input.current?.select(); setOpen(true); }
     };
+    // Andre deler av Flow kan åpne «Spør Flow» med et ferdig spørsmål (f.eks. «Ferdigstill i chat» i anløpet).
+    const onAsk = (e: Event) => {
+      const d = (e as CustomEvent<{ text: string; context?: string }>).detail;
+      setQ(d.text); setAskContext(d.context); setAsking(d.text); setVessel(null); setOpen(true);
+    };
     document.addEventListener('mousedown', onDown);
     window.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
+    window.addEventListener('flow:ask', onAsk);
+    return () => { document.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); window.removeEventListener('flow:ask', onAsk); };
   }, []);
 
   const reset = () => { setOpen(false); setVessel(null); setAsking(null); setQ(''); input.current?.blur(); };
@@ -123,7 +130,7 @@ export function GlobalSearch() {
   const needle = needleRaw.toLowerCase();
   const question = ai && looksLikeQuestion(raw);
   const d = term.length >= 2 && !(ai && looksLikeQuestion(term)) ? res.data : undefined;
-  const ask = (text: string) => { setAsking(text); setVessel(null); };
+  const ask = (text: string) => { setAskContext(undefined); setAsking(text); setVessel(null); };
 
   // ---------------------------------------------------------------- treffene, i rekkefølge
   const sections: Section[] = [];
@@ -224,7 +231,7 @@ export function GlobalSearch() {
       {open && (
         <div ref={list} id="gsearch-list" className="glass scroll" role="listbox" aria-label={tr('Søkeresultater')}
           style={{ position: 'absolute', top: 54, left: 0, right: 0, ...(asking ? { right: 'auto', width: 'min(620px, calc(100vw - 32px))' } : {}), maxHeight: 'min(640px, calc(100vh - 120px))', padding: 10, zIndex: 40, background: 'rgba(var(--glass-rgb), .95)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {asking ? <AskFlow key={asking} question={asking} onBack={() => setAsking(null)} go={to => { reset(); nav(to); }} />
+          {asking ? <AskFlow key={asking} question={asking} context={askContext} onBack={() => setAsking(null)} go={to => { reset(); nav(to); }} />
             : vessel ? <VesselCard v={vessel} onBack={() => setVessel(null)} go={to => { reset(); nav(to); }} /> : (
             <>
               {sections.map(s => (
@@ -236,7 +243,7 @@ export function GlobalSearch() {
                   })}
                 </Group>
               ))}
-              {!raw && <Tips ai={ai} onPick={t => { setQ(t); input.current?.focus(); }} />}
+              {!raw && <Tips ai={ai} onPick={(t, direct) => { setQ(t); if (direct) ask(t); else input.current?.focus(); }} />}
               {raw && scope && <p className="sub" style={{ margin: '0 8px 6px', fontSize: 12 }}>{tr('Søker bare i «{hva}».', { hva: raw.split(':')[0] })}</p>}
               {term.length >= 2 && !question && res.isFetching && !d && <p className="sub" style={{ margin: 8 }}>{tr('Søker …')}</p>}
               {d && !count && !question && <p className="sub" style={{ margin: 8 }}>{tr('Ingen treff på «{q}».', { q: d.q })}</p>}
@@ -284,17 +291,35 @@ function Item({ e, active, pinned, onHover, onClick, onPin }: { e: Entry; active
   );
 }
 
-/** Når feltet er tomt: hva søket kan gjøre. */
-function Tips({ onPick, ai }: { onPick: (t: string) => void; ai: boolean }) {
-  const tips = [
-    ...(ai ? [tr('Hvilken båt har vi oftest problemer med?'), tr('Flytt neste båt til kai 2'), tr('Hvordan legger jeg til en ny sjåfør?')] : []), tr('i morgen'), tr('ny bulk SU 20 110'), tr('båt: coneste'),
+/** Når feltet er tomt: eksempler (med båtene som faktisk kommer), gruppert etter hva søket kan gjøre. */
+function Tips({ onPick, ai }: { onPick: (t: string, ask: boolean) => void; ai: boolean }) {
+  const today = todayOslo();
+  const calls = usePortCalls(addDays(today, -1), addDays(today, 3));
+  const list = (calls.data?.calls ?? []).filter(c => c.status !== 'avlyst');
+  const atQuay = list.find(c => c.status === 'ved_kai' || (c.status !== 'ferdig' && c.service_date <= today && !c.has_quay_log));
+  const next = list.find(c => c.status !== 'ferdig' && c.status !== 'ved_kai' && c !== atQuay);
+  const boat = next?.boat.name ?? 'Coneste';
+  const groups: { title: string; items: string[]; ask?: boolean }[] = [
+    ...(ai ? [
+      { title: tr('Spør'), ask: true, items: [tr('Hvilken båt har vi oftest problemer med?'), tr('Hva er det mest populære produktet vi selger?'), tr('Hvor er {båt} nå?', { båt: boat }), tr('Hvem ligger ved kai nå?')] },
+      { title: tr('Gjør'), ask: true, items: [
+        atQuay ? tr('Ferdigstill {båt} og fyll ut kaiboka', { båt: atQuay.boat.name }) : tr('Ferdigstill dagens båt og fyll ut kaiboka'),
+        tr('Flytt {båt} til kai 2 en time senere', { båt: boat }), tr('Bestill 18 t veisalt til SU 20 110 for Statens vegvesen'), tr('Skriv i chatten på {båt} at kranen er klar', { båt: boat }),
+      ] },
+      { title: tr('Hjelp'), ask: true, items: [tr('Hvordan legger jeg til en ny sjåfør?'), tr('Hvordan legger jeg en SO på en båt?')] },
+    ] : []),
+    { title: tr('Søk'), items: [tr('i morgen'), tr('uke 43'), tr('ny bulk SU 20 110'), `${tr('båt:')} ${boat.toLowerCase()}`, 'P-2631'] },
   ];
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '6px 10px 4px' }}>
-      <span className="eyebrow" style={{ fontSize: 11 }}>{tr('Prøv')}</span>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {tips.map(t => <button key={t} type="button" className="tab" style={{ minHeight: 30, fontSize: 12, padding: '0 10px' }} onClick={() => onPick(t)}>{t}</button>)}
-      </div>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '6px 10px 4px' }}>
+      {groups.map(g => (
+        <div key={g.title} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span className="eyebrow" style={{ fontSize: 11 }}>{g.title}</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {g.items.map(t => <button key={t} type="button" className="tab" style={{ minHeight: 30, fontSize: 12, padding: '0 10px', textAlign: 'left' }} onClick={() => onPick(t, !!g.ask)}>{t}</button>)}
+          </div>
+        </div>
+      ))}
       <span className="sub" style={{ fontSize: 12 }}>
         {tr('Prefiks: båt:, so:, bil:, sjåfør:, kunde:, kai:, person: · ↑↓ og Enter for å velge · Esc lukker')}
       </span>

@@ -1,31 +1,41 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import type { AskAction, AskAnswer, AskTurn } from '../../../shared/api.ts';
 import { api, errorText } from '../lib/api.ts';
 import { useDictation } from '../lib/dictation.ts';
 import { getLang, tr, tx } from '../lib/i18n.ts';
 import { ArrowLeft, Check, Mic, Send, Sparkle } from './Icons.tsx';
 import { Markdown } from './Markdown.tsx';
+import { splitChoices } from '../../../shared/markdown.ts';
 
 // «Spør Flow» som samtale: spørsmål, svar og jobber Claude foreslår (brukeren trykker «Utfør»), med oppfølgingsspørsmål.
 
 type Turn = { q: string; a?: AskAnswer; error?: string };
 
-export function AskFlow({ question, onBack, go }: { question: string; onBack: () => void; go: (to: string) => void }) {
+export function AskFlow({ question, context, onBack, go }: {
+  question: string;
+  /** Sendes med det første spørsmålet uten å vises (f.eks. hvilket anløp det gjelder). */
+  context?: string;
+  onBack: () => void; go: (to: string) => void;
+}) {
   const [turns, setTurns] = useState<Turn[]>([{ q: question }]);
   const [draft, setDraft] = useState('');
   const end = useRef<HTMLDivElement>(null);
-  const history = (upto: number): AskTurn[] => turns.slice(0, upto).flatMap(t => (t.a ? [{ role: 'user' as const, content: t.q }, { role: 'assistant' as const, content: t.a.answer || t.a.actions.map(a => a.summary).join('\n') }] : []));
+  const history = (upto: number): AskTurn[] => turns.slice(0, upto).flatMap((t, j) => (t.a ? [
+    { role: 'user' as const, content: j === 0 && context ? `${t.q}\n\n(${context})` : t.q },
+    { role: 'assistant' as const, content: [t.a.answer, ...t.a.actions.map(a => `[Forslag ${a.status}: ${a.summary}]`)].filter(Boolean).join('\n') },
+  ] : []));
   const m = useMutation({
-    mutationFn: ({ q, i }: { q: string; i: number }) => api<AskAnswer>('/ask', { body: { question: q, lang: getLang(), history: history(i) } }),
+    mutationFn: ({ q, i }: { q: string; i: number }) => api<AskAnswer>('/ask', { body: { question: i === 0 && context ? `${q}\n\n(${context})` : q, lang: getLang(), history: history(i) } }),
     onSuccess: (a, { i }) => setTurns(ts => ts.map((t, j) => (j === i ? { ...t, a, error: undefined } : t))),
     onError: (e, { i }) => setTurns(ts => ts.map((t, j) => (j === i ? { ...t, error: errorText(e) } : t))),
   });
   useEffect(() => { m.mutate({ q: question, i: 0 }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { end.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [turns]);
   const dict = useDictation(t => setDraft(d => (d ? `${d} ${t}` : t)));
-  const send = () => {
-    const q = draft.trim();
+  const send = (text?: string) => {
+    const q = (text ?? draft).trim();
     if (!q || m.isPending) return;
     dict.stop();
     setDraft('');
@@ -50,12 +60,22 @@ export function AskFlow({ question, onBack, go }: { question: string; onBack: ()
                 onClick={() => { setTurns(ts => ts.map((x, j) => (j === i ? { q: x.q } : x))); m.mutate({ q: t.q, i }); }}>{tr('Prøv igjen')}</button>
             </div>
           )}
-          {t.a && (
-            <>
-              {t.a.answer && <Markdown text={t.a.answer} go={go} />}
-              {t.a.actions.map(a => <ActionCard key={a.id} initial={a} go={go} />)}
-            </>
-          )}
+          {t.a && (() => {
+            const { text, choices } = splitChoices(t.a.answer);
+            const last = i === turns.length - 1;
+            return (
+              <>
+                {text && <Markdown text={text} go={go} />}
+                {last && choices.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {choices.map(c => <button key={c} type="button" className="tab" disabled={m.isPending} onClick={() => send(c)}
+                      style={{ minHeight: 34, fontSize: 13, padding: '0 14px', border: '1px solid rgba(128,239,222,.35)' }}>{c}</button>)}
+                  </div>
+                )}
+                {t.a.actions.map(a => <ActionCard key={a.id} initial={a} go={go} />)}
+              </>
+            );
+          })()}
         </div>
       ))}
       <div ref={end} />
@@ -110,6 +130,23 @@ function ActionCard({ initial, go }: { initial: AskAction; go: (to: string) => v
             {a.link && <button type="button" className="btn" style={{ minHeight: 32, fontSize: 13 }} onClick={() => go(a.link!)}>{tr('Åpne')}</button>}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** «Spør Flow» som eget vindu (fullskjerm på mobil), f.eks. «Ferdigstill i chat» fra et anløp. */
+export function AskSheet({ question, context, onClose }: { question: string; context?: string; onClose: () => void }) {
+  const nav = useNavigate();
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [onClose]);
+  return (
+    <div className="ask-sheet-bg" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="glass scroll ask-sheet" role="dialog" aria-modal="true" aria-label={tr('Spør Flow')}>
+        <AskFlow question={question} context={context} onBack={onClose} go={to => { onClose(); nav(to); }} />
       </div>
     </div>
   );

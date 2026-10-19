@@ -31,7 +31,7 @@ export function parseDay(raw: string, today: string): DayRange | null {
   if (/^(forrige uke|last week)$/.test(q)) return { from: addDays(monday, -7), to: addDays(monday, -1) };
   const wd = q.replace(/^(på|on|neste|next)\s+/, '');
   if (WEEKDAYS[wd]) return one(addDays(today, (WEEKDAYS[wd] - dow + 7) % 7));
-  const wk = /^(?:uke|week|veke)\s*(\d{1,2})(?:\s+(\d{4}))?$/.exec(q);
+  const wk = /^(?:uke|week|veke|uge|vecka|vika|savaitė)\s*(\d{1,2})(?:\s+(\d{4}))?$/.exec(q);
   if (wk) {
     const week = Number(wk[1]);
     if (week < 1 || week > 53) return null;

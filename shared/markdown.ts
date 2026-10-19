@@ -65,3 +65,12 @@ export function parseInline(s: string): Inline[] {
 
 /** Bare lenker inn i Flow (relativ sti) er klikkbare; alt annet vises som tekst. */
 export const isInternalHref = (href: string) => href.startsWith('/') && !href.startsWith('//');
+
+/** «Valg: Ja | Nei | Litt forsinket» på siste linje blir knapper (Claude legger det til ved oppfølgingsspørsmål). */
+const CHOICES = /^\s*\**(?:valg|options|choices|pasirinkimai|val|valmöjligheter|valkostir|svarmuligheder)\**\s*:\s*\**\s*(.+)$/i;
+export function splitChoices(answer: string): { text: string; choices: string[] } {
+  const lines = answer.trimEnd().split('\n');
+  const m = CHOICES.exec(lines[lines.length - 1] ?? '');
+  if (!m) return { text: answer, choices: [] };
+  return { text: lines.slice(0, -1).join('\n').trimEnd(), choices: m[1].split('|').map(x => x.trim().replace(/^[«"]|[»"]$/g, '')).filter(Boolean).slice(0, 6) };
+}

@@ -16,6 +16,7 @@ import { tr, tx, getLang } from '../lib/i18n.ts';
 import { Translated } from './Translated.tsx';
 import { useQuery } from '@tanstack/react-query';
 import { Markdown } from './Markdown.tsx';
+import { AskSheet } from './AskFlow.tsx';
 
 export type DetailTab = 'oversikt' | 'chat' | 'profil' | 'logg';
 
@@ -29,6 +30,7 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
   const me = useMe();
   const nav = useNavigate();
   const loadOrder = useLoadOrder(call.id);
+  const [chat, setChat] = useState(false);
   const editable = canPlan(me.data) && call.status !== 'ferdig' && call.status !== 'avlyst' && !call.has_quay_log;
   const chips = [...new Set([call.seller?.short_name, call.responsible?.short_name,
     ...(users.data ?? []).filter(u => u.roles.includes('produksjon')).map(u => u.short_name)])]
@@ -101,6 +103,13 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
               <Check size={17} strokeWidth={2.2} />{tr('Ferdigstill og fyll ut kaibok')}
             </button>
           ) : null}
+          {!call.has_quay_log && call.status !== 'avlyst' && call.status !== 'ferdig' && canQuayLog(me.data) && me.data?.ai ? (
+            <button type="button" className="btn" style={{ minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 14 }}
+              onClick={() => setChat(true)}>
+              <Sparkle size={15} />{tr('Ferdigstill i chat med Flow')}
+            </button>
+          ) : null}
+          {chat && <AskSheet question={tr('Ferdigstill {båt} og fyll ut kaiboka', { båt: call.boat.name })} context={`port_call_id: ${call.id}`} onClose={() => setChat(false)} />}
         </div>
       )}
 

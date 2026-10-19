@@ -53,6 +53,38 @@ const dateProp = (d: string) => ({ type: 'string', description: `${d} (YYYY-MM-D
 const periodProps = { from: dateProp('Fra og med dato'), to: dateProp('Til og med dato') };
 
 export const TOOLS = {
+  kaibok_grunnlag: tool({
+    description: 'Fakta om ett anløp før kaiboka fylles ut: båt, kai, type, ETA/ETD og faktisk ankomst/avgang fra AIS (med forsinkelse i minutter), varer og SO-er, mannskap, de siste chatmeldingene, bilder lastet opp, og båtens tidligere kaibøker. Bruk når brukeren vil ferdigstille et anløp.',
+    input: z.object({ port_call_id: z.string().min(1).max(64) }),
+    schema: { type: 'object', required: ['port_call_id'], properties: { port_call_id: { type: 'string' } } },
+    run: async (env, i) => {
+      const db = env.DB;
+      const c = await db.prepare(`SELECT pc.*, b.name AS boat, b.id AS boat_id, q.name AS quay, b.ship_contact, b.ship_phone,
+                                         (SELECT u.name FROM users u WHERE u.id = pc.responsible_user_id) AS responsible
+                                  FROM port_calls pc JOIN boats b ON b.id = pc.boat_id JOIN quays q ON q.id = pc.quay_id WHERE pc.id = ?`).bind(i.port_call_id).first<Record<string, string | number | null>>();
+      if (!c) return { feil: 'Fant ikke anløpet. Slå opp med verktøyet anlop.' };
+      const [goods, crew, msgs, photos, prev] = await db.batch([
+        db.prepare(`SELECT p.name AS produkt, s.unit AS enhet, g.quantity AS antall, g.direction AS retning, round(g.quantity * s.kg_per_unit / 1000.0, 1) AS tonn, so.so_number AS so, so.customer AS kunde
+                    FROM port_call_goods g JOIN skus s ON s.id = g.sku_id JOIN products p ON p.id = s.product_id LEFT JOIN sales_orders so ON so.id = g.sales_order_id WHERE g.port_call_id = ?`).bind(i.port_call_id),
+        db.prepare(`SELECT cs.crew_role AS rolle, u.name AS navn FROM crew_slots cs LEFT JOIN users u ON u.id = cs.user_id WHERE cs.port_call_id = ? ORDER BY cs.sort`).bind(i.port_call_id),
+        db.prepare(`SELECT coalesce(u.short_name, 'Flow') AS fra, m.body AS tekst, m.created_at AS tid FROM messages m LEFT JOIN users u ON u.id = m.author_id
+                    WHERE m.port_call_id = ? ORDER BY m.created_at DESC LIMIT 12`).bind(i.port_call_id),
+        db.prepare(`SELECT count(*) AS n FROM quay_log_photos WHERE port_call_id = ? AND quay_log_id IS NULL`).bind(i.port_call_id),
+        db.prepare(`SELECT pc.service_date AS dato, ql.had_deviation AS avvik, ql.description AS beskrivelse, ql.boat_note AS notat, ql.r_punctuality AS punktlighet, ql.r_cooperation AS samarbeid, ql.r_equipment AS utstyr
+                    FROM quay_logs ql JOIN port_calls pc ON pc.id = ql.port_call_id WHERE pc.boat_id = ? AND pc.id <> ? ORDER BY pc.eta DESC LIMIT 3`).bind(c.boat_id, i.port_call_id),
+      ]);
+      const late = (a: unknown, b: unknown) => (a && b ? Math.round((Date.parse(String(a)) - Date.parse(String(b))) / 60_000) : null);
+      return {
+        anlop: {
+          id: c.id, bat: c.boat, link: `/?id=${c.id}`, type: c.type, kai: c.quay, dato: c.service_date, eta: c.time_known ? c.eta : null, etd: c.time_known ? c.etd : null,
+          ankom_ais: c.arrived_at, gikk_ais: c.departed_at, minutter_etter_eta: c.time_known ? late(c.arrived_at, c.eta) : null,
+          kaibok_levert: !!c.completed_at, avlyst: !!c.cancelled_at, ansvarlig: c.responsible, kontakt_om_bord: c.ship_contact, telefon_om_bord: c.ship_phone, merknad: c.notes,
+        },
+        varer: goods.results, mannskap: crew.results, siste_chat: (msgs.results as unknown[]).reverse(),
+        bilder_lastet_opp: (photos.results[0] as { n: number }).n, tidligere_kaiboker: prev.results,
+      };
+    },
+  }),
   hjelp: tool({
     description: 'Brukerhåndboka for Flow: hvor ting gjøres og stegene (ny sjåfør, ny SO, kaibok, flytte anløp, roller …), med lenker til sidene. Bruk ved «hvordan …»-spørsmål.',
     input: z.object({}),
@@ -370,7 +402,15 @@ Jobber:
 - Tider er Europe/Oslo; skriv ISO med tidssone (+01:00 vinter, +02:00 sommer). Flytter du et anløp i tid, behold varigheten (ETD − ETA) hvis ikke annet er sagt.
 - Mangler noe vesentlig (hvilken båt, dag, mengde, kunde), spør kort i stedet for å gjette. Små ting (f.eks. kai når bare én passer) kan du velge og nevne.
 - Etter forslaget: skriv én kort setning om hva kortet gjør (ikke gjenta alle detaljene).
-- Du kan ikke slette data, endre tilganger eller registre for sjåfører; forklar da hvor i Flow det gjøres.`;
+- Du kan ikke slette data, endre tilganger eller registre for sjåfører; forklar da hvor i Flow det gjøres.
+
+Ferdigstille anløp og kaibok i chatten (lever_kaibok):
+- Finn anløpet (anlop for i dag/i går; spør hvis flere passer), og hent kaibok_grunnlag. Er kaiboka levert, si det.
+- Intervju brukeren som en erfaren formann: ÉTT kort spørsmål om gangen, og bygg på svarene og fakta (f.eks. «AIS viser at båten kom 52 min etter ETA – stemmer det, og hvorfor?»). Dekk: gikk det som planlagt / avvik? Ved avvik: hva skjedde, når i anløpet, omfang (antall paller/BB, tonn, skade), årsak, hvem var involvert, hva ble gjort der og da, og om noe må følges opp (kunde, rederi, forsikring, HMS-melding). Deretter punktlighet, samarbeid med mannskapet og båtens utstyr/kran (spør om en vurdering hvis det ikke går fram), og om noe er nyttig å vite neste gang båten kommer.
+- Når et spørsmål har typiske svar, avslutt meldingen med en egen siste linje: «Valg: Ja | Nei | Litt forsinket» (2–5 korte alternativer på brukerens språk, men ordet «Valg:» skrives alltid slik, uten fet skrift). Brukeren kan også svare fritt.
+- Hopp over det som allerede er besvart. Vanligvis holder 3–7 spørsmål; ingen avvik = færre spørsmål.
+- Til slutt: vis en kort oppsummering og kall foresla_handling med lever_kaibok. Beskrivelsen (description) skal være en ryddig, saklig og utfyllende rapport på brukerens språk, med korte avsnitt: «Hendelse:», «Omfang:», «Årsak:», «Tiltak:», «Oppfølging:» (bare de som er relevante), med tider og tall. Karakterer 1–5 (1 svært dårlig, 3 ok, 5 svært bra) settes ut fra svarene; nevn dem i oppsummeringen. boat_note: bare det som er nyttig neste gang. Uten avvik: description tom, og en kort positiv/nøytral boat_note hvis brukeren sa noe nyttig.
+- detaljer i forslaget: avvik/kategorier, karakterene og 1–2 linjer fra rapporten.`;
 }
 
 type Block = { type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: unknown };

@@ -4,8 +4,9 @@ import type { PortCallView } from '../../../shared/api.ts';
 import { CREW_ROLE_LABEL } from '../../../shared/domain/types.ts';
 import { AlertsPanel } from '../components/Alerts.tsx';
 import { Chat } from '../components/Chat.tsx';
-import { Anchor, ArrowLeft, Check, Phone } from '../components/Icons.tsx';
+import { Anchor, ArrowLeft, Check, Phone, Sparkle } from '../components/Icons.tsx';
 import { KaibokForm } from '../components/KaibokForm.tsx';
+import { AskSheet } from '../components/AskFlow.tsx';
 import { GlobalSearch } from '../components/GlobalSearch.tsx';
 import { BellButton, BoatTabs, Sidebar, UserBadge } from '../components/Topbar.tsx';
 import { QuayMark, StatusBadge } from '../components/ui.tsx';
@@ -130,9 +131,11 @@ export function MobileApp() {
 function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
   call: PortCallView; now: Date; today: string; onBack: () => void; onKaibok: () => void; canLog: boolean;
 }) {
+  const [chat, setChat] = useState(false);
   const boat = useBoat(c.boat.id);
   const users = useUsers();
   const me = useMe();
+  const ai = !!me.data?.ai;
   const f = FLAG_STYLE[c.boat.flag];
   const mins = Math.round((Date.parse(c.eta) - now.getTime()) / 60_000);
   const card = !c.time_known && c.status !== 'ferdig' && c.status !== 'kaibok_mangler'
@@ -265,13 +268,19 @@ function Detail({ call: c, now, today, onBack, onKaibok, canLog }: {
           <Chat callId={c.id} chips={chips} variant="mobile" />
         </div>
         {c.status !== 'ferdig' && canLog && (
-          <div style={{ flex: 'none', padding: '10px 16px 20px' }}>
+          <div style={{ flex: 'none', padding: '10px 16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button type="button" onClick={onKaibok}
               style={{ width: '100%', minHeight: 60, borderRadius: 999, border: 'none', background: '#F2F5F3', color: '#1A231E', fontSize: 17, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <Check size={20} strokeWidth={2.2} />{tr('Ferdigstill og fyll ut kaibok')}
             </button>
+            {ai && !c.has_quay_log && (
+              <button type="button" className="btn" onClick={() => setChat(true)} style={{ width: '100%', minHeight: 50, borderRadius: 999, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <Sparkle size={17} />{tr('Ferdigstill i chat med Flow')}
+              </button>
+            )}
           </div>
         )}
+        {chat && <AskSheet question={tr('Ferdigstill {båt} og fyll ut kaiboka', { båt: c.boat.name })} context={`port_call_id: ${c.id}`} onClose={() => setChat(false)} />}
       </section>
     </>
   );
