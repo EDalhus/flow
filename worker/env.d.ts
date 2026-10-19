@@ -10,6 +10,9 @@ interface __FlowOptionalEnv {
   /** BarentsWatch AIS – Cloudflare-secrets, settes i dashbordet eller med `wrangler secret put`. */
   BW_CLIENT_ID?: string;
   BW_CLIENT_SECRET?: string;
+  /** «Spør Flow» (Claude): API-nøkkel som Cloudflare-secret, og valgfri modell (standard claude-sonnet-5-5). */
+  ANTHROPIC_API_KEY?: string;
+  AI_MODEL?: string;
 }
 interface Env extends __FlowOptionalEnv {}
 declare namespace Cloudflare {

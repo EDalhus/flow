@@ -12,6 +12,7 @@ import { tr } from '../lib/i18n.ts';
 import {
   useBulkAction, useBulkLog, useBulkOrders, useBulkQualities, useBulkRegistry, useBulkReport, useBulkWeighings, useCreateBulkOrder, useSaveRegistry,
 } from '../lib/queries.ts';
+import { usePrefill } from '../lib/prefill.ts';
 import './moduler.css';
 
 type Tab = 'ko' | 'veiinger' | 'rapport' | 'register';
@@ -181,16 +182,19 @@ function BulkLog({ id }: { id: string }) {
 /** Kontoret bestiller for en sjåfør (f.eks. på telefon), nå eller frem i tid. */
 function OfficeBooking() {
   const reg = useBulkRegistry();
+  const [prefill] = usePrefill(['bil']);
   const qualities = useBulkQualities();
   const create = useCreateBulkOrder();
   const [key, setKey] = useState(0);
   const r = reg.data;
+  const norm = (s: string) => s.replace(/\s+/g, '').toUpperCase();
+  const preVehicle = prefill?.bil ? r?.vehicles.find(v => norm(v.reg_no) === norm(prefill.bil))?.id : undefined;
   return (
     <aside className="glass" aria-labelledby="bulk-h" style={{ flex: '1 1 380px', maxWidth: 460, padding: 20, display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 20 }}>
       <h2 id="bulk-h" style={{ margin: 0, fontSize: 24, fontWeight: 300 }}>{tr('Bestill lasting')}</h2>
       {!r ? <Loading /> : !r.vehicles.length || !r.customers.length
         ? <p className="muted" style={{ margin: 0 }}>{tr('Legg inn biler og kunder under Register først.')}</p>
-        : <BookingForm key={key} vehicles={r.vehicles.filter(v => v.active)} customers={r.customers.filter(c => c.active)} qualities={qualities.data ?? []}
+        : <BookingForm key={`${key}-${prefill?.n ?? ''}`} initialVehicleId={preVehicle} vehicles={r.vehicles.filter(v => v.active)} customers={r.customers.filter(c => c.active)} qualities={qualities.data ?? []}
             drivers={r.drivers.filter(d => d.active)} pending={create.isPending} error={create.isError ? errorText(create.error) : null}
             onSubmit={b => create.mutate(b, { onSuccess: () => setKey(k => k + 1) })} />}
     </aside>
@@ -259,7 +263,8 @@ function Report() {
   const today = todayOslo();
   const [period, setPeriod] = useState<Period>('maned');
   const [custom, setCustom] = useState({ from: addDays(today, -29), to: today });
-  const [group, setGroup] = useState<BulkGroup>('kvalitet');
+  const [params] = useSearchParams();
+  const [group, setGroup] = useState<BulkGroup>((GROUPS.find(g => g.value === params.get('per'))?.value) ?? 'kvalitet');
   const range = period === 'dag' ? { from: today, to: today } : period === 'uke' ? { from: addDays(today, -6), to: today }
     : period === 'maned' ? { from: addDays(today, -29), to: today } : period === 'ar' ? { from: `${today.slice(0, 4)}-01-01`, to: today } : custom;
   const r = useBulkReport(range.from, range.to, group);

@@ -78,3 +78,11 @@ export const Vessel = ({ size = 16, fill, rotate = 0 }: { size?: number; fill: s
     <path d="M10 1 17 18 10 14 3 18z" fill={fill} />
   </svg>
 );
+/** Stjerne med strek, fylt når den er valgt (festet i søket). */
+export const StarLine = ({ size = 15, filled = false }: { size?: number; filled?: boolean }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? '#F7B955' : 'none'} stroke={filled ? '#F7B955' : 'currentColor'} strokeWidth={1.8}
+    strokeLinejoin="round" aria-hidden="true">
+    <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" />
+  </svg>
+);
+export const Message = (p: P) => <Stroke {...p}><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20.5l1.4-4.6A8 8 0 1 1 21 12z" /></Stroke>;

@@ -11,6 +11,15 @@ Internt logistikksystem for kaia på Flatholmen i Ålesund. Menyen har fire hove
 
 **Søk øverst på alle sider** finner sider, båter, anløp, biler, bulkbiler og folk i Flow. Med BarentsWatch-nøklene på plass søker det også i AIS (Kystverkets data) på navn, MMSI, IMO eller kallesignal – også båter som ikke er i båtregisteret. Fra treffet kan båten legges til i båtregisteret, og «Vis i kartet» viser hvor den er nå. BarentsWatch kan ikke søke på navn, så Flow henter alle fartøy de har sett siste 24 timer i norske farvann og filtrerer selv (listen holdes i minnet i tre minutter). Båter som ikke har vært i området det siste døgnet, blir ikke funnet.
 
+Søket kan også:
+- **Handlinger:** «ny bulk SU 20 110», «ny bil 2045555 Brødrene Sperre», «ny so 2043644 Nergård», «ny båt Coneste» åpner skjemaet ferdig utfylt.
+- **Gjenkjenning:** SO-nummer, MMSI/IMO, reg.nr. (bilens lastinger i dag og totalt), følgeseddelnummer (åpner PDF-en) og prosjektnummer.
+- **Datoer:** «i dag», «i morgen», «fredag», «neste uke», «uke 43», «23.10» viser anløp, bilhentinger og bulk den dagen.
+- **Prefiks:** `båt:`, `so:`, `bil:`, `sjåfør:`, `kunde:`, `kai:`, `person:` søker bare i én ting.
+- **Festet og nylig:** stjerna fester et treff; det du sist åpnet vises når feltet er tomt (lagres i nettleseren).
+- **Tastatur:** `Ctrl/⌘ + K` eller `/` åpner søket, piltastene velger og Enter åpner. Folk, sjåfører og agenter har knapper for å ringe og sende SMS.
+- **Spør Flow:** spørsmål med vanlige ord («Hvilken båt har vi oftest problemer med?», «Hva er det mest populære produktet vi selger?», «Hvor er Coneste?») besvares av Claude. Claude får ikke tilgang til databasen, bare åtte faste verktøy som leser kaibøker, salg, bulk, anløp, salgsordre, bilhentinger, status nå og båtinfo. Svaret har tall og lenker inn i Flow. Spørsmål og svar logges i tabellen `ai_questions`, og hver bruker kan stille 40 spørsmål i timen. Krever `ANTHROPIC_API_KEY` (steg 3).
+
 **Salgsordre (SO) er sannheten; anløpet er båten.** SO-nummeret kommer fra Dynamics 365 (20 + fem siffer, f.eks. 2043644) og tastes inn under **Anløp → Ny SO**. Varene ligger på SO-en, ikke på båten. Et anløp (én båt, én kai, én ETA) kan ha mange SO-er, og de har en **lasterekkefølge** som endres med pilene på anløpet (det som skal først på eller av båten øverst). En SO kan ligge uten båt («venter på båt»), legges på en planlagt båt eller en ny båt, flyttes til en annen båt i siste liten, eller deles på to båter (delt levering). Bytter rederiet båt for hele anløpet, brukes **Bytt båt** på anløpet; da følger alle SO-ene med. Avlyses et anløp, går SO-ene tilbake til «venter på båt». Når kaiboka leveres, blir SO-ene ferdige.
 
 **Endringslogg:** Hver SO har sin egen logg over hvem som gjorde hva og når: opprettet, varer lagt til, endret eller fjernet, ny båt, ny ETA, ny kai, flyttet, lasterekkefølge, kansellert og ferdig. Endringer på anløpet (båt, ETA, kai) føres hos hver SO som ligger på det, og selgeren får varsel i bjella når noen andre endrer. Anløpet har fanen **Endringer** som samler alt for båten. Søket finner SO-er på nummer og kunde.
@@ -115,6 +124,8 @@ Alt legges inn i dashbordet under **Workers & Pages → flow → Settings → Va
 | `ADMIN_EMAILS` | Text | Bare med Access: din e-post, eventuelt flere adskilt med komma. Disse blir admin ved første innlogging. |
 | `BW_CLIENT_ID` | **Secret** | Klient-ID fra BarentsWatch (se steg 5) |
 | `BW_CLIENT_SECRET` | **Secret** | Klienthemmelighet fra BarentsWatch |
+| `ANTHROPIC_API_KEY` | **Secret** | Nøkkel til Claude for «Spør Flow» i søkefeltet. Lages på [console.anthropic.com](https://console.anthropic.com) → **API Keys**. Uten nøkkel virker alt annet i søket. |
+| `AI_MODEL` | Text | Valgfritt: hvilken Claude-modell «Spør Flow» bruker. Standard `claude-sonnet-5-5`. |
 
 Nye verdier gjelder fra neste forespørsel; ny deploy trengs ikke.
 

@@ -92,5 +92,9 @@ export const SERVER_TEXTS = [
   'Det finnes allerede et transportfirma med dette navnet.', 'Det finnes allerede en kunde med dette navnet.',
   'Det finnes allerede en sjåfør med dette telefonnummeret.', 'Det finnes allerede en bil med dette reg.nr.',
   'NØDSTOPP ved utlastingen: {bil} ({navn})', 'Egne biler',
+  // Søk og «Spør Flow»
+  'Ny bulklasting', 'Ny bilhenting', 'Ny salgsordre', 'Ny båt', 'Agent',
+  'Spør Flow er ikke satt opp (ANTHROPIC_API_KEY mangler).', 'Nøkkelen til Claude (ANTHROPIC_API_KEY) er ugyldig.', 'Claude er opptatt akkurat nå. Prøv igjen om litt.',
+  'Fikk ikke svar fra Claude.', 'Spørsmålet ble for omfattende. Prøv å spørre mer avgrenset.', 'Du har stilt mange spørsmål den siste timen. Prøv igjen litt senere.',
   'Noe gikk galt.', 'Feil {kode}',
 ];

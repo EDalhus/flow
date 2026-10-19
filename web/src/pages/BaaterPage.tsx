@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
+import { usePrefill } from '../lib/prefill.ts';
 import type { BoatView } from '../../../shared/api.ts';
 import { FLAGS, FLAG_LABEL, type Flag } from '../../../shared/domain/types.ts';
 import { Phone, Plus } from '../components/Icons.tsx';
@@ -26,6 +27,8 @@ export function BaaterPage() {
   const me = useMe();
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState<'ny' | 'rediger' | null>(null);
+  const [prefill] = usePrefill(['navn', 'mmsi']);
+  useEffect(() => { if (prefill) setEditing('ny'); }, [prefill]);
   const [filter, setFilter] = useState<Filter>('alle');
   const [q, setQ] = useState('');
   const list = boats.data ?? [];
@@ -86,7 +89,7 @@ export function BaaterPage() {
 
       {editing ? (
         <aside className="glass scroll" style={{ flex: '1 1 360px', maxWidth: 400, padding: 20, maxHeight: 'calc(100vh - 120px)', position: 'sticky', top: 20 }}>
-          <BoatForm boat={editing === 'rediger' ? list.find(b => b.id === selId) : undefined} onClose={() => setEditing(null)}
+          <BoatForm key={prefill?.n} initial={editing === 'ny' ? prefill ?? undefined : undefined} boat={editing === 'rediger' ? list.find(b => b.id === selId) : undefined} onClose={() => setEditing(null)}
             onSaved={id => { setEditing(null); setParams({ id }, { replace: true }); }} />
         </aside>
       ) : selId && <BoatProfile id={selId} onEdit={canPlan(me.data) ? () => setEditing('rediger') : undefined} />}

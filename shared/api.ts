@@ -1,5 +1,6 @@
 // Responstyper fra API-et. Brukes av frontend.
 import type { Collision, Suggestion } from './domain/collisions.ts';
+import type { SearchScope } from './domain/search.ts';
 import type { CallStatus, CallType, Category, CrewRole, Direction, Flag, UserRole } from './domain/types.ts';
 
 export interface UserRef {
@@ -556,15 +557,32 @@ export interface ExternalVessel {
   boat_id: string | null;
 }
 
+export interface SearchBulk {
+  id: string; truck: string; destination: string | null; status: string; delivery_no: number | null; project_no: string | null; at: string;
+}
+
+/** Svar fra «Spør Flow». */
+export interface AskAnswer { question: string; answer: string; tools: string[] }
+
 export interface SearchResult {
   q: string;
   boats: { id: string; name: string; mmsi: string | null; flag: Flag }[];
   calls: { id: string; boat_name: string; service_date: string; eta: string; time_known: boolean; type: CallType | 'begge'; status: CallStatus }[];
   orders: { id: string; so_number: string; customer: string; status: OrderStatus; boat_name: string | null; service_date: string | null }[];
   trucks: { id: string; so_number: string; customer: string; expected_date: string; reg_no: string | null; picked_up: boolean }[];
-  bulk: { id: string; truck: string; destination: string | null; status: string }[];
+  bulk: SearchBulk[];
   users: { id: string; name: string; title: string | null; phone: string | null }[];
   vessels: ExternalVessel[];
+  /** Prefiks som avgrenser søket («båt:», «so:», «bil:», «sjåfør:», «kunde:», «kai:», «person:»). */
+  scope: SearchScope | null;
+  /** Dato eller periode i søket («i morgen», «fredag», «uke 43»): det som skjer da. */
+  agenda: { from: string; to: string; calls: SearchResult['calls']; trucks: SearchResult['trucks']; bulk: SearchBulk[] } | null;
+  /** Biler (reg.nr.) fra bulkregisteret, med lastinger i dag og totalt. */
+  vehicles: { id: string; reg_no: string; description: string | null; hauler: string; today: number; total: number; last_at: string | null }[];
+  /** Prosjektnumre på bulkleveranser. */
+  projects: { project_no: string; customer: string | null; loads: number; tonnes: number }[];
+  drivers: { id: string; name: string; phone: string; hauler: string }[];
+  agents: { id: string; name: string; phone: string | null }[];
   /** Hvorfor AIS-søket ikke ga svar (ikke satt opp, feil fra BarentsWatch), ellers null. */
   ais_error: string | null;
 }

@@ -61,14 +61,16 @@ type StepDraft = { quality_id: string; tonnes: string; target: 'bil' | 'henger' 
  * Bestilling: bil, kunde (prosjektnummer når kunden krever det), SO, nå eller ca. tid, og stegene (bil + ev. henger).
  * Kontoret velger også sjåfør; sjåføren bestiller for seg selv.
  */
-export function BookingForm({ vehicles, customers, qualities, drivers, pending, error, onSubmit, onCancel, large }: {
+export function BookingForm({ vehicles, customers, qualities, drivers, pending, error, onSubmit, onCancel, large, initialVehicleId }: {
   vehicles: Vehicle[]; customers: { id: string; name: string; requires_project: boolean }[]; qualities: BulkQuality[];
   /** Bare på kontoret: sjåfører (filtreres på bilens transportfirma). */
   drivers?: { id: string; name: string; hauler: { id: string } }[];
   pending: boolean; error: string | null; onSubmit: (b: BulkOrderCreateInput) => void; onCancel?: () => void; large?: boolean;
+  /** Fra søket («ny bulk SU 20 110»). */
+  initialVehicleId?: string;
 }) {
   const storedVehicle = (() => { try { return localStorage.getItem('flow-bulk-bil') ?? ''; } catch { return ''; } })();
-  const [vehicleId, setVehicleId] = useState(vehicles.find(v => v.id === storedVehicle)?.id ?? vehicles[0]?.id ?? '');
+  const [vehicleId, setVehicleId] = useState(vehicles.find(v => v.id === (initialVehicleId ?? storedVehicle))?.id ?? vehicles[0]?.id ?? '');
   const [driverId, setDriverId] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [project, setProject] = useState('');

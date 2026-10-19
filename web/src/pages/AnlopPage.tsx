@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { usePrefill } from '../lib/prefill.ts';
 import type { OrderView, PortCallView } from '../../../shared/api.ts';
 import { isoWeek } from '../../../shared/time.ts';
 import { Plus } from '../components/Icons.tsx';
@@ -29,7 +30,9 @@ export function AnlopPage() {
   const calls = usePortCalls(today, addDays(today, q.trim() ? 60 : 7));
   const orders = useOrders();
   const [filter, setFilter] = useState<Filter>('uke');
-  const [showNew, setShowNew] = useState(params.get('ny') === '1');
+  const [showNew, setShowNew] = useState(false);
+  const [prefill, clearPrefill] = usePrefill(['so', 'kunde', 'anlop']);
+  useEffect(() => { if (prefill) { setShowNew(true); setParams(p => { p.set('vis', 'ordre'); p.delete('so'); return p; }, { replace: true }); } }, [prefill]); // eslint-disable-line react-hooks/exhaustive-deps
   // Fra det globale søket: /anlop?q=båtnavn, /anlop?so=2043644
   const urlQ = params.get('q');
   useEffect(() => { if (urlQ) { setQ(urlQ); setFilter('uke'); } }, [urlQ]);
@@ -107,7 +110,7 @@ export function AnlopPage() {
       {soKey ? (
         <OrderPanel id={soKey} onClose={() => openSo(null)} onOpenCall={id => nav(`/?id=${id}`)} />
       ) : showNew && (
-        <NewOrderDrawer initialCall={params.get('anlop') ?? undefined} onClose={() => setShowNew(false)} onCreated={o => { setShowNew(false); openSo(o.so_number); }} />
+        <NewOrderDrawer key={prefill?.n} initialCall={prefill?.anlop} initialSo={prefill?.so} initialCustomer={prefill?.kunde} onClose={() => { setShowNew(false); clearPrefill(); }} onCreated={o => { setShowNew(false); openSo(o.so_number); }} />
       )}
     </Page>
   );

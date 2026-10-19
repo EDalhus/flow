@@ -6,11 +6,11 @@ import { Close } from './Icons.tsx';
 import { tr } from '../lib/i18n.ts';
 
 /** Ny båt eller redigering. MMSI trengs for at AIS skal finne båten. */
-export function BoatForm({ boat, onClose, onSaved }: { boat?: BoatView; onClose: () => void; onSaved: (id: string) => void }) {
+export function BoatForm({ boat, onClose, onSaved, initial }: { boat?: BoatView; onClose: () => void; onSaved: (id: string) => void; initial?: Record<string, string> }) {
   const agents = useAgents();
   const save = useSaveBoat();
   const [f, setF] = useState({
-    name: boat?.name ?? '', mmsi: boat?.mmsi ?? '', imo: boat?.imo ?? '', callsign: boat?.callsign ?? '',
+    name: boat?.name ?? initial?.navn ?? '', mmsi: boat?.mmsi ?? initial?.mmsi ?? '', imo: boat?.imo ?? '', callsign: boat?.callsign ?? '',
     agent_id: boat?.agent?.id ?? '', ship_contact: boat?.ship_contact ?? '', ship_phone: boat?.ship_phone ?? '', note: boat?.note ?? '',
   });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });

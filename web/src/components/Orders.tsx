@@ -537,7 +537,9 @@ function CancelOrder({ order: o, onDone, onCancel }: { order: OrderDetail; onDon
 // ---------------------------------------------------------------- ny SO
 
 /** Ny salgsordre fra Dynamics 365: SO-nummer, kunde, varer og båt (ingen ennå, planlagt båt eller ny båt). */
-export function NewOrderDrawer({ onClose, onCreated, initialCall }: { onClose: () => void; onCreated: (o: OrderDetail) => void; initialCall?: string }) {
+export function NewOrderDrawer({ onClose, onCreated, initialCall, initialSo, initialCustomer }: {
+  onClose: () => void; onCreated: (o: OrderDetail) => void; initialCall?: string; initialSo?: string; initialCustomer?: string;
+}) {
   const me = useMe();
   const users = useUsers();
   const boats = useBoats();
@@ -545,8 +547,8 @@ export function NewOrderDrawer({ onClose, onCreated, initialCall }: { onClose: (
   const skus = useSkus();
   const create = useCreateOrder();
   const today = todayOslo();
-  const [so, setSo] = useState('');
-  const [customer, setCustomer] = useState('');
+  const [so, setSo] = useState(initialSo ?? '');
+  const [customer, setCustomer] = useState(initialCustomer ?? '');
   const [sellerId, setSellerId] = useState('');
   const [wanted, setWanted] = useState(today);
   const [type, setType] = useState<'ut' | 'inn'>('ut');

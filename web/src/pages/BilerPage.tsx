@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePrefill } from '../lib/prefill.ts';
 import type { TruckOrderView } from '../../../shared/api.ts';
 import { Check, Close, Plus } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
@@ -21,6 +22,7 @@ export function BilerPage() {
   const pickup = usePickupTruck();
   const [filter, setFilter] = useState<Filter>('aapne');
   const [showNew, setShowNew] = useState(false);
+  const [prefill, clearPrefill] = usePrefill(['kunde', 'reg', 'so']);
 
   const all = (orders.data ?? []).filter(o => !o.cancelled_at);
   const visible = all.filter(o => filter === 'alle' || !o.picked_up_at);
@@ -102,21 +104,21 @@ export function BilerPage() {
         {orders.isSuccess && !visible.length && <p className="empty">{tr('Ingen biler ventes.')}</p>}
       </div>
 
-      {showNew && <NewTruckDrawer onClose={() => setShowNew(false)} />}
+      {(showNew || prefill) && <NewTruckDrawer key={prefill?.n} initial={prefill ?? {}} onClose={() => { setShowNew(false); clearPrefill(); }} />}
     </Page>
   );
 }
 
 type Line = { sku_id: string; quantity: string };
 
-function NewTruckDrawer({ onClose }: { onClose: () => void }) {
+function NewTruckDrawer({ onClose, initial }: { onClose: () => void; initial: Record<string, string> }) {
   const today = todayOslo();
   const products = useProducts();
   const create = useCreateTruckOrder();
-  const [customer, setCustomer] = useState('');
+  const [customer, setCustomer] = useState(initial.kunde ?? '');
   const [carrier, setCarrier] = useState('');
-  const [regNo, setRegNo] = useState('');
-  const [so, setSo] = useState('');
+  const [regNo, setRegNo] = useState(initial.reg ?? '');
+  const [so, setSo] = useState(initial.so ?? '');
   const [date, setDate] = useState(today);
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<Line[]>([{ sku_id: '', quantity: '24' }]);
