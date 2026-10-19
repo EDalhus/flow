@@ -61,7 +61,7 @@ export function ShipCard({ v, x = 0, y = 0, now, approach: a, trackError, onClos
   );
   return (
     <div className={docked ? 'glass' : 'glass ov-hide'} role="dialog" aria-label={tr('Fartøy {navn}', { navn: name })}
-      style={{ position: 'absolute', left, top, width: 300, ...docked, padding: 16, borderRadius: 18, background: 'rgba(var(--chrome-rgb), .92)', display: 'flex', flexDirection: 'column', gap: 12, zIndex: 6 }}>
+      style={{ position: 'absolute', left, top, width: 300, zIndex: 6, ...docked, padding: 16, borderRadius: 18, background: 'rgba(var(--chrome-rgb), .92)', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <span style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(242,245,243,.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
           <span style={{ width: 12, height: 22, background: CATEGORY_COLOR[v.cat], clipPath: 'polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%)', transform: 'rotate(30deg)' }} />

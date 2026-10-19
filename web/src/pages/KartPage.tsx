@@ -111,10 +111,6 @@ export function KartPage() {
           </span>
         )}
         <VesselLayer project={project} vessels={vessels} calls={list} selectedId={selected?.id} onSelect={id => select(id)} quayPos={quayPos} />
-        {shipSel && selShip && (() => {
-          const pt = project(selShip.lon, selShip.lat);
-          return pt && <ShipCard v={selShip} x={pt[0]} y={pt[1]} now={now.getTime()} approach={t.approach} trackError={trackError} onClose={() => setShipSel(null)} />;
-        })()}
         {focus && !traffic.some(v => v.mmsi === focus.mmsi) && (() => {
           const pt = project(focus.lon, focus.lat);
           return pt && (
@@ -159,6 +155,12 @@ export function KartPage() {
       </div>
 
       <TrafficLegend s={t} />
+
+      {/* Fartøyet som er trykket på: fast oppe til høyre (venstre for anløpspanelet når det er åpent), ikke over skipet. */}
+      {shipSel && selShip && (
+        <ShipCard v={selShip} now={now.getTime()} approach={t.approach} trackError={trackError} onClose={() => setShipSel(null)}
+          docked={{ position: 'absolute', top: 96, left: 'auto', right: selected ? 'calc(32px + var(--col) + 24px)' : 32, width: 320, zIndex: 25, maxHeight: 'calc(100% - 96px - 24px)', overflowY: 'auto' }} />
+      )}
 
       <Timeline today={today} selected={selected?.id} onSelect={select} now={now} quays={quays.data ?? []} open={tlOpen} onToggle={toggleTl} />
 
