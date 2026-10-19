@@ -287,7 +287,7 @@ function Item({ e, active, pinned, onHover, onClick, onPin }: { e: Entry; active
 /** Når feltet er tomt: hva søket kan gjøre. */
 function Tips({ onPick, ai }: { onPick: (t: string) => void; ai: boolean }) {
   const tips = [
-    ...(ai ? [tr('Hvilken båt har vi oftest problemer med?'), tr('Flytt neste båt til kai 2')] : []), tr('i morgen'), tr('ny bulk SU 20 110'), tr('båt: coneste'),
+    ...(ai ? [tr('Hvilken båt har vi oftest problemer med?'), tr('Flytt neste båt til kai 2'), tr('Hvordan legger jeg til en ny sjåfør?')] : []), tr('i morgen'), tr('ny bulk SU 20 110'), tr('båt: coneste'),
   ];
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '6px 10px 4px' }}>

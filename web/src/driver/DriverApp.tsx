@@ -5,6 +5,9 @@ import { bulkPhase } from '../../../shared/domain/bulk.ts';
 import type { BulkOrderCreateInput } from '../../../shared/schemas.ts';
 import { BookingForm, PhaseBadge, StepChips } from '../components/Bulk.tsx';
 import { LangFlag } from '../components/Flag.tsx';
+import { Mic } from '../components/Icons.tsx';
+import { Markdown } from '../components/Markdown.tsx';
+import { useDictation } from '../lib/dictation.ts';
 import { ApiError, errorText } from '../lib/api.ts';
 import { dayShort, fr, osloTime, todayOslo } from '../lib/format.ts';
 import { LANGS, getLang, loadLang, tr } from '../lib/i18n.ts';
@@ -108,6 +111,7 @@ function DriverHome({ lang, setLang, onLogout }: { lang: Lang; setLang: (l: Lang
   const qc = useQueryClient();
   const me = useQuery({ queryKey: ['driver-me'], queryFn: () => dapi<DriverMe>('/me'), refetchInterval: 5000 });
   const [booking, setBooking] = useState(false);
+  const [help, setHelp] = useState(false);
   const create = useMutation({
     mutationFn: (b: BulkOrderCreateInput) => dapi<BulkOrderView>('/orders', { body: b }),
     onSuccess: () => { setBooking(false); qc.invalidateQueries({ queryKey: ['driver-me'] }); },
@@ -142,10 +146,12 @@ function DriverHome({ lang, setLang, onLogout }: { lang: Lang; setLang: (l: Lang
             <div style={{ fontSize: 24 }}>{d.driver.name}</div>
             <div className="muted" style={{ fontSize: 15 }}>{d.driver.hauler.name}</div>
           </div>
+          {d.ai && <button type="button" className="btn" onClick={() => setHelp(!help)} aria-expanded={help}>{tr('Hjelp')}</button>}
           <button type="button" className="btn" onClick={out}>{tr('Logg ut')}</button>
         </div>
         <LangPicker lang={lang} setLang={chooseLang} />
       </header>
+      {help && <DriverHelp onClose={() => setHelp(false)} />}
 
       {active.map(o => <ActiveOrder key={o.id} order={o} />)}
       {waiting.map(o => <WaitingOrder key={o.id} order={o} today={today} canStart={!active.length} />)}
@@ -300,5 +306,50 @@ function PdfButton({ order: o }: { order: BulkOrderView }) {
       </button>
       {err && <div className="error-box">{err}</div>}
     </>
+  );
+}
+
+/** Hjelp: spør med egne ord på ditt språk («hvordan starter jeg henger?»); Claude svarer ut fra sjåførhåndboka. */
+function DriverHelp({ onClose }: { onClose: () => void }) {
+  const [turns, setTurns] = useState<{ q: string; a?: string; error?: string }[]>([]);
+  const [draft, setDraft] = useState('');
+  const dict = useDictation(t => setDraft(x => (x ? `${x} ${t}` : t)));
+  const m = useMutation({
+    mutationFn: ({ q, i }: { q: string; i: number }) => dapi<{ answer: string }>('/help', { body: {
+      question: q, history: turns.slice(0, i).flatMap(t => (t.a ? [{ role: 'user', content: t.q }, { role: 'assistant', content: t.a }] : [])),
+    } }),
+    onSuccess: (r, { i }) => setTurns(ts => ts.map((t, j) => (j === i ? { ...t, a: r.answer } : t))),
+    onError: (e, { i }) => setTurns(ts => ts.map((t, j) => (j === i ? { ...t, error: errorText(e) } : t))),
+  });
+  const send = () => {
+    const q = draft.trim();
+    if (!q || m.isPending) return;
+    dict.stop();
+    setDraft('');
+    setTurns(ts => [...ts, { q }]);
+    m.mutate({ q, i: turns.length });
+  };
+  return (
+    <section className="glass" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }} aria-label={tr('Hjelp')}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ flex: 1, fontSize: 20, fontWeight: 300 }}>{tr('Hjelp')}</span>
+        <button type="button" className="btn" onClick={onClose}>{tr('Lukk')}</button>
+      </div>
+      {!turns.length && <span className="muted" style={{ fontSize: 15 }}>{tr('Spør med egne ord, f.eks. «Hvordan starter jeg henger?» eller «Jeg har glemt PIN».')}</span>}
+      {turns.map((t, i) => (
+        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ alignSelf: 'flex-end', maxWidth: '85%', padding: '8px 12px', borderRadius: '14px 14px 4px 14px', background: 'rgba(var(--tint), .08)', fontSize: 16 }}>{t.q}</div>
+          {t.a ? <Markdown text={t.a} go={() => {}} size={16} /> : t.error ? <div className="error-box">{t.error}</div> : <span className="sub loading">{tr('Et øyeblikk …')}</span>}
+        </div>
+      ))}
+      <form onSubmit={e => { e.preventDefault(); send(); }} style={{ display: 'flex', gap: 8 }}>
+        <input className="inp" value={draft} onChange={e => setDraft(e.target.value)} placeholder={tr('Skriv spørsmålet ditt …')} style={{ flex: 1, minHeight: 52, fontSize: 17 }} aria-label={tr('Spørsmål')} />
+        {dict.supported && (
+          <button type="button" className="icon-btn" onClick={dict.toggle} aria-pressed={dict.on} aria-label={dict.on ? tr('Stopp diktering') : tr('Snakk inn')}
+            style={{ width: 52, height: 52, ...(dict.on ? { background: '#E5484D', color: '#fff' } : {}) }}><Mic size={20} /></button>
+        )}
+        <button type="submit" className="btn btn-w" disabled={!draft.trim() || m.isPending} style={{ minHeight: 52 }}>{tr('Send')}</button>
+      </form>
+    </section>
   );
 }

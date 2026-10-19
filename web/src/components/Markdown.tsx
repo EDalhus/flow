@@ -18,16 +18,16 @@ function inline(list: Inline[], go: (to: string) => void, k = ''): ReactNode[] {
   });
 }
 
-export function Markdown({ text, go }: { text: string; go: (to: string) => void }) {
+export function Markdown({ text, go, size = 14 }: { text: string; go: (to: string) => void; size?: number }) {
   const blocks = parseMarkdown(text);
   const firstP = blocks.findIndex(b => b.t === 'p');
   return (
-    <div className="md" style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 14, lineHeight: 1.55, color: 'var(--fg-75)' }}>
+    <div className="md" style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: size, lineHeight: 1.55, color: 'var(--fg-75)' }}>
       {blocks.map((b, i) => {
         if (b.t === 'h') return <h3 key={i} className="eyebrow" style={{ margin: '4px 0 -4px', fontSize: 11, fontWeight: 500 }}>{inline(b.c, go)}</h3>;
         if (b.t === 'p') {
           return (
-            <p key={i} style={{ margin: 0, ...(i === firstP ? { fontSize: 15.5, color: 'var(--fg)' } : {}) }}>
+            <p key={i} style={{ margin: 0, ...(i === firstP ? { fontSize: size + 1.5, color: 'var(--fg)' } : {}) }}>
               {b.lines.map((l, j) => <span key={j}>{j > 0 && <br />}{inline(l, go, `${i}-${j}-`)}</span>)}
             </p>
           );

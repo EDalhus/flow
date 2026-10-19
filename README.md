@@ -27,6 +27,12 @@ Søket kan også:
 
 **Oversettelse:** Chatmeldinger, avvik, notater og merknader som er skrevet på et annet språk enn ditt, vises automatisk oversatt, med «Vis original». Hver tekst oversettes én gang per språk og lagres (`translations`). Oversettelsen bruker den raske modellen `claude-haiku-5-5` (kan endres med `AI_TRANSLATE_MODEL`).
 
+**Før båten kommer:** I anløpspanelet (Oversikt) vises et kort sammendrag av båten: avvik siste år, kategorier, kontakt og ting kaia bør passe på. Det lages på nytt når kaibøker, flagg eller merknad endres, ellers etter en uke (`ai_boat_briefs`).
+
+**Rapport med forklaringer:** Øverst på Rapporter: velg måned (eller hittil i år) → «Lag rapport». Tonn inn/ut, anløp, bilhentinger, bulk, produkter, kunder, avvik og punktlighet, sammenlignet med perioden før, og hva som har endret seg. «Last ned PDF» åpner utskrift (lagre som PDF). Rapporten lagres (`ai_reports`); «Lag på nytt» lager den på nytt.
+
+**Hjelp til Flow:** «Hvordan legger jeg til en ny sjåfør?» i søket gir stegene og lenke til riktig side (håndboka står i `worker/lib/help.ts` og må holdes oppdatert). Sjåførene har en egen «Hjelp»-knapp i sjåførvisningen som svarer på deres språk ut fra sjåførhåndboka (maks 20 spørsmål i timen).
+
 Uten `ANTHROPIC_API_KEY` er alle Claude-funksjonene skjult, og resten av Flow virker som før.
 
 **Salgsordre (SO) er sannheten; anløpet er båten.** SO-nummeret kommer fra Dynamics 365 (20 + fem siffer, f.eks. 2043644) og tastes inn under **Anløp → Ny SO**. Varene ligger på SO-en, ikke på båten. Et anløp (én båt, én kai, én ETA) kan ha mange SO-er, og de har en **lasterekkefølge** som endres med pilene på anløpet (det som skal først på eller av båten øverst). En SO kan ligge uten båt («venter på båt»), legges på en planlagt båt eller en ny båt, flyttes til en annen båt i siste liten, eller deles på to båter (delt levering). Bytter rederiet båt for hele anløpet, brukes **Bytt båt** på anløpet; da følger alle SO-ene med. Avlyses et anløp, går SO-ene tilbake til «venter på båt». Når kaiboka leveres, blir SO-ene ferdige.

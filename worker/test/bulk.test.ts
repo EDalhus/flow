@@ -124,5 +124,8 @@ describe('bulk: lasting', () => {
     expect((await driverApi(`/orders/${o.id}/cancel`, { token, body: {} })).status).toBe(404); // ikke hans
     const mine = (await driverApi('/orders', { token, body: { vehicle_id: car.id, customer_id: cust.id, steps: [{ quality_id: 'havsalt', tonnes: 10, target: 'bil' }] } })).json;
     expect((await driverApi(`/orders/${mine.id}/cancel`, { token, body: {} })).json.status).toBe('avlyst');
+    // Hjelp med Claude: av uten nøkkel.
+    expect((await driverApi('/me', { token })).json.ai).toBe(false);
+    expect((await driverApi('/help', { token, body: { question: 'Hvordan starter jeg?' } })).status).toBe(503);
   });
 });

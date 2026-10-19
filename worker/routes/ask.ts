@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import type { AskAction, AskAnswer, KaibokDraft, MorningBrief, Translation } from '../../shared/api.ts';
+import type { AiReport, AskAction, AskAnswer, KaibokDraft, MorningBrief, Translation } from '../../shared/api.ts';
 import { todayOslo } from '../../shared/time.ts';
 import { CAN, requireRole } from '../auth/access.ts';
 import { expired, linkFor } from '../lib/actions.ts';
-import { AskError, ask, kaibokDraft, morningBrief, translateTexts } from '../lib/ask.ts';
+import { AskError, ask, boatBrief, kaibokDraft, morningBrief, periodReport, translateTexts } from '../lib/ask.ts';
 import { body, fail, nowIso } from '../lib/http.ts';
 import { INTERNAL_HEADER, internalToken } from '../lib/internal.ts';
 import { sha256 } from '../lib/pin.ts';
@@ -123,6 +123,44 @@ app.post('/kaibok', requireRole(...CAN.quayLog), body(z.object({ port_call_id: z
   if (!call) throw fail(404, 'Fant ikke anløpet.');
   const draft = await guard(() => kaibokDraft(c.env, call, text));
   return c.json(draft satisfies KaibokDraft);
+});
+
+// ---------------------------------------------------------------- før båten kommer
+
+/** Sammendrag av båten til anløpet. Lages på nytt når kaibøker, flagg eller merknad endres, ellers etter en uke. */
+app.get('/boat/:id', async c => {
+  if (!c.env.ANTHROPIC_API_KEY?.trim()) return c.json({ text: null });
+  const db = c.env.DB;
+  const l = c.get('user').prefs.lang ?? 'nb';
+  const b = await db.prepare(`SELECT id, name, rating_count, last_log_at, flag_auto, flag_override, note FROM boats WHERE id = ?`).bind(c.req.param('id'))
+    .first<{ id: string; name: string; rating_count: number; last_log_at: string | null; flag_auto: string; flag_override: string | null; note: string | null }>();
+  if (!b) throw fail(404, 'Fant ikke båten.');
+  const basis = await sha256([b.rating_count, b.last_log_at, b.flag_override ?? b.flag_auto, b.note].join('|'));
+  const row = await db.prepare('SELECT basis, text, created_at FROM ai_boat_briefs WHERE boat_id = ? AND lang = ?').bind(b.id, l).first<{ basis: string; text: string; created_at: string }>();
+  if (row && row.basis === basis && Date.parse(row.created_at) > Date.now() - 7 * 86_400_000) return c.json({ text: row.text });
+  const text = await guard(() => boatBrief(c.env, b.name, l));
+  await db.prepare('INSERT OR REPLACE INTO ai_boat_briefs (boat_id, lang, basis, text) VALUES (?, ?, ?, ?)').bind(b.id, l, basis, text).run();
+  return c.json({ text });
+});
+
+// ---------------------------------------------------------------- rapport med forklaringer
+
+const date = z.iso.date();
+app.post('/report', body(z.object({ from: date, to: date, fresh: z.boolean().optional() })), async c => {
+  const { from, to, fresh } = c.req.valid('json');
+  if (to < from) throw fail(400, 'Til-dato må være etter fra-dato.');
+  if (Date.parse(to) - Date.parse(from) > 366 * 86_400_000) throw fail(400, 'Velg en periode på maks ett år.');
+  const db = c.env.DB;
+  const user = c.get('user');
+  const l = user.prefs.lang ?? 'nb';
+  if (!fresh) {
+    const row = await db.prepare('SELECT text, created_at FROM ai_reports WHERE period_from = ? AND period_to = ? AND lang = ?').bind(from, to, l).first<{ text: string; created_at: string }>();
+    if (row) return c.json({ from, to, text: row.text, created_at: row.created_at } satisfies AiReport);
+  }
+  const text = await guard(() => periodReport(c.env, from, to, l));
+  const created = nowIso();
+  await db.prepare('INSERT OR REPLACE INTO ai_reports (period_from, period_to, lang, text, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(from, to, l, text, user.id, created).run();
+  return c.json({ from, to, text, created_at: created } satisfies AiReport);
 });
 
 // ---------------------------------------------------------------- oversettelse

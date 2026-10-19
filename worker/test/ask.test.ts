@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import { looksLikeQuestion, parseActions, parseDay, parseScope } from '../../shared/domain/search.ts';
 import { propose } from '../lib/actions.ts';
-import { ANTHROPIC_URL, TOOLS, ask, runTool, translateTexts } from '../lib/ask.ts';
+import { ANTHROPIC_URL, TOOLS, ask, periodReport, runTool, translateTexts } from '../lib/ask.ts';
 import { api, at, call } from './fixtures.ts';
 
 const ADA = { id: 'u_admin', name: 'Ada', roles: ['admin'] };
@@ -73,7 +73,8 @@ describe('Spør Flow', () => {
     expect(await runTool(env, 'salg', { from: 'i fjor', to: '2030-01-01' })).toMatchObject({ feil: 'Ugyldige parametere' });
     expect(await runTool(env, 'salg', { from: '2030-01-01', to: '2029-01-01' })).toMatchObject({ feil: expect.stringMatching(/to må være/) });
     expect(await runTool(env, 'slett_alt', {})).toMatchObject({ feil: expect.stringMatching(/Ukjent/) });
-    expect(Object.keys(TOOLS)).toHaveLength(8);
+    expect(Object.keys(TOOLS)).toHaveLength(9);
+    expect(await runTool(env, 'hjelp', {})).toMatchObject({ handbok: expect.stringContaining('Ny sjåfør') });
   });
 
   it('kjører verktøyene Claude ber om og returnerer svaret', async () => {
@@ -170,5 +171,33 @@ describe('Claude: brief, kaibok og oversettelse', () => {
     };
     expect(await translateTexts({ ...env, ANTHROPIC_API_KEY: 'k' }, ['Kranas sugedęs', 'Alt ok'], 'nb', fetcher))
       .toEqual([{ text: 'Kranen er ødelagt', source_lang: 'lt' }, { text: null, source_lang: 'nb' }]);
+  });
+});
+
+describe('Claude: før båten kommer, rapport og hjelp', () => {
+  it('uten nøkkel: ingen sammendrag, rapport og sjåførhjelp gir 503', async () => {
+    expect((await api('/ask/boat/b_a')).json).toEqual({ text: null });
+    expect((await api('/ask/report', { body: { from: '2030-01-01', to: '2030-01-31' } })).status).toBe(503);
+    expect((await api('/ask/report', { body: { from: '2030-02-01', to: '2030-01-31' } })).status).toBe(400);
+  });
+
+  it('rapporten henter tall for perioden og perioden før', async () => {
+    const asked: string[] = [];
+    let n = 0;
+    const fetcher = async (_u: string, init: RequestInit) => {
+      const b = JSON.parse(init.body as string);
+      if (n++ === 0) {
+        expect(b.system).toMatch(/2029-12-01 til 2029-12-31/); // perioden før januar (31 dager)
+        return Response.json({ stop_reason: 'tool_use', content: [
+          { type: 'tool_use', id: 's1', name: 'salg', input: { from: '2030-01-01', to: '2030-01-31' } },
+          { type: 'tool_use', id: 's2', name: 'salg', input: { from: '2029-12-01', to: '2029-12-31' } },
+        ] });
+      }
+      asked.push(...b.messages[2].content.map((r: { content: string }) => r.content));
+      return Response.json({ stop_reason: 'end_turn', content: [{ type: 'text', text: '### Hovedtall\n- **Tonn ut:** 0 t' }] });
+    };
+    expect(await periodReport({ ...env, ANTHROPIC_API_KEY: 'k' }, '2030-01-01', '2030-01-31', 'nb', fetcher)).toMatch(/Hovedtall/);
+    expect(asked).toHaveLength(2);
+    expect(JSON.parse(asked[0])).toHaveProperty('sum_tonn');
   });
 });

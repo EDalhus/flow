@@ -2,11 +2,12 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { z } from 'zod';
-import type { BulkQuality, DriverMe, Vehicle } from '../../shared/api.ts';
+import type { BulkQuality, DriverMe, Lang, Vehicle } from '../../shared/api.ts';
 import { normalizePhone } from '../../shared/domain/bulk.ts';
 import { bulkOrderCreate, driverLogin } from '../../shared/schemas.ts';
 import { osloToUtc, todayOslo } from '../../shared/time.ts';
 import { readWeighed, bulkAct, createBulkOrder, loadBulk, loadBulkOne, pdfResponse, type Actor, type BulkAction } from '../db/bulk.ts';
+import { AskError, driverHelp } from '../lib/ask.ts';
 import { body, fail, nowIso } from '../lib/http.ts';
 import { newToken, sha256, verifyPin } from '../lib/pin.ts';
 import { publish } from '../lib/realtime.ts';
@@ -86,6 +87,7 @@ app.get('/me', async c => {
     customers: (customers.results as { id: string; name: string; requires_project: number }[]).map(x => ({ ...x, requires_project: !!x.requires_project })),
     qualities: qualities.results as BulkQuality[],
     orders,
+    ai: !!c.env.ANTHROPIC_API_KEY?.trim(),
   } satisfies DriverMe);
 });
 
@@ -115,6 +117,26 @@ app.post('/orders/:id/:action{start|step-done|stop|continue|cancel}', async c =>
   const view = await bulkAct(c.env, o, action, me(c.get('driver')), weighed);
   publish(c as unknown as Context<AppEnv>, { type: 'bulk.changed' });
   return c.json(view);
+});
+
+/** Hjelp i sjåførvisningen (Claude, ut fra håndboka for sjåfører). Maks 20 spørsmål i timen. */
+app.post('/help', body(z.object({
+  question: z.string().trim().min(2).max(500),
+  history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(3000) })).max(12).default([]),
+})), async c => {
+  const d = c.get('driver');
+  const { question, history } = c.req.valid('json');
+  const db = c.env.DB;
+  const used = await db.prepare('SELECT count(*) AS n FROM ai_questions WHERE driver_id = ? AND created_at >= ?').bind(d.id, new Date(Date.now() - 3_600_000).toISOString()).first<{ n: number }>();
+  if ((used?.n ?? 0) >= 20) throw fail(429, 'Du har stilt mange spørsmål den siste timen. Prøv igjen litt senere.');
+  try {
+    const answer = await driverHelp(c.env, question, (d.lang as Lang) ?? 'nb', history);
+    await db.prepare('INSERT INTO ai_questions (driver_id, question, answer, tools) VALUES (?, ?, ?, ?)').bind(d.id, question, answer, '[]').run();
+    return c.json({ answer });
+  } catch (e) {
+    if (e instanceof AskError) throw fail(e.status, e.message);
+    throw e;
+  }
 });
 
 app.get('/orders/:id/pdf', async c => pdfResponse(c.env, await own(c, c.req.param('id'))));

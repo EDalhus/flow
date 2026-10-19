@@ -5,9 +5,10 @@ import { TrendUp } from '../components/Icons.tsx';
 import { Page } from '../components/Topbar.tsx';
 import { Loading, Segmented, StatStrip } from '../components/ui.tsx';
 import { arrow, fr, nb, pct } from '../lib/format.ts';
-import { useProductReport, useProducts, useQualityReport, useWeeklyReport } from '../lib/queries.ts';
+import { useMe, useProductReport, useProducts, useQualityReport, useWeeklyReport } from '../lib/queries.ts';
 import './rapporter.css';
 import { tr, tx } from '../lib/i18n.ts';
+import { AiReport } from '../components/AiReport.tsx';
 
 type Dir = 'begge' | 'inn' | 'ut';
 type View = 'graf' | 'tabell';
@@ -28,6 +29,7 @@ export function RapporterPage() {
   const weekly = useWeeklyReport(undefined, prod, dir);
   const prodReport = useProductReport(dir);
   const quality = useQualityReport();
+  const me = useMe();
 
   const w = weekly.data;
   const name = prod ? products.data?.find(p => p.id === prod)?.name ?? tr('varen') : tr('alle varer');
@@ -55,6 +57,8 @@ export function RapporterPage() {
             <Segmented<View> label={tr('Visning')} value={view} onChange={setView} options={[{ value: 'graf', label: tr('Grafer') }, { value: 'tabell', label: tr('Tabell') }]} />
           </div>
         </div>
+
+        {me.data?.ai && <AiReport />}
 
         {!w ? <Loading /> : (
           <>

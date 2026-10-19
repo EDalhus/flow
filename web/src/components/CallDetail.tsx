@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { BoatPhotos } from './BoatPhotos.tsx';
 import type { CollisionView, PortCallView, UserView } from '../../../shared/api.ts';
 import { CREW_ROLE_LABEL, CREW_ROLES, type CrewRole } from '../../../shared/domain/types.ts';
-import { errorText } from '../lib/api.ts';
+import { api, errorText } from '../lib/api.ts';
 import { dayRelative, ddmm, fr, hmFromIso, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
 import { osloToUtc } from '../../../shared/time.ts';
 import { useAssignOrder, useBoat, useBoats, useCallLog, useLoadOrder, useMe, useOrders, usePatchPortCall, usePutCrew, useUsers } from '../lib/queries.ts';
@@ -10,10 +10,12 @@ import { useNavigate } from 'react-router';
 import { CallOrders, OrderLog } from './Orders.tsx';
 import { canCrew, canPlan, canQuayLog } from '../lib/roles.ts';
 import { Chat } from './Chat.tsx';
-import { Check, Chevron, Close, Phone, Plus } from './Icons.tsx';
+import { Check, Chevron, Close, Phone, Plus, Sparkle } from './Icons.tsx';
 import { BigNumber, FlagBadge, Loading, QuayMark, Rating, RatingBars, Segmented } from './ui.tsx';
-import { tr, tx } from '../lib/i18n.ts';
+import { tr, tx, getLang } from '../lib/i18n.ts';
 import { Translated } from './Translated.tsx';
+import { useQuery } from '@tanstack/react-query';
+import { Markdown } from './Markdown.tsx';
 
 export type DetailTab = 'oversikt' | 'chat' | 'profil' | 'logg';
 
@@ -61,6 +63,7 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {canPlan(me.data) && call.status !== 'ferdig' && call.status !== 'avlyst' && !call.has_quay_log && <><BoatEditor call={call} /><TimeEditor call={call} /></>}
           {call.collisions.length > 0 && <ClashButton collisions={call.collisions} onClick={onOpenAlerts} />}
+          {me.data?.ai && call.status !== 'ferdig' && call.status !== 'avlyst' && <BoatBrief boatId={call.boat.id} />}
           <CrewEditor call={call} users={users.data ?? []} />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -356,3 +359,16 @@ function TimeEditor({ call }: { call: PortCallView }) {
     </div>
   );
 }
+
+/** «Før båten kommer»: kort sammendrag fra Claude av båtens historikk, avvik og ting kaia bør passe på. */
+function BoatBrief({ boatId }: { boatId: string }) {
+  const q = useQuery({ queryKey: ['boat-brief', boatId, getLang()], queryFn: () => api<{ text: string | null }>(`/ask/boat/${boatId}`), staleTime: 3_600_000, retry: false });
+  if (q.isError || (q.data && !q.data.text)) return null;
+  return (
+    <section style={{ borderRadius: 16, padding: '10px 14px', background: 'rgba(128,239,222,.06)', border: '1px solid rgba(128,239,222,.22)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="eyebrow" style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--aqua)' }}><Sparkle size={12} /> {tr('Før båten kommer')}</span>
+      {q.data?.text ? <Markdown text={q.data.text} go={() => {}} /> : <span className="sub loading" style={{ fontSize: 13 }}>{tr('Ser på båtens historikk …')}</span>}
+    </section>
+  );
+}
+

@@ -5,6 +5,7 @@ import { fetchAllLatest, matchVessels } from '../ais/barentswatch.ts';
 import { bulkReport } from '../db/bulk.ts';
 import { loadOrders } from '../db/orders.ts';
 import { ACTIONS, ACTION_KINDS, propose } from './actions.ts';
+import { HELP_DRIVER, HELP_FLOW } from './help.ts';
 import { loadSettings } from './settings.ts';
 
 // «Spør Flow»: spørsmål med vanlige ord i søkefeltet besvares av Claude (Anthropic API).
@@ -52,6 +53,12 @@ const dateProp = (d: string) => ({ type: 'string', description: `${d} (YYYY-MM-D
 const periodProps = { from: dateProp('Fra og med dato'), to: dateProp('Til og med dato') };
 
 export const TOOLS = {
+  hjelp: tool({
+    description: 'Brukerhåndboka for Flow: hvor ting gjøres og stegene (ny sjåfør, ny SO, kaibok, flytte anløp, roller …), med lenker til sidene. Bruk ved «hvordan …»-spørsmål.',
+    input: z.object({}),
+    schema: { type: 'object', properties: {} },
+    run: async () => ({ handbok: HELP_FLOW }),
+  }),
   bat_kvalitet: tool({
     description: 'Kvalitet per båt fra kaibøkene i en periode: antall anløp, kaibøker, avvik, avvik per kategori (skade_gods, utstyr_kran, mannskap_hms, forsinkelse, annet), snittkarakterer 1–5 (punktlighet, samarbeid, utstyr), flagg og eksempler på avviksbeskrivelser. Sortert med flest avvik først. Bruk til «hvilken båt har vi oftest problemer med», «beste båt», «punktlighet».',
     input: z.object({ ...period, limit: z.number().int().min(1).max(30).default(10) }),
@@ -356,6 +363,7 @@ Regler:
 - «Problemer» med en båt = avvik i kaibøkene og lave karakterer. «Populært produkt» = flest tonn solgt (retning ut).
 - Lenk til det du nevner med markdown-lenker, og bare med stier som står i «link» i verktøyresultatene, f.eks. [Coneste](/baater?id=…). Lenk hvert navn bare første gang, og ikke legg lenker inne i **fet** tekst.
 - Tall: bruk norsk/europeisk format med komma som desimaltegn når du svarer på norsk, og enheten (t, tonn, kn, nm).
+- «Hvordan …»-spørsmål om Flow: bruk verktøyet hjelp og svar med korte, nummererte steg og en lenke til siden (stier fra håndboka er lov å lenke til). Bruk knappenavnene på brukerens språk hvis du kjenner dem, ellers de norske i «».
 
 Jobber:
 - Ber brukeren deg gjøre noe (flytte et anløp, lage SO, bestille bulk, markere hentet, skrive i chatten …), slå opp det du trenger (anlop, salgsordre, bilhentinger, oppslag) og kall foresla_handling. Du utfører aldri noe selv – brukeren får et kort med «Utfør» og bekrefter.
@@ -527,6 +535,62 @@ export async function translateTexts(env: Env, texts: string[], lang: Lang, fetc
     const it = items.find(x => x.i === i);
     return { text: it && !it.same && it.text ? it.text : null, source_lang: it?.source_lang?.slice(0, 5) ?? null };
   });
+}
+
+// ---------------------------------------------------------------- før båten kommer
+
+/** Kort, praktisk sammendrag av båten før anløpet (historikk, avvik, kontakt, ting å passe på). */
+export async function boatBrief(env: Env, boatName: string, lang: Lang, fetcher: Fetcher = fetch): Promise<string> {
+  const today = todayOslo();
+  const r = await converse(env, {
+    system: `${systemPrompt(lang, 'kaia', [])}
+
+Lag et kort «Før båten kommer»-sammendrag for kaia om båten ${boatName}. Bruk bat_info (profil, agent, kontakt, siste anløp) og bat_kvalitet for siste 12 måneder (${addDays(today, -365)} til ${today}); se bare på denne båten.
+Format: én setning med det viktigste (f.eks. «3 avvik siste år, kranproblemer to ganger»), så 1–4 korte punkter med det kaia bør gjøre eller passe på (kontakt/telefon, utstyr, punktlighet, notater fra tidligere kaibøker). Har båten ingen kaibøker eller avvik, si det kort i én setning. Maks 70 ord. Ingen lenker.`,
+    messages: [{ role: 'user', content: `Før båten kommer: ${boatName}` }],
+    tools: toolList(['bat_info', 'bat_kvalitet']),
+    maxTokens: 500,
+  }, fetcher);
+  return r.answer;
+}
+
+// ---------------------------------------------------------------- rapport med forklaringer
+
+/** Rapport for en periode med sammenligning mot perioden før, og forklaringer på endringene. */
+export async function periodReport(env: Env, from: string, to: string, lang: Lang, fetcher: Fetcher = fetch): Promise<string> {
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
+  const prevTo = addDays(from, -1), prevFrom = addDays(prevTo, -(days - 1));
+  const r = await converse(env, {
+    system: `${systemPrompt(lang, 'ledelsen', ['admin'])}
+
+Nå skal du skrive en rapport for perioden ${from} til ${to}, sammenlignet med perioden før (${prevFrom} til ${prevTo}). Hent tall med verktøyene for begge periodene: salg (per produkt og per kunde, retning ut, og retning inn), bat_kvalitet, bulk (per kvalitet og per kunde), anlop og bilhentinger.
+Format (markdown, her er overskrifter lov):
+- Én innledende setning med hovedbildet (tonn ut og endring i prosent).
+- ### Hovedtall – punkter: tonn ut og inn, antall anløp, bilhentinger, bulk (veid tonn), hver med endring mot perioden før.
+- ### Produkter – de største produktene med tonn og andel, og hva som har økt eller falt mest.
+- ### Kunder – de 5 største kundene, og nye eller borte kunder hvis det er tydelig.
+- ### Båter og kvalitet – avvik og kategorier, punktlighet, båter med flest avvik.
+- ### Bulk – kort.
+- ### Hva har endret seg – 2–4 punkter som forklarer de viktigste endringene ut fra tallene (ikke gjett årsaker utenfor dataene; skriv «ser ut til» når det er tolkning).
+Maks ca. 400 ord. Ingen lenker.`,
+    messages: [{ role: 'user', content: `Lag rapporten for ${from} til ${to}.` }],
+    tools: toolList(['salg', 'bat_kvalitet', 'bulk', 'anlop', 'bilhentinger']),
+    maxTokens: 2500,
+  }, fetcher);
+  return r.answer;
+}
+
+// ---------------------------------------------------------------- hjelp for sjåfører
+
+export async function driverHelp(env: Env, question: string, lang: Lang, history: AskTurn[] = [], fetcher: Fetcher = fetch): Promise<string> {
+  const model = env.AI_MODEL?.trim() || DEFAULT_MODEL;
+  const data = await callClaude(env, {
+    model, max_tokens: 600,
+    system: `Du hjelper sjåfører som henter bulksalt hos Flatholmen havn med sjåførvisningen i Flow. Svar på ${LANG_NAME[lang]}, kort og med nummererte steg når det passer. Bruk bare håndboka under; vet du ikke, si at de skal ringe kontoret. Ingen lenker.
+${HELP_DRIVER}`,
+    messages: [...history.slice(-6).map(t => ({ role: t.role, content: t.content })), { role: 'user', content: question }],
+  }, fetcher);
+  return textOf(data.content) || 'Ring kontoret, så hjelper de deg.';
 }
 
 export class AskError extends Error {

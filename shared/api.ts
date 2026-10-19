@@ -509,6 +509,8 @@ export interface DriverMe {
   customers: { id: string; name: string; requires_project: boolean }[];
   qualities: BulkQuality[];
   orders: BulkOrderView[];
+  /** Hjelp med Claude er tilgjengelig. */
+  ai: boolean;
 }
 
 export interface ProductionOrderView {
@@ -579,6 +581,8 @@ export interface KaibokDraft {
   had_deviation: boolean; categories: string[]; r_punctuality: number; r_cooperation: number; r_equipment: number;
   description: string | null; boat_note: string | null;
 }
+/** Rapport med forklaringer fra Claude for en periode. */
+export interface AiReport { from: string; to: string; text: string; created_at: string }
 /** Oversatt fritekst: null = allerede på leserens språk (eller kunne ikke oversettes). */
 export interface Translation { text: string | null; source_lang: string | null }
 
