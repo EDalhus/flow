@@ -122,7 +122,7 @@ app.post('/orders/:id/:action{start|step-done|stop|continue|cancel}', async c =>
 /** Hjelp i sjåførvisningen (Claude, ut fra håndboka for sjåfører). Maks 20 spørsmål i timen. */
 app.post('/help', body(z.object({
   question: z.string().trim().min(2).max(500),
-  history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(3000) })).max(12).default([]),
+  history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(3000) })).max(200).default([]).transform(h => h.slice(-12)),
 })), async c => {
   const d = c.get('driver');
   const { question, history } = c.req.valid('json');

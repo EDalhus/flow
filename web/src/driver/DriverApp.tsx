@@ -316,7 +316,7 @@ function DriverHelp({ onClose }: { onClose: () => void }) {
   const dict = useDictation(t => setDraft(x => (x ? `${x} ${t}` : t)));
   const m = useMutation({
     mutationFn: ({ q, i }: { q: string; i: number }) => dapi<{ answer: string }>('/help', { body: {
-      question: q, history: turns.slice(0, i).flatMap(t => (t.a ? [{ role: 'user', content: t.q }, { role: 'assistant', content: t.a }] : [])),
+      question: q, history: turns.slice(0, i).flatMap(t => (t.a ? [{ role: 'user', content: t.q }, { role: 'assistant', content: t.a }] : [])).slice(-12),
     } }),
     onSuccess: (r, { i }) => setTurns(ts => ts.map((t, j) => (j === i ? { ...t, a: r.answer } : t))),
     onError: (e, { i }) => setTurns(ts => ts.map((t, j) => (j === i ? { ...t, error: errorText(e) } : t))),

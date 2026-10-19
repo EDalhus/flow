@@ -476,7 +476,7 @@ async function runLookup(env: Env, input: unknown) {
 export async function ask(env: Env, question: string, lang: Lang, user: { id: string; name: string; roles: string[] }, history: AskTurn[] = [], fetcher: Fetcher = fetch): Promise<AskResult> {
   if (!env.ANTHROPIC_API_KEY?.trim()) throw new AskError(503, 'Spør Flow er ikke satt opp (ANTHROPIC_API_KEY mangler).');
   const actions: AskAction[] = [];
-  const messages: Msg[] = [...history.slice(-8).map(t => ({ role: t.role, content: t.content })), { role: 'user', content: question }];
+  const messages: Msg[] = [...history.slice(-40).map(t => ({ role: t.role, content: t.content })), { role: 'user', content: question }];
   const r = await converse(env, { system: systemPrompt(lang, user.name, user.roles), messages, tools: toolList([...Object.keys(TOOLS), 'oppslag'], [PROPOSE]) }, fetcher,
     async (name, input) => {
       if (name !== 'foresla_handling') return undefined;
@@ -628,7 +628,7 @@ export async function driverHelp(env: Env, question: string, lang: Lang, history
     model, max_tokens: 600,
     system: `Du hjelper sjåfører som henter bulksalt hos Flatholmen havn med sjåførvisningen i Flow. Svar på ${LANG_NAME[lang]}, kort og med nummererte steg når det passer. Bruk bare håndboka under; vet du ikke, si at de skal ringe kontoret. Ingen lenker.
 ${HELP_DRIVER}`,
-    messages: [...history.slice(-6).map(t => ({ role: t.role, content: t.content })), { role: 'user', content: question }],
+    messages: [...history.slice(-12).map(t => ({ role: t.role, content: t.content })), { role: 'user', content: question }],
   }, fetcher);
   return textOf(data.content) || 'Ring kontoret, så hjelper de deg.';
 }

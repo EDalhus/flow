@@ -24,7 +24,8 @@ async function guard<T>(run: () => Promise<T>): Promise<T> {
 
 app.post('/', body(z.object({
   question: z.string().trim().min(2).max(1000), lang: lang.optional(),
-  history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(6000) })).max(16).default([]),
+  // Lange samtaler (f.eks. kaibok-intervju) kuttes til de siste 40 meldingene i stedet for å avvises.
+  history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(8000) })).max(200).default([]).transform(h => h.slice(-40)),
 })), async c => {
   const { question, lang: l, history } = c.req.valid('json');
   const user = c.get('user');

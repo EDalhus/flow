@@ -25,7 +25,7 @@ export function AskFlow({ question, context, onBack, go }: {
   const history = (upto: number): AskTurn[] => turns.slice(0, upto).flatMap((t, j) => (t.a ? [
     { role: 'user' as const, content: j === 0 && context ? `${t.q}\n\n(${context})` : t.q },
     { role: 'assistant' as const, content: [t.a.answer, ...t.a.actions.map(a => `[Forslag ${a.status}: ${a.summary}]`)].filter(Boolean).join('\n') },
-  ] : []));
+  ] : [])).slice(-40);
   const m = useMutation({
     mutationFn: ({ q, i }: { q: string; i: number }) => api<AskAnswer>('/ask', { body: { question: i === 0 && context ? `${q}\n\n(${context})` : q, lang: getLang(), history: history(i) } }),
     onSuccess: (a, { i }) => setTurns(ts => ts.map((t, j) => (j === i ? { ...t, a, error: undefined } : t))),

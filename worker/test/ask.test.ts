@@ -56,6 +56,8 @@ describe('søk: smart gjenkjenning og dato', () => {
 
 describe('Spør Flow', () => {
   it('svarer 503 når nøkkelen mangler', async () => {
+    const long = Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `tur ${i}` }));
+    expect((await api('/ask', { body: { question: 'Og så?', history: long } })).status).toBe(503); // ikke 400 for lang samtale
     const r = await api('/ask', { body: { question: 'Hvilken båt har vi oftest problemer med?' } });
     expect(r.status).toBe(503);
     expect(r.json.error).toMatch(/ANTHROPIC_API_KEY/);
