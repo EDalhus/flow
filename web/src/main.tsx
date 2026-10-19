@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Fragment, StrictMode, Suspense, lazy, useEffect, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { MorningBrief } from './components/MorningBrief.tsx';
 import { ApiError } from './lib/api.ts';
 import { useMe } from './lib/queries.ts';
 import { useRealtime } from './lib/realtime.ts';
@@ -9,6 +10,7 @@ import { setTheme } from './lib/theme.ts';
 import { getLang, loadLang, tr, tx } from './lib/i18n.ts';
 import type { Lang } from '../../shared/api.ts';
 import './styles/global.css';
+import { setTranslationEnabled } from './lib/translate.ts';
 
 // Hver side lastes ved behov; kartbiblioteket (MapLibre) hentes bare på kart og mobil.
 const KartPage = lazy(() => import('./pages/KartPage.tsx').then(m => ({ default: m.KartPage })));
@@ -46,6 +48,7 @@ function App() {
   useRealtime();
   const isNarrow = useNarrow();
   const theme = me.data?.prefs.theme;
+  setTranslationEnabled(!!me.data?.ai);
   const lang = me.data?.prefs.lang ?? storedLang();
   useEffect(() => { if (me.data) setTheme(theme ?? 'mork'); }, [me.data, theme]);
   // Språket: ordboka hentes før siden vises på nytt, og valget huskes til neste gang siden åpnes.
@@ -90,6 +93,7 @@ function App() {
       <Route path="/admin" element={<Navigate to="/innstillinger" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    <MorningBrief />
     </Fragment>
     </Suspense>
   );

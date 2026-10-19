@@ -1,18 +1,32 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import type { AskAnswer } from '../../shared/api.ts';
-import { AskError, ask } from '../lib/ask.ts';
-import { body, fail } from '../lib/http.ts';
+import type { AskAction, AskAnswer, KaibokDraft, MorningBrief, Translation } from '../../shared/api.ts';
+import { todayOslo } from '../../shared/time.ts';
+import { CAN, requireRole } from '../auth/access.ts';
+import { expired, linkFor } from '../lib/actions.ts';
+import { AskError, ask, kaibokDraft, morningBrief, translateTexts } from '../lib/ask.ts';
+import { body, fail, nowIso } from '../lib/http.ts';
+import { INTERNAL_HEADER, internalToken } from '../lib/internal.ts';
+import { sha256 } from '../lib/pin.ts';
 import type { AppEnv } from '../types.ts';
 
-// «Spør Flow»: spørsmål med vanlige ord fra søkefeltet. Svaret lages av Claude med verktøy som bare leser data.
+// Claude i Flow: «Spør Flow» (spørsmål og jobber), morgenbrief, kaibok med egne ord og oversettelse av fritekst.
 // Alle spørsmål logges (ai_questions), og hver bruker kan stille et begrenset antall per time.
 const app = new Hono<AppEnv>();
 
 const PER_HOUR = 40;
+const lang = z.enum(['nb', 'en', 'lt', 'da', 'sv', 'is']);
 
-app.post('/', body(z.object({ question: z.string().trim().min(3).max(300), lang: z.enum(['nb', 'en', 'lt', 'da', 'sv', 'is']).optional() })), async c => {
-  const { question, lang } = c.req.valid('json');
+/** Gjør om AskError til HTTP-feil. */
+async function guard<T>(run: () => Promise<T>): Promise<T> {
+  try { return await run(); } catch (e) { if (e instanceof AskError) throw fail(e.status, e.message); throw e; }
+}
+
+app.post('/', body(z.object({
+  question: z.string().trim().min(2).max(1000), lang: lang.optional(),
+  history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(6000) })).max(16).default([]),
+})), async c => {
+  const { question, lang: l, history } = c.req.valid('json');
   const user = c.get('user');
   const db = c.env.DB;
   const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
@@ -20,16 +34,120 @@ app.post('/', body(z.object({ question: z.string().trim().min(3).max(300), lang:
   if ((used?.n ?? 0) >= PER_HOUR) throw fail(429, 'Du har stilt mange spørsmål den siste timen. Prøv igjen litt senere.');
   const t0 = Date.now();
   try {
-    const r = await ask(c.env, question, lang ?? user.prefs.lang ?? 'nb', user.name);
+    const r = await ask(c.env, question, l ?? user.prefs.lang ?? 'nb', { id: user.id, name: user.name, roles: user.roles }, history);
     await db.prepare('INSERT INTO ai_questions (user_id, question, answer, tools, model, ms) VALUES (?, ?, ?, ?, ?, ?)')
       .bind(user.id, question, r.answer, JSON.stringify(r.tools), r.model, Date.now() - t0).run();
-    return c.json({ question, answer: r.answer, tools: r.tools } satisfies AskAnswer);
+    return c.json({ question, answer: r.answer, tools: r.tools, actions: r.actions } satisfies AskAnswer);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Ukjent feil';
     await db.prepare('INSERT INTO ai_questions (user_id, question, ms, error) VALUES (?, ?, ?, ?)').bind(user.id, question, Date.now() - t0, msg).run();
     if (e instanceof AskError) throw fail(e.status, e.message);
     throw e;
   }
+});
+
+// ---------------------------------------------------------------- jobber
+
+type ActionRow = { id: number; user_id: string; kind: string; summary: string; details: string; method: string; path: string; body: string; status: AskAction['status']; result: string | null; error: string | null; created_at: string };
+const view = (r: ActionRow, link: string | null = null): AskAction => ({
+  id: r.id, kind: r.kind, summary: r.summary, details: JSON.parse(r.details), status: r.status, link, error: r.error,
+});
+async function own(c: { env: Env; get: (k: 'user') => { id: string } }, id: string) {
+  const r = await c.env.DB.prepare('SELECT * FROM ai_actions WHERE id = ?').bind(Number(id)).first<ActionRow>();
+  if (!r || r.user_id !== c.get('user').id) throw fail(404, 'Fant ikke forslaget.');
+  return r;
+}
+
+/** Brukeren bekrefter: jobben kjøres gjennom den vanlige API-ruten som brukeren selv. */
+app.post('/actions/:id/confirm', async c => {
+  const r = await own(c, c.req.param('id'));
+  if (r.status !== 'foreslatt') throw fail(409, r.status === 'utfort' ? 'Jobben er allerede gjort.' : 'Forslaget er ikke aktivt lenger.');
+  if (expired(r.created_at)) throw fail(409, 'Forslaget er for gammelt. Spør på nytt, så lager Flow et nytt.');
+  // Marker først, så samme forslag ikke kan kjøres to ganger samtidig.
+  const claimed = await c.env.DB.prepare("UPDATE ai_actions SET status = 'utfort', done_at = ? WHERE id = ? AND status = 'foreslatt'").bind(nowIso(), r.id).run();
+  if (!claimed.meta.changes) throw fail(409, 'Jobben er allerede gjort.');
+  const { app: api } = await import('../app.ts');
+  const res = await api.request(`/api${r.path}`, {
+    method: r.method, body: r.body, headers: { 'content-type': 'application/json', [INTERNAL_HEADER]: internalToken(c.get('user')) },
+  }, c.env, c.executionCtx);
+  const text = await res.text();
+  let data: Record<string, unknown> = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { /* ikke JSON */ }
+  if (!res.ok) {
+    const err = typeof data.error === 'string' ? data.error : `Feil ${res.status}`;
+    await c.env.DB.prepare("UPDATE ai_actions SET status = 'feilet', error = ?, result = ? WHERE id = ?").bind(err, text.slice(0, 4000), r.id).run();
+    return c.json(view({ ...r, status: 'feilet', error: err }), 200);
+  }
+  await c.env.DB.prepare('UPDATE ai_actions SET result = ? WHERE id = ?').bind(text.slice(0, 4000), r.id).run();
+  return c.json(view({ ...r, status: 'utfort' }, linkFor(r.kind, data, r.path, JSON.parse(r.body))));
+});
+
+app.post('/actions/:id/cancel', async c => {
+  const r = await own(c, c.req.param('id'));
+  if (r.status === 'foreslatt') await c.env.DB.prepare("UPDATE ai_actions SET status = 'avbrutt', done_at = ? WHERE id = ?").bind(nowIso(), r.id).run();
+  return c.json(view({ ...r, status: r.status === 'foreslatt' ? 'avbrutt' : r.status }));
+});
+
+// ---------------------------------------------------------------- morgenbrief
+
+/** Dagens brief første gang brukeren åpner Flow i dag; null når den er sett (eller Claude ikke er satt opp). */
+app.get('/brief', async c => {
+  const user = c.get('user');
+  const db = c.env.DB;
+  const day = todayOslo();
+  if (!c.env.ANTHROPIC_API_KEY?.trim()) return c.json({ brief: null });
+  const seen = await db.prepare('SELECT 1 FROM ai_brief_views WHERE user_id = ? AND day = ?').bind(user.id, day).first();
+  if (seen) return c.json({ brief: null });
+  const roles = [...user.roles].sort().join(',') || 'admin';
+  const l = user.prefs.lang ?? 'nb';
+  let row = await db.prepare('SELECT text FROM ai_briefs WHERE day = ? AND roles = ? AND lang = ?').bind(day, roles, l).first<{ text: string }>();
+  if (!row) {
+    const text = await guard(() => morningBrief(c.env, roles.split(','), l));
+    await db.prepare('INSERT OR IGNORE INTO ai_briefs (day, roles, lang, text) VALUES (?, ?, ?, ?)').bind(day, roles, l, text).run();
+    row = { text };
+  }
+  return c.json({ brief: { day, text: row.text } satisfies MorningBrief });
+});
+
+app.post('/brief/seen', async c => {
+  await c.env.DB.prepare('INSERT OR IGNORE INTO ai_brief_views (user_id, day) VALUES (?, ?)').bind(c.get('user').id, todayOslo()).run();
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------- kaibok med egne ord
+
+app.post('/kaibok', requireRole(...CAN.quayLog), body(z.object({ port_call_id: z.string().min(1).max(64), text: z.string().trim().min(3).max(4000) })), async c => {
+  const { port_call_id, text } = c.req.valid('json');
+  const call = await c.env.DB.prepare('SELECT b.name AS boat, pc.type, pc.eta FROM port_calls pc JOIN boats b ON b.id = pc.boat_id WHERE pc.id = ?')
+    .bind(port_call_id).first<{ boat: string; type: string; eta: string }>();
+  if (!call) throw fail(404, 'Fant ikke anløpet.');
+  const draft = await guard(() => kaibokDraft(c.env, call, text));
+  return c.json(draft satisfies KaibokDraft);
+});
+
+// ---------------------------------------------------------------- oversettelse
+
+/** Oversetter fritekst til leserens språk. Hver tekst oversettes én gang per språk og lagres. */
+app.post('/translate', body(z.object({ texts: z.array(z.string().max(4000)).min(1).max(50), lang })), async c => {
+  const { texts, lang: l } = c.req.valid('json');
+  const db = c.env.DB;
+  const hashes = await Promise.all(texts.map(t => sha256(t.trim())));
+  const cached = await db.prepare(`SELECT hash, source_lang, text FROM translations WHERE lang = ? AND hash IN (SELECT value FROM json_each(?))`)
+    .bind(l, JSON.stringify(hashes)).all<{ hash: string; source_lang: string | null; text: string | null }>();
+  const have = new Map(cached.results.map(r => [r.hash, r]));
+  const missing = [...new Set(hashes.filter(h => !have.has(h)))];
+  if (missing.length && c.env.ANTHROPIC_API_KEY?.trim()) {
+    const src = missing.map(h => texts[hashes.indexOf(h)].trim());
+    try {
+      const out = await translateTexts(c.env, src, l);
+      await db.batch(out.map((o, i) => db.prepare('INSERT OR REPLACE INTO translations (hash, lang, source_lang, text) VALUES (?, ?, ?, ?)')
+        .bind(missing[i], l, o.source_lang, o.text)));
+      out.forEach((o, i) => have.set(missing[i], { hash: missing[i], ...o }));
+    } catch (e) {
+      console.error('oversettelse', e);
+    }
+  }
+  return c.json(hashes.map(h => ({ text: have.get(h)?.text ?? null, source_lang: have.get(h)?.source_lang ?? null }) satisfies Translation));
 });
 
 export default app;

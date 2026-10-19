@@ -96,5 +96,8 @@ export const SERVER_TEXTS = [
   'Ny bulklasting', 'Ny bilhenting', 'Ny salgsordre', 'Ny båt', 'Agent',
   'Spør Flow er ikke satt opp (ANTHROPIC_API_KEY mangler).', 'Nøkkelen til Claude (ANTHROPIC_API_KEY) er ugyldig.', 'Claude er opptatt akkurat nå. Prøv igjen om litt.',
   'Fikk ikke svar fra Claude.', 'Spørsmålet ble for omfattende. Prøv å spørre mer avgrenset.', 'Du har stilt mange spørsmål den siste timen. Prøv igjen litt senere.',
+  // Claude: jobber, brief og kaibok
+  'Fant ikke forslaget.', 'Jobben er allerede gjort.', 'Forslaget er ikke aktivt lenger.', 'Forslaget er for gammelt. Spør på nytt, så lager Flow et nytt.',
+  'Claude klarte ikke å fylle ut kaiboka. Prøv å beskrive litt mer.', 'Gi nettleseren tilgang til mikrofonen.', 'Talegjenkjenningen stoppet.',
   'Noe gikk galt.', 'Feil {kode}',
 ];

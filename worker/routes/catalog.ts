@@ -11,7 +11,7 @@ import type { AppEnv } from '../types.ts';
 // Små oppslagsressurser: meg, brukere, kaier, produkter, agenter, innstillinger, vakter.
 const app = new Hono<AppEnv>();
 
-app.get('/me', c => c.json(c.get('user')));
+app.get('/me', c => c.json({ ...c.get('user'), ai: !!c.env.ANTHROPIC_API_KEY?.trim() }));
 
 /** Egne valg: slås sammen med det som er lagret fra før. */
 app.put('/me/prefs', body(prefsPut), async c => {

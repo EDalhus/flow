@@ -1,11 +1,13 @@
+import { useMutation } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import type { PortCallView } from '../../../shared/api.ts';
+import type { KaibokDraft, PortCallView } from '../../../shared/api.ts';
 import { CATEGORIES, CATEGORY_LABEL, type Category } from '../../../shared/domain/types.ts';
 import { api, errorText } from '../lib/api.ts';
 import { uploadPhoto } from '../lib/images.ts';
 import { fr, timeRange, typeLabel } from '../lib/format.ts';
-import { useDeliverQuayLog, type QuayLogResult } from '../lib/queries.ts';
-import { Camera, Check, Close, Star } from './Icons.tsx';
+import { useDeliverQuayLog, useMe, type QuayLogResult } from '../lib/queries.ts';
+import { Camera, Check, Close, Mic, Sparkle, Star } from './Icons.tsx';
+import { useDictation } from '../lib/dictation.ts';
 import { QuayMark } from './ui.tsx';
 import { tr, tx } from '../lib/i18n.ts';
 
@@ -30,6 +32,7 @@ export function KaibokForm({ call, onClose, onDone, fullscreen }: {
   const [r, setR] = useState<Record<RatingKey, number>>({ punctuality: 0, cooperation: 0, equipment: 0 });
   const [note, setNote] = useState('');
   const deliver = useDeliverQuayLog(call.id);
+  const me = useMe();
   const result = deliver.data;
   const [photos, setPhotos] = useState<Photo[]>([]);
   const photosRef = useRef(photos);
@@ -96,6 +99,13 @@ export function KaibokForm({ call, onClose, onDone, fullscreen }: {
       {!result ? (
         <>
           <div className="scroll-none" style={{ flex: 1, padding: '4px 16px 24px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+            {me.data?.ai && <TellSection callId={call.id} onDraft={d => {
+              setAvvik(d.had_deviation ? 'ja' : 'nei');
+              setCats(d.categories.filter((c): c is Category => (CATEGORIES as readonly string[]).includes(c)));
+              setDesc(d.description ?? '');
+              setR({ punctuality: d.r_punctuality, cooperation: d.r_cooperation, equipment: d.r_equipment });
+              setNote(d.boat_note ?? '');
+            }} />}
             <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <h2 style={{ margin: '0 4px', fontSize: 17, fontWeight: 400 }}>{tr('Var det avvik under anløpet?')}</h2>
               <div role="group" aria-label={tr('Avvik')} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
@@ -233,6 +243,40 @@ export function KaibokForm({ call, onClose, onDone, fullscreen }: {
 }
 
 /** Modal rundt skjemaet på desktop (som i Main-tavla). */
+/**
+ * «Fortell med egne ord»: kaiarbeideren skriver eller snakker inn hva som skjedde, og Claude fyller ut skjemaet
+ * (avvik, kategorier, karakterer, beskrivelse og notat). Alt kan justeres før lagring.
+ */
+function TellSection({ callId, onDraft }: { callId: string; onDraft: (d: KaibokDraft) => void }) {
+  const [text, setText] = useState('');
+  const [filled, setFilled] = useState(false);
+  const dict = useDictation(t => setText(x => (x ? `${x} ${t}` : t)));
+  const fill = useMutation({
+    mutationFn: () => api<KaibokDraft>('/ask/kaibok', { body: { port_call_id: callId, text } }),
+    onSuccess: d => { onDraft(d); setFilled(true); },
+  });
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 8, borderRadius: 22, padding: 14, background: 'rgba(128,239,222,.06)', border: '1px solid rgba(128,239,222,.25)' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}><Sparkle size={15} /> {tr('Fortell med egne ord')}</span>
+      <div style={{ position: 'relative' }}>
+        <textarea rows={3} value={text} onChange={e => setText(e.target.value)} placeholder={tr('F.eks. «Kom en time for sent, tre paller skadet av båtkrana, ellers greit mannskap»')}
+          style={{ width: '100%', fontSize: 15, color: 'var(--fg)', border: '1px solid rgba(var(--tint), .12)', borderRadius: 16, padding: '12px 52px 12px 14px', resize: 'vertical', minHeight: 84, background: 'rgba(0,0,0,.25)' }} />
+        {dict.supported && (
+          <button type="button" className="icon-btn" onClick={dict.toggle} aria-pressed={dict.on} aria-label={dict.on ? tr('Stopp diktering') : tr('Snakk inn')}
+            style={{ position: 'absolute', right: 8, top: 8, width: 38, height: 38, ...(dict.on ? { background: '#E5484D', color: '#fff' } : {}) }}><Mic size={16} /></button>
+        )}
+      </div>
+      {dict.on && <span style={{ fontSize: 13, color: '#FF8A8D' }} className="loading">{tr('Lytter … snakk fritt, trykk igjen for å stoppe')}</span>}
+      {dict.error && <span style={{ fontSize: 13, color: 'rgba(var(--tint), .6)' }}>{tr(dict.error)}</span>}
+      {fill.isError && <div className="error-box">{errorText(fill.error)}</div>}
+      {filled && !fill.isPending && <span style={{ fontSize: 13, color: 'var(--aqua)' }}>{tr('Fylt ut av Claude – sjekk og juster under før du lagrer.')}</span>}
+      <button type="button" className="btn" disabled={text.trim().length < 3 || fill.isPending} onClick={() => { dict.stop(); fill.mutate(); }} style={{ minHeight: 44, alignSelf: 'flex-start' }}>
+        {fill.isPending ? tr('Fyller ut …') : filled ? tr('Fyll ut på nytt') : tr('Fyll ut skjemaet')}
+      </button>
+    </section>
+  );
+}
+
 export function KaibokModal({ call, onClose }: { call: PortCallView; onClose: () => void }) {
   return (
     <div role="dialog" aria-modal="true" aria-label={tr('Kaibok')} onKeyDown={e => e.key === 'Escape' && onClose()}

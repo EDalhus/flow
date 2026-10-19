@@ -11,6 +11,7 @@ import { canPlan, canQuayLog } from '../lib/roles.ts';
 import './moduler.css';
 import { tr, tx } from '../lib/i18n.ts';
 import { SoNo } from '../components/Orders.tsx';
+import { Translated } from '../components/Translated.tsx';
 
 type Filter = 'aapne' | 'alle';
 
@@ -66,7 +67,7 @@ export function BilerPage() {
                 </button>
               )}
             </span>
-            {o.notes && <span style={{ gridColumn: '1 / -1', fontSize: 13, color: 'var(--fg-62)' }}>{o.notes}</span>}
+            {o.notes && <Translated text={o.notes} style={{ gridColumn: '1 / -1', fontSize: 13, color: 'var(--fg-62)' }} />}
           </div>
         ))}
       </div>

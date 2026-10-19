@@ -6,6 +6,8 @@ import { useMe, useMessages, useSendMessage, useUsers } from '../lib/queries.ts'
 import { ArrowRight } from './Icons.tsx';
 import { tr, tx } from '../lib/i18n.ts';
 import { ROLE_NAMES } from '../lib/format.ts';
+import { useTranslated } from '../lib/translate.ts';
+import { TranslatedMark } from './Translated.tsx';
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -106,13 +108,17 @@ function Message({ m, author, users, meId, mobile }: { m: MessageView; author?: 
     : mine ? { background: 'rgba(var(--tint), .1)' } : { background: 'rgba(var(--tint), .05)' };
   const who = m.author?.short_name ?? 'Flow';
   // Meldinger fra Flow selv lagres på norsk og oversettes her; det folk skriver vises som det er.
-  const body = m.kind === 'system' || m.body.endsWith('(fra varsel om kollisjon).') ? tx(m.body) : m.body;
+  const system = m.kind === 'system' || m.body.endsWith('(fra varsel om kollisjon).');
+  // Det folk skriver oversettes automatisk til leserens språk (med «Vis original»).
+  const t = useTranslated(system ? null : m.body);
+  const body = system ? tx(m.body) : t.text;
 
   if (mobile) {
     return (
       <li style={{ borderRadius: 20, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 2, ...bubble }}>
         <span style={{ fontSize: 13, color: 'rgba(var(--tint), .6)' }}><span style={{ color: 'var(--fg)' }}>{who}</span> · {time}</span>
         <span style={{ fontSize: 15 }}>{segments(body, users, meId)}</span>
+        <TranslatedMark t={t} />
       </li>
     );
   }
@@ -127,6 +133,7 @@ function Message({ m, author, users, meId, mobile }: { m: MessageView; author?: 
           <span style={{ color: 'rgba(var(--tint), .55)' }}>{author?.title ? `${author.title} · ` : m.kind === 'system' ? `${tr('System')} · ` : ''}{time}</span>
         </span>
         <p style={{ margin: 0, padding: '9px 12px', borderRadius: '4px 16px 16px 16px', fontSize: 14, ...bubble }}>{segments(body, users, meId)}</p>
+        <TranslatedMark t={t} />
       </div>
     </li>
   );

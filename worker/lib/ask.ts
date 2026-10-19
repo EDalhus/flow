@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import type { BulkGroup, Lang } from '../../shared/api.ts';
+import type { AskAction, AskTurn, BulkGroup, KaibokDraft, Lang } from '../../shared/api.ts';
 import { addDays, osloToUtc, todayOslo } from '../../shared/time.ts';
 import { fetchAllLatest, matchVessels } from '../ais/barentswatch.ts';
 import { bulkReport } from '../db/bulk.ts';
 import { loadOrders } from '../db/orders.ts';
+import { ACTIONS, ACTION_KINDS, propose } from './actions.ts';
 import { loadSettings } from './settings.ts';
 
 // «Spør Flow»: spørsmål med vanlige ord i søkefeltet besvares av Claude (Anthropic API).
@@ -12,7 +13,7 @@ import { loadSettings } from './settings.ts';
 
 export const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
-const MAX_ROUNDS = 6;
+const MAX_ROUNDS = 8;
 
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -167,7 +168,7 @@ export const TOOLS = {
       return {
         periode: i, flere_enn_60: results.length > 60,
         anlop: results.slice(0, 60).map(r => ({
-          bat: r.boat, link: `/baater?id=${r.boat_id}`, dato: r.service_date, eta: r.time_known ? r.eta : null, etd: r.time_known ? r.etd : null,
+          id: r.id, bat: r.boat, link: `/baater?id=${r.boat_id}`, dato: r.service_date, eta: r.time_known ? r.eta : null, etd: r.time_known ? r.etd : null,
           type: r.type, kai: r.quay, status: status(r), so: r.so, tonn: r1(r.tonnes as number | null),
         })),
       };
@@ -278,7 +279,7 @@ export const TOOLS = {
                (SELECT sum(g.quantity * s.kg_per_unit) / 1000.0 FROM truck_order_goods g JOIN skus s ON s.id = g.sku_id WHERE g.order_id = t.id) AS tonnes
         FROM truck_orders t WHERE t.cancelled_at IS NULL AND t.expected_date BETWEEN ? AND ? AND t.customer LIKE ? ORDER BY t.expected_date LIMIT 60`)
         .bind(i.from, i.to, like).all<Record<string, string | number | null>>();
-      return { periode: i, link: '/biler', ordrer: results.map(t => ({ kunde: t.customer, dag: t.expected_date, so: t.so_number, reg_nr: t.reg_no, transportor: t.carrier, varer: t.goods, tonn: r1(t.tonnes as number), hentet: !!t.picked_up_at })) };
+      return { periode: i, link: '/biler', ordrer: results.map(t => ({ id: t.id, kunde: t.customer, dag: t.expected_date, so: t.so_number, reg_nr: t.reg_no, transportor: t.carrier, varer: t.goods, tonn: r1(t.tonnes as number), hentet: !!t.picked_up_at })) };
     },
   }),
 };
@@ -296,10 +297,55 @@ export async function runTool(env: Env, name: string, input: unknown): Promise<u
   }
 }
 
-function systemPrompt(lang: Lang, userName: string) {
+// ---------------------------------------------------------------- oppslag og jobber
+
+/** Id-er Claude trenger for å foreslå jobber: kaier, varer (SKU), bulkregister, pakkelinjer og folk. */
+const LOOKUP = tool({
+  description: 'Slå opp id-er før du foreslår en jobb: kaier (quay_id), varer (sku_id/product_id med enhet), bulk (bil/vehicle_id, kunde/customer_id, sjåfør/driver_id, kvalitet/quality_id), pakkelinjer (line_id) og folk (user_id).',
+  input: z.object({ hva: z.array(z.enum(['kaier', 'varer', 'bulk', 'pakkelinjer', 'folk'])).min(1) }),
+  schema: { type: 'object', required: ['hva'], properties: { hva: { type: 'array', items: { type: 'string', enum: ['kaier', 'varer', 'bulk', 'pakkelinjer', 'folk'] } } } },
+  run: async (env, i) => {
+    const db = env.DB;
+    const out: Record<string, unknown> = {};
+    if (i.hva.includes('kaier')) out.kaier = (await db.prepare('SELECT id, name, nickname, company FROM quays WHERE active = 1 ORDER BY sort').all()).results;
+    if (i.hva.includes('varer')) out.varer = (await db.prepare(`SELECT s.id AS sku_id, p.id AS product_id, p.name AS produkt, s.unit AS enhet, s.pallet_type AS pall, s.bags_per_unit AS sekker, s.kg_per_unit AS kg_per_enhet
+                                                              FROM skus s JOIN products p ON p.id = s.product_id WHERE s.active = 1 ORDER BY p.sort, s.sort`).all()).results;
+    if (i.hva.includes('bulk')) {
+      const [v, c, d, q] = await db.batch([
+        db.prepare('SELECT v.id, v.reg_no, v.description, v.has_trailer, h.name AS transportfirma FROM vehicles v JOIN haulers h ON h.id = v.hauler_id WHERE v.active = 1'),
+        db.prepare('SELECT id, name, requires_project FROM bulk_customers WHERE active = 1'),
+        db.prepare('SELECT d.id, d.name, h.name AS transportfirma FROM drivers d JOIN haulers h ON h.id = d.hauler_id WHERE d.active = 1'),
+        db.prepare('SELECT id, name FROM bulk_qualities WHERE active = 1'),
+      ]);
+      out.bulk = { biler: v.results, kunder: c.results, sjaforer: d.results, kvaliteter: q.results };
+    }
+    if (i.hva.includes('pakkelinjer')) out.pakkelinjer = (await db.prepare('SELECT id, name FROM packing_lines ORDER BY id').all()).results;
+    if (i.hva.includes('folk')) out.folk = (await db.prepare(`SELECT u.id, u.name, u.short_name, group_concat(r.role) AS roller FROM users u LEFT JOIN user_roles r ON r.user_id = u.id
+                                                              WHERE u.active = 1 GROUP BY u.id ORDER BY u.name`).all()).results;
+    return out;
+  },
+});
+
+const PROPOSE = {
+  name: 'foresla_handling',
+  description: `Foreslå en jobb i Flow som brukeren må bekrefte før den gjøres. Handlinger:
+${ACTION_KINDS.map(k => `- ${k}: ${ACTIONS[k].description} Parametere: ${JSON.stringify((ACTIONS[k].schema as { properties: Record<string, unknown> }).properties)}`).join('\n')}
+Flow sjekker forslaget; får du «feil», rett parameterne og prøv igjen. Ett kall per jobb (flere jobber = flere kall).`,
+  input_schema: {
+    type: 'object', required: ['handling', 'parametere', 'oppsummering'],
+    properties: {
+      handling: { type: 'string', enum: ACTION_KINDS },
+      parametere: { type: 'object', description: 'Parametere for handlingen (se listen)' },
+      oppsummering: { type: 'string', description: 'Kort, på brukerens språk: hva som gjøres, f.eks. «Flytt Coneste til Kai 2, i morgen 14:00–18:00»' },
+      detaljer: { type: 'array', items: { type: 'string' }, description: '1–6 korte linjer med det viktigste (navn, ikke id-er)' },
+    },
+  },
+};
+
+function systemPrompt(lang: Lang, userName: string, roles: string[]) {
   const today = todayOslo();
   return `Du er «Spør Flow», assistenten i Flow – kai- og logistikksystemet til Flatholmen havn 81B i Ålesund (salt: havsalt, steinsalt, blandet salt, veisalt m.m., levert med båt, kundebil og bulkbil).
-I dag er ${today} (Europe/Oslo). Brukeren heter ${userName}.
+I dag er ${today} (Europe/Oslo, ${new Intl.DateTimeFormat('nb-NO', { weekday: 'long', timeZone: 'Europe/Oslo' }).format(new Date())}). Klokka er ${new Intl.DateTimeFormat('nb-NO', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' }).format(new Date())}. Brukeren heter ${userName} (roller: ${roles.join(', ') || 'ingen'}).
 
 Regler:
 - Svar på ${LANG_NAME[lang]}, kort og konkret. Ikke gjenta spørsmålet.
@@ -310,51 +356,177 @@ Regler:
 - «Problemer» med en båt = avvik i kaibøkene og lave karakterer. «Populært produkt» = flest tonn solgt (retning ut).
 - Lenk til det du nevner med markdown-lenker, og bare med stier som står i «link» i verktøyresultatene, f.eks. [Coneste](/baater?id=…). Lenk hvert navn bare første gang, og ikke legg lenker inne i **fet** tekst.
 - Tall: bruk norsk/europeisk format med komma som desimaltegn når du svarer på norsk, og enheten (t, tonn, kn, nm).
-- Du kan bare lese. Ber brukeren om å endre noe, forklar kort hvor i Flow det gjøres.`;
+
+Jobber:
+- Ber brukeren deg gjøre noe (flytte et anløp, lage SO, bestille bulk, markere hentet, skrive i chatten …), slå opp det du trenger (anlop, salgsordre, bilhentinger, oppslag) og kall foresla_handling. Du utfører aldri noe selv – brukeren får et kort med «Utfør» og bekrefter.
+- Tider er Europe/Oslo; skriv ISO med tidssone (+01:00 vinter, +02:00 sommer). Flytter du et anløp i tid, behold varigheten (ETD − ETA) hvis ikke annet er sagt.
+- Mangler noe vesentlig (hvilken båt, dag, mengde, kunde), spør kort i stedet for å gjette. Små ting (f.eks. kai når bare én passer) kan du velge og nevne.
+- Etter forslaget: skriv én kort setning om hva kortet gjør (ikke gjenta alle detaljene).
+- Du kan ikke slette data, endre tilganger eller registre for sjåfører; forklar da hvor i Flow det gjøres.`;
 }
 
 type Block = { type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: unknown };
-export interface AskResult { answer: string; tools: string[]; model: string }
+type Msg = { role: 'user' | 'assistant'; content: unknown };
+export interface AskResult { answer: string; tools: string[]; model: string; actions: AskAction[] }
 
-/** Spør Claude, med verktøyene over, til modellen har et svar (maks seks runder). */
-export async function ask(env: Env, question: string, lang: Lang, userName: string, fetcher: Fetcher = fetch): Promise<AskResult> {
+/** Ett kall til Anthropic Messages API, med forståelige feil. */
+async function callClaude(env: Env, body: Record<string, unknown>, fetcher: Fetcher): Promise<{ content: Block[]; stop_reason: string }> {
   const key = env.ANTHROPIC_API_KEY?.trim();
   if (!key) throw new AskError(503, 'Spør Flow er ikke satt opp (ANTHROPIC_API_KEY mangler).');
+  const res = await fetcher(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.error('anthropic', res.status, text.slice(0, 500));
+    if (res.status === 401 || res.status === 403) throw new AskError(502, 'Nøkkelen til Claude (ANTHROPIC_API_KEY) er ugyldig.');
+    if (res.status === 429 || res.status === 529) throw new AskError(503, 'Claude er opptatt akkurat nå. Prøv igjen om litt.');
+    throw new AskError(502, 'Fikk ikke svar fra Claude.');
+  }
+  return res.json();
+}
+const textOf = (content: Block[]) => content.filter((b): b is Extract<Block, { type: 'text' }> => b.type === 'text').map(b => b.text).join('\n').trim();
+const toolList = (names: string[], extra: Record<string, unknown>[] = []) => {
+  const all: Record<string, unknown>[] = [
+    ...names.map(name => { const t = (TOOLS as Record<string, Tool<z.ZodType>>)[name] ?? (name === 'oppslag' ? LOOKUP : null); return { name, description: t!.description, input_schema: t!.schema }; }),
+    ...extra,
+  ];
+  all[all.length - 1] = { ...all[all.length - 1], cache_control: { type: 'ephemeral' } };
+  return all;
+};
+
+/** Kjører en samtale med verktøy til Claude har et svar. `onTool` håndterer verktøy som ikke bare leser. */
+async function converse(env: Env, opts: { system: string; messages: Msg[]; tools: Record<string, unknown>[]; maxTokens?: number },
+  fetcher: Fetcher, onTool?: (name: string, input: unknown) => Promise<unknown | undefined>) {
   const model = env.AI_MODEL?.trim() || DEFAULT_MODEL;
-  const names = Object.keys(TOOLS) as ToolName[];
-  const tools = names.map((name, i) => ({
-    name, description: TOOLS[name].description, input_schema: TOOLS[name].schema,
-    ...(i === names.length - 1 ? { cache_control: { type: 'ephemeral' } } : {}),
-  }));
-  const messages: { role: 'user' | 'assistant'; content: unknown }[] = [{ role: 'user', content: question }];
+  const messages = [...opts.messages];
   const used: string[] = [];
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const res = await fetcher(ANTHROPIC_URL, {
-      method: 'POST',
-      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model, max_tokens: 1200, system: systemPrompt(lang, userName), tools, messages }),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      console.error('anthropic', res.status, text.slice(0, 500));
-      if (res.status === 401 || res.status === 403) throw new AskError(502, 'Nøkkelen til Claude (ANTHROPIC_API_KEY) er ugyldig.');
-      if (res.status === 429 || res.status === 529) throw new AskError(503, 'Claude er opptatt akkurat nå. Prøv igjen om litt.');
-      throw new AskError(502, 'Fikk ikke svar fra Claude.');
-    }
-    const data = await res.json() as { content: Block[]; stop_reason: string };
+    const data = await callClaude(env, { model, max_tokens: opts.maxTokens ?? 1500, system: opts.system, tools: opts.tools, messages }, fetcher);
     const calls = data.content.filter((b): b is Extract<Block, { type: 'tool_use' }> => b.type === 'tool_use');
-    if (data.stop_reason !== 'tool_use' || !calls.length) {
-      const answer = data.content.filter((b): b is Extract<Block, { type: 'text' }> => b.type === 'text').map(b => b.text).join('\n').trim();
-      return { answer: answer || 'Jeg fant ikke noe svar.', tools: used, model };
-    }
+    if (data.stop_reason !== 'tool_use' || !calls.length) return { answer: textOf(data.content), tools: used, model };
     messages.push({ role: 'assistant', content: data.content });
-    const results = await Promise.all(calls.map(async c => {
+    const results = [];
+    for (const c of calls) {
       used.push(c.name);
-      return { type: 'tool_result', tool_use_id: c.id, content: JSON.stringify(await runTool(env, c.name, c.input)) };
-    }));
+      const custom = onTool ? await onTool(c.name, c.input) : undefined;
+      const out = custom !== undefined ? custom : c.name === 'oppslag' ? await runLookup(env, c.input) : await runTool(env, c.name, c.input);
+      results.push({ type: 'tool_result', tool_use_id: c.id, content: JSON.stringify(out) });
+    }
     messages.push({ role: 'user', content: results });
   }
   throw new AskError(504, 'Spørsmålet ble for omfattende. Prøv å spørre mer avgrenset.');
+}
+async function runLookup(env: Env, input: unknown) {
+  const p = LOOKUP.input.safeParse(input ?? {});
+  return p.success ? LOOKUP.run(env, p.data) : { feil: 'Ugyldige parametere' };
+}
+
+/** «Spør Flow»: spørsmål og jobber, med tidligere turer i samme samtale. */
+export async function ask(env: Env, question: string, lang: Lang, user: { id: string; name: string; roles: string[] }, history: AskTurn[] = [], fetcher: Fetcher = fetch): Promise<AskResult> {
+  if (!env.ANTHROPIC_API_KEY?.trim()) throw new AskError(503, 'Spør Flow er ikke satt opp (ANTHROPIC_API_KEY mangler).');
+  const actions: AskAction[] = [];
+  const messages: Msg[] = [...history.slice(-8).map(t => ({ role: t.role, content: t.content })), { role: 'user', content: question }];
+  const r = await converse(env, { system: systemPrompt(lang, user.name, user.roles), messages, tools: toolList([...Object.keys(TOOLS), 'oppslag'], [PROPOSE]) }, fetcher,
+    async (name, input) => {
+      if (name !== 'foresla_handling') return undefined;
+      const p = await propose(env.DB, user.id, input);
+      if (!p.ok) return { feil: p.feil };
+      actions.push(p.action);
+      return { ok: true, melding: 'Forslaget vises for brukeren med «Utfør». Ikke utført ennå.' };
+    });
+  return { ...r, answer: r.answer || (actions.length ? '' : 'Jeg fant ikke noe svar.'), actions };
+}
+
+// ---------------------------------------------------------------- morgenbrief
+
+const BRIEF_FOCUS: Record<string, string> = {
+  kaiarbeider: 'kaia: båtene som kommer og går i dag og i morgen (tid, kai, levering/henting, tonn), kollisjoner på kaia, båter med rødt/gult flagg, bilhentinger i dag',
+  produksjon: 'produksjon og drift: anløp i dag (tonn ut/inn), bulkkøen og bulk i går, bilhentinger i dag, båter med rødt flagg',
+  salg: 'salg: salgsordrer som venter på båt eller har ønsket dag snart, anløp i dag og i morgen, bilhentinger i dag, solgt siste 7 dager mot uka før',
+  admin: 'hele driften: anløp i dag, bilhentinger, bulk, salgsordrer som venter på båt, og avvik siste uke',
+};
+
+/** Morgenbrief for en rollekombinasjon: kort, konkret og bare med tall fra verktøyene. */
+export async function morningBrief(env: Env, roles: string[], lang: Lang, fetcher: Fetcher = fetch): Promise<string> {
+  const focus = (roles.length ? roles : ['admin']).map(r => BRIEF_FOCUS[r]).filter(Boolean).join('; ');
+  const today = todayOslo();
+  const r = await converse(env, {
+    system: `${systemPrompt(lang, 'teamet', roles)}
+
+Nå skal du skrive dagens morgenbrief (ingen jobber, bare lese). Fokus for denne rollen: ${focus}.
+Format: én åpningssetning med det viktigste i dag, så 3–6 punkter («- ») med **fet etikett:** først, og eventuelt én setning til slutt om noe som krever handling. Maks ca. 120 ord. Ikke hils.`,
+    messages: [{ role: 'user', content: `Lag morgenbriefen for ${today}.` }],
+    tools: toolList(Object.keys(TOOLS)),
+    maxTokens: 900,
+  }, fetcher);
+  return r.answer;
+}
+
+// ---------------------------------------------------------------- kaibok med egne ord
+
+const KAIBOK_TOOL = {
+  name: 'fyll_kaibok',
+  description: 'Fyll ut kaiboka fra det kaiarbeideren fortalte.',
+  input_schema: {
+    type: 'object', required: ['had_deviation', 'categories', 'r_punctuality', 'r_cooperation', 'r_equipment', 'description'],
+    properties: {
+      had_deviation: { type: 'boolean', description: 'Var det avvik (skade, utstyr, HMS, forsinkelse eller annet)?' },
+      categories: { type: 'array', items: { type: 'string', enum: ['skade_gods', 'utstyr_kran', 'mannskap_hms', 'forsinkelse', 'annet'] }, description: 'Bare når had_deviation er true' },
+      r_punctuality: { type: 'integer', minimum: 1, maximum: 5, description: '1 = svært dårlig, 3 = ok, 5 = svært bra. Ikke nevnt = 4 (bra) hvis det ikke var forsinkelse' },
+      r_cooperation: { type: 'integer', minimum: 1, maximum: 5 },
+      r_equipment: { type: 'integer', minimum: 1, maximum: 5 },
+      description: { type: ['string', 'null'], description: 'Ryddig, saklig beskrivelse av avviket (hva, hvor mye, konsekvens), på samme språk som kaiarbeideren skrev. null uten avvik' },
+      boat_note: { type: ['string', 'null'], description: 'Ting som er nyttig neste gang båten kommer (utstyr, kontakt, rutiner), ellers null' },
+    },
+  },
+};
+
+export async function kaibokDraft(env: Env, call: { boat: string; type: string; eta: string }, text: string, fetcher: Fetcher = fetch): Promise<KaibokDraft> {
+  const model = env.AI_MODEL?.trim() || DEFAULT_MODEL;
+  const data = await callClaude(env, {
+    model, max_tokens: 800,
+    system: 'Du fyller ut kaibøker i Flow (Flatholmen havn) ut fra det kaiarbeideren forteller med egne ord, ofte diktert. Ikke legg til noe som ikke er sagt. Karakterer: 1 svært dårlig, 2 dårlig, 3 ok, 4 bra, 5 svært bra.',
+    tools: [KAIBOK_TOOL], tool_choice: { type: 'tool', name: 'fyll_kaibok' },
+    messages: [{ role: 'user', content: `Anløp: ${call.boat} (${call.type}, ETA ${call.eta}).\nKaiarbeideren sier:\n${text}` }],
+  }, fetcher);
+  const use = data.content.find((b): b is Extract<Block, { type: 'tool_use' }> => b.type === 'tool_use');
+  const p = z.object({
+    had_deviation: z.boolean(), categories: z.array(z.enum(['skade_gods', 'utstyr_kran', 'mannskap_hms', 'forsinkelse', 'annet'])).default([]),
+    r_punctuality: z.number().int().min(1).max(5), r_cooperation: z.number().int().min(1).max(5), r_equipment: z.number().int().min(1).max(5),
+    description: z.string().max(2000).nullable().default(null), boat_note: z.string().max(2000).nullable().default(null),
+  }).safeParse(use?.input);
+  if (!p.success) throw new AskError(502, 'Claude klarte ikke å fylle ut kaiboka. Prøv å beskrive litt mer.');
+  return { ...p.data, categories: p.data.had_deviation ? p.data.categories : [] };
+}
+
+// ---------------------------------------------------------------- oversettelse
+
+export const TRANSLATE_MODEL = 'claude-haiku-5-5';
+
+/** Oversetter tekster til `lang`. Tekster som allerede er på målspråket gir text = null. */
+export async function translateTexts(env: Env, texts: string[], lang: Lang, fetcher: Fetcher = fetch): Promise<{ text: string | null; source_lang: string | null }[]> {
+  const model = env.AI_TRANSLATE_MODEL?.trim() || TRANSLATE_MODEL;
+  const data = await callClaude(env, {
+    model, max_tokens: 4000,
+    system: `Du oversetter korte fritekster fra en havn (chatmeldinger, avvik, merknader) til ${LANG_NAME[lang]}. Behold navn på båter, personer, firma, SO-numre, reg.nr. og tall uendret, og behold tonen (kort og muntlig er greit). Er teksten allerede på ${LANG_NAME[lang]} (eller bare navn/tall), sett same = true.`,
+    tools: [{
+      name: 'oversettelser', description: 'Oversettelsene, i samme rekkefølge som tekstene.',
+      input_schema: { type: 'object', required: ['items'], properties: { items: { type: 'array', items: { type: 'object', required: ['i', 'source_lang', 'same'], properties: {
+        i: { type: 'integer' }, source_lang: { type: 'string', description: 'ISO 639-1, f.eks. nb, lt, en' }, same: { type: 'boolean' }, text: { type: 'string' },
+      } } } } },
+    }],
+    tool_choice: { type: 'tool', name: 'oversettelser' },
+    messages: [{ role: 'user', content: JSON.stringify(texts.map((t, i) => ({ i, text: t }))) }],
+  }, fetcher);
+  const use = data.content.find((b): b is Extract<Block, { type: 'tool_use' }> => b.type === 'tool_use');
+  const items = (use?.input as { items?: { i: number; source_lang?: string; same?: boolean; text?: string }[] })?.items ?? [];
+  return texts.map((_, i) => {
+    const it = items.find(x => x.i === i);
+    return { text: it && !it.same && it.text ? it.text : null, source_lang: it?.source_lang?.slice(0, 5) ?? null };
+  });
 }
 
 export class AskError extends Error {

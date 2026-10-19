@@ -2,6 +2,7 @@ import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { UserRole } from '../../shared/domain/types.ts';
+import { INTERNAL_HEADER, takeInternal } from '../lib/internal.ts';
 import { fail, newId } from '../lib/http.ts';
 import type { AppEnv, AuthUser } from '../types.ts';
 
@@ -103,6 +104,9 @@ export async function authenticate(env: Env, request: {
 }
 
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
+  // Jobb fra «Spør Flow» som brukeren har bekreftet (se lib/internal.ts).
+  const internal = takeInternal(c.req.header(INTERNAL_HEADER));
+  if (internal) { c.set('user', internal); await next(); return; }
   c.set('user', await authenticate(c.env, {
     header: n => c.req.header(n),
     cookie: () => getCookie(c, 'CF_Authorization'),

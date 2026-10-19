@@ -19,6 +19,15 @@ Søket kan også:
 - **Festet og nylig:** stjerna fester et treff; det du sist åpnet vises når feltet er tomt (lagres i nettleseren).
 - **Tastatur:** `Ctrl/⌘ + K` eller `/` åpner søket, piltastene velger og Enter åpner. Folk, sjåfører og agenter har knapper for å ringe og sende SMS.
 - **Spør Flow:** spørsmål med vanlige ord («Hvilken båt har vi oftest problemer med?», «Hva er det mest populære produktet vi selger?», «Hvor er Coneste?») besvares av Claude. Claude får ikke tilgang til databasen, bare åtte faste verktøy som leser kaibøker, salg, bulk, anløp, salgsordre, bilhentinger, status nå og båtinfo. Svaret har tall og lenker inn i Flow. Spørsmål og svar logges i tabellen `ai_questions`, og hver bruker kan stille 40 spørsmål i timen. Krever `ANTHROPIC_API_KEY` (steg 3).
+- **Jobber:** Spør Flow kan også gjøre ting: «Flytt Nordkyn til kai 2 i morgen kl. 14», «Lag SO 2043644 til Nergård med 24 BB havsalt», «Bestill 18 t veisalt til SU 20 110 for Statens vegvesen», «Marker Brødrene Sperre som hentet», «Skriv i chatten på Coneste at kranen er klar». Claude lager et forslag som vises som et kort med **Utfør**; ingenting endres før brukeren trykker. Jobben kjøres gjennom de vanlige API-rutene som brukeren selv, med samme tilgang, kontroller og logg. Forslag gjelder i 30 minutter og ligger i tabellen `ai_actions`. Claude kan ikke slette data eller endre tilganger. Man kan stille oppfølgingsspørsmål i samme samtale, og snakke inn med mikrofonen.
+
+**Morgenbrief:** Første gang man åpner Flow hver dag, vises en kort brief nede til høyre, tilpasset rollen (kai, salg, produksjon, admin). Den lages én gang per dag, rollekombinasjon og språk (`ai_briefs`), og «Lukk for i dag» skjuler den til neste dag.
+
+**Kaibok med egne ord:** Øverst i kaiboka kan kaiarbeideren skrive eller snakke inn hva som skjedde («kom en time for sent, tre paller skadet av båtkrana»). Claude fyller ut avvik, kategorier, karakterer, beskrivelse og notat, og alt kan justeres før lagring. Talen gjenkjennes i nettleseren (Chrome, Edge og Safari).
+
+**Oversettelse:** Chatmeldinger, avvik, notater og merknader som er skrevet på et annet språk enn ditt, vises automatisk oversatt, med «Vis original». Hver tekst oversettes én gang per språk og lagres (`translations`). Oversettelsen bruker den raske modellen `claude-haiku-5-5` (kan endres med `AI_TRANSLATE_MODEL`).
+
+Uten `ANTHROPIC_API_KEY` er alle Claude-funksjonene skjult, og resten av Flow virker som før.
 
 **Salgsordre (SO) er sannheten; anløpet er båten.** SO-nummeret kommer fra Dynamics 365 (20 + fem siffer, f.eks. 2043644) og tastes inn under **Anløp → Ny SO**. Varene ligger på SO-en, ikke på båten. Et anløp (én båt, én kai, én ETA) kan ha mange SO-er, og de har en **lasterekkefølge** som endres med pilene på anløpet (det som skal først på eller av båten øverst). En SO kan ligge uten båt («venter på båt»), legges på en planlagt båt eller en ny båt, flyttes til en annen båt i siste liten, eller deles på to båter (delt levering). Bytter rederiet båt for hele anløpet, brukes **Bytt båt** på anløpet; da følger alle SO-ene med. Avlyses et anløp, går SO-ene tilbake til «venter på båt». Når kaiboka leveres, blir SO-ene ferdige.
 
@@ -125,7 +134,8 @@ Alt legges inn i dashbordet under **Workers & Pages → flow → Settings → Va
 | `BW_CLIENT_ID` | **Secret** | Klient-ID fra BarentsWatch (se steg 5) |
 | `BW_CLIENT_SECRET` | **Secret** | Klienthemmelighet fra BarentsWatch |
 | `ANTHROPIC_API_KEY` | **Secret** | Nøkkel til Claude for «Spør Flow» i søkefeltet. Lages på [console.anthropic.com](https://console.anthropic.com) → **API Keys**. Uten nøkkel virker alt annet i søket. |
-| `AI_MODEL` | Text | Valgfritt: hvilken Claude-modell «Spør Flow» bruker. Standard `claude-sonnet-5-5`. |
+| `AI_MODEL` | Text | Valgfritt: hvilken Claude-modell «Spør Flow», jobber, morgenbrief og kaibok bruker. Standard `claude-sonnet-5-5`. |
+| `AI_TRANSLATE_MODEL` | Text | Valgfritt: modell for oversettelse av fritekst. Standard `claude-haiku-5-5`. |
 
 Nye verdier gjelder fra neste forespørsel; ny deploy trengs ikke.
 

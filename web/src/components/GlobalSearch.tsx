@@ -1,14 +1,14 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import type { AskAnswer, BoatDetail, ExternalVessel, SearchBulk, SearchResult } from '../../../shared/api.ts';
+import type { BoatDetail, ExternalVessel, SearchBulk, SearchResult } from '../../../shared/api.ts';
 import { looksLikeQuestion, parseActions, parseDay, parseScope, type SearchAction } from '../../../shared/domain/search.ts';
 import { api, errorText } from '../lib/api.ts';
 import { FLAG_STYLE, STATUS_STYLE, addDays, dayRelative, ddmm, fr, osloTime, telHref, titleCase, todayOslo, typeLabel } from '../lib/format.ts';
-import { getLang, tr, tx } from '../lib/i18n.ts';
+import { tr, tx } from '../lib/i18n.ts';
 import { useMe } from '../lib/queries.ts';
 import { canBoats } from '../lib/roles.ts';
-import { Markdown } from './Markdown.tsx';
+import { AskFlow } from './AskFlow.tsx';
 import { ArrowLeft, Close, Message, Phone, Search, Sparkle, StarLine } from './Icons.tsx';
 
 // Søk øverst på alle sider: sider, båter, anløp, salgsordre, biler, bulk, folk og fartøy fra AIS (Kystverket via BarentsWatch).
@@ -77,10 +77,11 @@ export function GlobalSearch() {
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const term = useDebounced(q.trim(), 250);
+  const ai = !!useMe().data?.ai;
   const res = useQuery({
     queryKey: ['search', term],
     queryFn: () => api<SearchResult>(`/search?q=${encodeURIComponent(term)}`),
-    enabled: term.length >= 2 && !looksLikeQuestion(term),
+    enabled: term.length >= 2 && !(ai && looksLikeQuestion(term)),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
@@ -120,8 +121,8 @@ export function GlobalSearch() {
   const raw = q.trim();
   const { scope, q: needleRaw } = parseScope(raw);
   const needle = needleRaw.toLowerCase();
-  const question = looksLikeQuestion(raw);
-  const d = term.length >= 2 && !question ? res.data : undefined;
+  const question = ai && looksLikeQuestion(raw);
+  const d = term.length >= 2 && !(ai && looksLikeQuestion(term)) ? res.data : undefined;
   const ask = (text: string) => { setAsking(text); setVessel(null); };
 
   // ---------------------------------------------------------------- treffene, i rekkefølge
@@ -191,7 +192,7 @@ export function GlobalSearch() {
       })));
     }
     // Alt som ikke er et kort oppslag kan sendes til «Spør Flow».
-    if (!question && !scope && !parseDay(raw, today) && !parseActions(raw).length && raw.length >= 8 && raw.split(/\s+/).length >= 2) add(tr('Spør Flow'), [askEntry(raw)]);
+    if (ai && !question && !scope && !parseDay(raw, today) && !parseActions(raw).length && raw.length >= 8 && raw.split(/\s+/).length >= 2) add(tr('Spør Flow'), [askEntry(raw)]);
   }
   const flat = sections.flatMap(s => s.entries);
   const count = flat.filter(e => !e.key.startsWith('ask:') && !e.key.startsWith('act:') && e.key !== 'agenda-empty').length;
@@ -222,8 +223,8 @@ export function GlobalSearch() {
 
       {open && (
         <div ref={list} id="gsearch-list" className="glass scroll" role="listbox" aria-label={tr('Søkeresultater')}
-          style={{ position: 'absolute', top: 54, left: 0, right: 0, maxHeight: 'min(640px, calc(100vh - 120px))', padding: 10, zIndex: 40, background: 'rgba(var(--glass-rgb), .95)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {asking ? <AskPanel question={asking} onBack={() => setAsking(null)} go={to => { reset(); nav(to); }} />
+          style={{ position: 'absolute', top: 54, left: 0, right: 0, ...(asking ? { right: 'auto', width: 'min(620px, calc(100vw - 32px))' } : {}), maxHeight: 'min(640px, calc(100vh - 120px))', padding: 10, zIndex: 40, background: 'rgba(var(--glass-rgb), .95)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {asking ? <AskFlow key={asking} question={asking} onBack={() => setAsking(null)} go={to => { reset(); nav(to); }} />
             : vessel ? <VesselCard v={vessel} onBack={() => setVessel(null)} go={to => { reset(); nav(to); }} /> : (
             <>
               {sections.map(s => (
@@ -235,7 +236,7 @@ export function GlobalSearch() {
                   })}
                 </Group>
               ))}
-              {!raw && <Tips onPick={t => { setQ(t); input.current?.focus(); }} />}
+              {!raw && <Tips ai={ai} onPick={t => { setQ(t); input.current?.focus(); }} />}
               {raw && scope && <p className="sub" style={{ margin: '0 8px 6px', fontSize: 12 }}>{tr('Søker bare i «{hva}».', { hva: raw.split(':')[0] })}</p>}
               {term.length >= 2 && !question && res.isFetching && !d && <p className="sub" style={{ margin: 8 }}>{tr('Søker …')}</p>}
               {d && !count && !question && <p className="sub" style={{ margin: 8 }}>{tr('Ingen treff på «{q}».', { q: d.q })}</p>}
@@ -284,9 +285,9 @@ function Item({ e, active, pinned, onHover, onClick, onPin }: { e: Entry; active
 }
 
 /** Når feltet er tomt: hva søket kan gjøre. */
-function Tips({ onPick }: { onPick: (t: string) => void }) {
+function Tips({ onPick, ai }: { onPick: (t: string) => void; ai: boolean }) {
   const tips = [
-    tr('Hvilken båt har vi oftest problemer med?'), tr('Hva er det mest populære produktet vi selger?'), tr('i morgen'), tr('ny bulk SU 20 110'), tr('båt: coneste'),
+    ...(ai ? [tr('Hvilken båt har vi oftest problemer med?'), tr('Flytt neste båt til kai 2')] : []), tr('i morgen'), tr('ny bulk SU 20 110'), tr('båt: coneste'),
   ];
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '6px 10px 4px' }}>
@@ -298,38 +299,6 @@ function Tips({ onPick }: { onPick: (t: string) => void }) {
         {tr('Prefiks: båt:, so:, bil:, sjåfør:, kunde:, kai:, person: · ↑↓ og Enter for å velge · Esc lukker')}
       </span>
     </section>
-  );
-}
-
-// ---------------------------------------------------------------- Spør Flow
-
-/** Svaret fra «Spør Flow»: Claude bruker verktøy som leser Flow-data, og svarer med tall og lenker. */
-function AskPanel({ question, onBack, go }: { question: string; onBack: () => void; go: (to: string) => void }) {
-  const m = useMutation({ mutationFn: (qq: string) => api<AskAnswer>('/ask', { body: { question: qq, lang: getLang() } }) });
-  useEffect(() => { m.mutate(question); }, [question]); // eslint-disable-line react-hooks/exhaustive-deps
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 6 }} aria-live="polite">
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <button type="button" className="icon-btn pill" aria-label={tr('Tilbake til treffene')} onClick={onBack} style={{ width: 36, height: 36, flex: 'none' }}><ArrowLeft size={15} /></button>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span className="eyebrow" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--aqua)' }}><Sparkle size={13} /> {tr('Spør Flow')}</span>
-          <span style={{ fontSize: 16 }}>{question}</span>
-        </div>
-      </div>
-      {m.isPending && <p className="sub loading" style={{ margin: 0 }}>{tr('Flow ser i dataene …')}</p>}
-      {m.isError && (
-        <div className="error-box" style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>{errorText(m.error)}</span>
-          <button type="button" className="btn" style={{ minHeight: 32, fontSize: 13 }} onClick={() => m.mutate(question)}>{tr('Prøv igjen')}</button>
-        </div>
-      )}
-      {m.data && (
-        <>
-          <Markdown text={m.data.answer} go={go} />
-          <span className="sub" style={{ fontSize: 11 }}>{tr('Svar fra Claude basert på data i Flow. Kan ta feil – sjekk tallene før du bruker dem.')}</span>
-        </>
-      )}
-    </div>
   );
 }
 

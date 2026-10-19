@@ -13,6 +13,7 @@ import { canFlag, canPlan } from '../lib/roles.ts';
 import { BoatForm } from '../components/BoatForm.tsx';
 import { BoatPhotos } from '../components/BoatPhotos.tsx';
 import { tr, tx } from '../lib/i18n.ts';
+import { Translated } from '../components/Translated.tsx';
 
 type Filter = 'alle' | 'red' | 'yellow' | 'green';
 
@@ -118,7 +119,7 @@ function BoatProfile({ id, onEdit }: { id: string; onEdit?: () => void }) {
         <h2 id="prof-h" style={{ margin: 0, fontSize: 32, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{b.name}</h2>
         <FlagBadge flag={b.flag} style={{ alignSelf: 'flex-start', fontSize: 13, padding: '4px 11px', gap: 6 }} />
         {b.flag_reason && <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--fg-75)' }}>{tx(b.flag_reason)}</p>}
-        {b.note && !(b.flag_reason && b.note.startsWith(b.flag_reason)) && <p style={{ margin: 0, fontSize: 14, color: 'var(--fg-62)' }}>{b.note}</p>}
+        {b.note && !(b.flag_reason && b.note.startsWith(b.flag_reason)) && <Translated as="p" text={b.note} style={{ margin: 0, fontSize: 14, color: 'var(--fg-62)' }} />}
       </div>
 
       {canFlag(me.data) && <FlagOverride boat={b} />}
@@ -161,7 +162,7 @@ function BoatProfile({ id, onEdit }: { id: string; onEdit?: () => void }) {
             <span className="n" style={{ fontSize: 12, color: 'rgba(var(--tint), .6)' }}>
               {ddmm(l.delivered_at)} · {l.delivered_by?.short_name} · {fr(l.avg)}/5{l.had_deviation && <span style={{ color: 'var(--bad-fg)' }}> · {tr('Avvik')}</span>}
             </span>
-            <span style={{ fontSize: 14 }}>{l.had_deviation && l.description ? l.description : l.boat_note ?? '—'}</span>
+            <Translated text={l.had_deviation && l.description ? l.description : l.boat_note ?? '—'} style={{ fontSize: 14 }} />
           </div>
         ))}
         {!b.recent_logs.length && <p style={{ margin: 0, padding: '10px 0', fontSize: 14, color: 'var(--fg-62)' }}>{tr('Ingen kaibøker ennå. Første anløp fyller profilen.')}</p>}

@@ -86,3 +86,5 @@ export const StarLine = ({ size = 15, filled = false }: { size?: number; filled?
   </svg>
 );
 export const Message = (p: P) => <Stroke {...p}><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20.5l1.4-4.6A8 8 0 1 1 21 12z" /></Stroke>;
+export const Mic = (p: P) => <Stroke {...p}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" /></Stroke>;
+export const Send = (p: P) => <Stroke {...p}><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></Stroke>;

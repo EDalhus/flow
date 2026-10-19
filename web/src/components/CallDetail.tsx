@@ -13,6 +13,7 @@ import { Chat } from './Chat.tsx';
 import { Check, Chevron, Close, Phone, Plus } from './Icons.tsx';
 import { BigNumber, FlagBadge, Loading, QuayMark, Rating, RatingBars, Segmented } from './ui.tsx';
 import { tr, tx } from '../lib/i18n.ts';
+import { Translated } from './Translated.tsx';
 
 export type DetailTab = 'oversikt' | 'chat' | 'profil' | 'logg';
 
@@ -127,7 +128,7 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
                   {ddmm(l.delivered_at)} · {l.delivered_by?.short_name} · {fr(l.avg)}/5
                   {l.had_deviation && <span style={{ color: 'var(--bad-fg)' }}> · {tr('Avvik')}</span>}
                 </span>
-                <span style={{ fontSize: 14 }}>{l.boat_note ?? l.description ?? '—'}</span>
+                <Translated text={l.boat_note ?? l.description ?? '—'} style={{ fontSize: 14 }} />
               </div>
             ))}
             {boat.data && !boat.data.recent_logs.length && <p className="muted" style={{ margin: 0, padding: '10px 6px', fontSize: 14 }}>{tr('Ingen kaibøker ennå.')}</p>}

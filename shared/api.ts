@@ -16,6 +16,8 @@ export interface Me extends UserRef {
   /** Appen kjører uten Cloudflare Access; brukeren velges i appen. */
   open: boolean;
   prefs: UserPrefs;
+  /** Claude er satt opp (ANTHROPIC_API_KEY): «Spør Flow», jobber, morgenbrief, kaibok med egne ord og oversettelse. */
+  ai: boolean;
 }
 
 /** Valg hver bruker gjør selv. */
@@ -561,8 +563,24 @@ export interface SearchBulk {
   id: string; truck: string; destination: string | null; status: string; delivery_no: number | null; project_no: string | null; at: string;
 }
 
+/** En jobb Claude foreslår i Flow; brukeren bekrefter før den gjøres. */
+export interface AskAction {
+  id: number; kind: string; summary: string; details: string[];
+  status: 'foreslatt' | 'utfort' | 'avbrutt' | 'feilet'; link: string | null; error: string | null;
+}
+/** Tidligere spørsmål og svar i samme samtale (for oppfølgingsspørsmål). */
+export interface AskTurn { role: 'user' | 'assistant'; content: string }
 /** Svar fra «Spør Flow». */
-export interface AskAnswer { question: string; answer: string; tools: string[] }
+export interface AskAnswer { question: string; answer: string; tools: string[]; actions: AskAction[] }
+/** Morgenbrief: første gang man åpner Flow hver dag. */
+export interface MorningBrief { day: string; text: string }
+/** Kaibok skrevet med egne ord, tolket av Claude (brukeren godkjenner). */
+export interface KaibokDraft {
+  had_deviation: boolean; categories: string[]; r_punctuality: number; r_cooperation: number; r_equipment: number;
+  description: string | null; boat_note: string | null;
+}
+/** Oversatt fritekst: null = allerede på leserens språk (eller kunne ikke oversettes). */
+export interface Translation { text: string | null; source_lang: string | null }
 
 export interface SearchResult {
   q: string;

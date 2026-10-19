@@ -13,6 +13,8 @@ interface __FlowOptionalEnv {
   /** «Spør Flow» (Claude): API-nøkkel som Cloudflare-secret, og valgfri modell (standard claude-sonnet-5-5). */
   ANTHROPIC_API_KEY?: string;
   AI_MODEL?: string;
+  /** Valgfri modell for oversettelse (standard claude-haiku-5-5). */
+  AI_TRANSLATE_MODEL?: string;
 }
 interface Env extends __FlowOptionalEnv {}
 declare namespace Cloudflare {

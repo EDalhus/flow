@@ -12,6 +12,7 @@ import {
 } from '../lib/queries.ts';
 import { Close, Minus, Plus } from './Icons.tsx';
 import { Loading, QuayMark, Segmented, StatusBadge } from './ui.tsx';
+import { Translated } from './Translated.tsx';
 
 // Salgsordre (SO): status, endringslogg, detaljpanel med flytting mellom båter, og skjema for ny ordre.
 
@@ -379,7 +380,7 @@ export function OrderPanel({ id, onClose, onOpenCall }: { id: string; onClose: (
           <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 14px', fontSize: 14 }}>
             <dt className="sub">{tr('Selger')}</dt><dd style={{ margin: 0 }}>{o.seller?.name ?? '–'}</dd>
             <dt className="sub">{tr('Ønsket dag')}</dt><dd style={{ margin: 0 }}>{o.wanted_date ? dayShort(o.wanted_date) : '–'}</dd>
-            {o.notes && <><dt className="sub">{tr('Merknad')}</dt><dd style={{ margin: 0 }}>{o.notes}</dd></>}
+            {o.notes && <><dt className="sub">{tr('Merknad')}</dt><dd style={{ margin: 0 }}><Translated text={o.notes} /></dd></>}
           </dl>
 
           <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

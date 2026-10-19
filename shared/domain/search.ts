@@ -81,8 +81,8 @@ export function parseActions(raw: string): SearchAction[] {
   return [];
 }
 
-const QUESTION_START = /^(hvem|hva|hvilk|hvor|når|hvordan|hvorfor|kan|er|har|vis meg|gi meg|finn|list|sammenlign|who|what|which|where|when|how|why|show|kuris|kas|kiek|kada|hvad|hvilke|vem|vad|vilk|var |hur|hver|hvað|hvaða|hvar|hvenær)/i;
-/** Ser teksten ut som et spørsmål til «Spør Flow»? */
+const QUESTION_START = /^(hvem|hva|hvilk|hvor|når|hvordan|hvorfor|kan|er|har|vis meg|gi meg|finn|list|sammenlign|flytt|lag|bestill|marker|send|avlys|kanseller|skriv|opprett|endre|utsett|move|create|book|cancel|mark|perkelk|sukurk|flyt|bestil|ändra|flytta|boka|færðu|bókaðu|who|what|which|where|when|how|why|show|kuris|kas|kiek|kada|hvad|hvilke|vem|vad|vilk|var |hur|hver|hvað|hvaða|hvar|hvenær)/i;
+/** Ser teksten ut som et spørsmål eller en jobb til «Spør Flow»? */
 export function looksLikeQuestion(raw: string): boolean {
   const q = raw.trim();
   if (q.length < 8) return false;

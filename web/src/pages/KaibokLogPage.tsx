@@ -9,6 +9,7 @@ import { ddmm, fr, osloTime, serviceDate } from '../lib/format.ts';
 import { useQuayLogs } from '../lib/queries.ts';
 import './kaibok.css';
 import { tr, tx } from '../lib/i18n.ts';
+import { Translated } from '../components/Translated.tsx';
 
 type Filter = 'alle' | 'avvik' | 'ok';
 
@@ -107,7 +108,7 @@ function LogDetail({ log: l }: { log: QuayLogView }) {
               {l.categories.map(c => <span key={c} style={{ fontSize: 13, borderRadius: 999, padding: '4px 11px', background: 'rgba(var(--tint), .1)' }}>{tx(CATEGORY_LABEL[c])}</span>)}
             </div>
           )}
-          {l.description && <p style={{ margin: 0, fontSize: 15 }}>{l.description}</p>}
+          {l.description && <Translated as="p" text={l.description} style={{ margin: 0, fontSize: 15 }} />}
           {l.photos.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
               {l.photos.map((p, i) => (
@@ -138,7 +139,7 @@ function LogDetail({ log: l }: { log: QuayLogView }) {
       {l.boat_note && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <h3 style={{ margin: 0, fontSize: 13, fontWeight: 400, color: 'var(--fg-62)' }}>{tr('Notat til båtprofilen')}</h3>
-          <p style={{ margin: 0, fontSize: 15 }}>{l.boat_note}</p>
+          <Translated as="p" text={l.boat_note} style={{ margin: 0, fontSize: 15 }} />
         </div>
       )}
       <Link to={`/baater?id=${l.boat.id}`} className="btn" style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', fontSize: 14, padding: '0 16px' }}>
