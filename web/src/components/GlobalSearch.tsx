@@ -8,6 +8,7 @@ import { FLAG_STYLE, STATUS_STYLE, addDays, dayRelative, ddmm, fr, osloTime, tel
 import { getLang, tr, tx } from '../lib/i18n.ts';
 import { useMe } from '../lib/queries.ts';
 import { canBoats } from '../lib/roles.ts';
+import { Markdown } from './Markdown.tsx';
 import { ArrowLeft, Close, Message, Phone, Search, Sparkle, StarLine } from './Icons.tsx';
 
 // Søk øverst på alle sider: sider, båter, anløp, salgsordre, biler, bulk, folk og fartøy fra AIS (Kystverket via BarentsWatch).
@@ -328,33 +329,6 @@ function AskPanel({ question, onBack, go }: { question: string; onBack: () => vo
           <span className="sub" style={{ fontSize: 11 }}>{tr('Svar fra Claude basert på data i Flow. Kan ta feil – sjekk tallene før du bruker dem.')}</span>
         </>
       )}
-    </div>
-  );
-}
-
-/** Liten markdown: avsnitt, punktlister, nummererte lister, **fet** og [lenker](/sti) til sider i Flow. */
-function Markdown({ text, go }: { text: string; go: (to: string) => void }) {
-  const inline = (s: string, k: string): ReactNode[] => s.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g).map((part, j) => {
-    const bold = /^\*\*(.+)\*\*$/.exec(part);
-    if (bold) return <strong key={`${k}${j}`} style={{ fontWeight: 600 }}>{bold[1]}</strong>;
-    const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
-    if (link) return link[2].startsWith('/') && !link[2].startsWith('//')
-      ? <a key={`${k}${j}`} href={link[2]} onClick={e => { e.preventDefault(); go(link[2]); }} style={{ color: 'var(--aqua)' }}>{link[1]}</a>
-      : <span key={`${k}${j}`}>{link[1]}</span>;
-    return part;
-  });
-  const blocks = text.split(/\n{2,}/);
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14, lineHeight: 1.5 }}>
-      {blocks.map((b, bi) => {
-        const lines = b.split('\n').filter(l => l.trim());
-        if (lines.length && lines.every(l => /^\s*([-*•]|\d+\.)\s+/.test(l))) {
-          const ordered = /^\s*\d+\./.test(lines[0]);
-          const Tag = ordered ? 'ol' : 'ul';
-          return <Tag key={bi} style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 3 }}>{lines.map((l, li) => <li key={li}>{inline(l.replace(/^\s*([-*•]|\d+\.)\s+/, ''), `${bi}-${li}-`)}</li>)}</Tag>;
-        }
-        return <p key={bi} style={{ margin: 0 }}>{lines.map((l, li) => <span key={li}>{li > 0 && <br />}{inline(l.replace(/^#+\s*/, ''), `${bi}-${li}-`)}</span>)}</p>;
-      })}
     </div>
   );
 }

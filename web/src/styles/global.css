@@ -388,3 +388,13 @@ input::placeholder, textarea::placeholder { color: rgba(var(--tint), .45); }
 .m-legend .legend-types { flex-wrap: wrap; overflow: visible; }
 .m-legend .legend-range { width: 100%; padding: 4px 0; }
 .m-legend .legend-range input { flex: 1; }
+
+/* «Spør Flow»: svar med lister og lenker inn i Flow. */
+.md-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; counter-reset: md; }
+.md-list > li { position: relative; padding-left: 20px; }
+.md-ul > li::before { content: ''; position: absolute; left: 4px; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: var(--aqua); opacity: .8; }
+.md-ol > li { counter-increment: md; padding-left: 24px; }
+.md-ol > li::before { content: counter(md); position: absolute; left: 0; top: .15em; width: 17px; height: 17px; border-radius: 50%; font-size: 11px; line-height: 17px; text-align: center; background: rgba(128, 239, 222, .16); color: var(--aqua); }
+.md-link { color: var(--aqua); text-decoration: none; padding: 0 5px; margin: 0 -1px; border-radius: 6px; background: rgba(128, 239, 222, .1); white-space: nowrap; }
+.md-link:hover { background: rgba(128, 239, 222, .2); }
+:root[data-theme="light"] .md-link { color: var(--teal); background: rgba(10, 120, 100, .08); }
