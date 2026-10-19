@@ -257,16 +257,42 @@ export const bulkStep = z.object({
   quality_id: id,
   tonnes: z.number().gt(0, 'Tonn må være over 0.').max(60),
   target: z.enum(['bil', 'henger']).nullable().optional().transform(v => v ?? null),
-  pause_after_sec: z.int().min(0).max(1800).default(0),
 });
+
+/** Bestilling av bulklasting (sjåfør eller kontor). Kunde er påkrevd; prosjektnummer når kunden krever det. */
 export const bulkOrderCreate = z.object({
-  truck: text(60).min(1, 'Skriv inn bil.'),
-  destination: optionalText(120),
+  vehicle_id: id,
+  customer_id: id,
+  /** Kontoret kan bestille for en sjåfør; sjåføren bestiller for seg selv. */
+  driver_id: id.nullable().optional(),
+  project_no: optionalText(40),
+  so_number: soNumber.nullable().optional(),
+  /** Ca. når bilen kommer (bestilling frem i tid). Tom = nå. */
   expected_at: dateTime.nullable().optional(),
   notes: optionalText(500),
-  steps: z.array(bulkStep).min(1, 'Legg til minst ett steg.').max(4),
+  steps: z.array(bulkStep).min(1, 'Legg til minst ett steg.').max(2),
 });
 export type BulkOrderCreateInput = z.input<typeof bulkOrderCreate>;
+export type BulkOrderCreate = z.infer<typeof bulkOrderCreate>;
+
+/** «Steg ferdig»: veid tonn fra vekta i utlastingen. */
+export const bulkStepDone = z.object({ weighed_tonnes: z.number().gt(0, 'Veid tonn må være over 0.').max(80) });
+
+export const driverLogin = z.object({ phone: z.string().trim().min(8).max(20), pin: z.string().regex(/^\d{4,6}$/, 'PIN er 4–6 siffer.') });
+
+export const haulerUpsert = z.object({ name: text(120).min(1), own: z.boolean().optional(), phone: optionalText(40), active: z.boolean().optional() });
+export const bulkCustomerUpsert = z.object({
+  name: text(120).min(1, 'Skriv inn kunde.'), requires_project: z.boolean().optional(), email: optionalText(200), notes: optionalText(500), active: z.boolean().optional(),
+});
+export const driverUpsert = z.object({
+  name: text(120).min(1, 'Skriv inn navn.'), phone: z.string().trim().min(8, 'Skriv inn telefonnummer.').max(20), hauler_id: id,
+  lang: z.enum(['nb', 'en', 'lt', 'da', 'sv', 'is']).optional(), active: z.boolean().optional(),
+  /** Ny PIN (4–6 siffer). Utelates for å beholde den gamle. */
+  pin: z.string().regex(/^\d{4,6}$/, 'PIN er 4–6 siffer.').optional(),
+});
+export const vehicleUpsert = z.object({
+  reg_no: text(16).min(2, 'Skriv inn reg.nr.'), hauler_id: id, description: optionalText(80), has_trailer: z.boolean().optional(), active: z.boolean().optional(),
+});
 
 // ---------------------------------------------------------------- produksjon (pakkelinjer og siloer)
 

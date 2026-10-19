@@ -81,5 +81,16 @@ export const SERVER_TEXTS = [
   'Skriv en kort begrunnelse.', 'Maks 92 dager per spørring.', 'Meldingen er tom.',
   'Velg minst én kategori eller skriv en beskrivelse av avviket.', 'Kategorier kan bare settes når det er avvik.',
   'Skriv en begrunnelse for overstyringen.', 'Skriv inn kunde.', 'Legg til minst én vare.', 'Skriv inn bil.', 'Legg til minst ett steg.',
+  // Bulkutlevering: logg, rapportgrupper og feilmeldinger fra /api/bulk og /api/driver
+  'Startet lasting', 'Steg ferdig – veid', 'Fortsatte lasting', 'Ferdig – følgeseddel laget',
+  'Kvalitet', 'Kunde', 'Bil', 'Sjåfør', 'Transportør', 'Prosjekt', 'Dag',
+  'Bilen er registrert uten henger.', 'Sett en PIN (4–6 siffer).', 'Skriv inn veid tonn.', 'Til-dato må være etter fra-dato.', 'Ukjent bil.', 'Ukjent kunde.',
+  'Ukjent saltkvalitet.', 'Ukjent sjåfør.', 'Feil telefonnummer eller PIN.', 'Ikke innlogget.', 'Innloggingen har utløpt. Logg inn på nytt.',
+  'Bilen hører til et annet transportfirma.', 'Fant ikke bestillingen.', 'Bestillingen er allerede ferdig eller avlyst.', 'Følgeseddel lages når lastingen er ferdig.',
+  'Ingen steg lastes nå.', 'Lastingen er ikke stoppet.', 'Lastingen er startet. Kontakt kontoret.', 'Lastingen kan ikke startes nå.',
+  'Nødstopp kan bare trykkes under lasting.', 'For mange forsøk. Prøv igjen om noen minutter.', '{kunde} krever prosjektnummer.',
+  'Det finnes allerede et transportfirma med dette navnet.', 'Det finnes allerede en kunde med dette navnet.',
+  'Det finnes allerede en sjåfør med dette telefonnummeret.', 'Det finnes allerede en bil med dette reg.nr.',
+  'NØDSTOPP ved utlastingen: {bil} ({navn})', 'Egne biler',
   'Noe gikk galt.', 'Feil {kode}',
 ];

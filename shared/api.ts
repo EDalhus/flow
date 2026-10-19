@@ -444,8 +444,11 @@ export interface BulkQuality { id: string; name: string; color: string }
 
 export interface BulkOrderView {
   id: string;
+  /** Reg.nr. (og beskrivelse) på bilen. */
   truck: string;
+  /** Kundens navn (eldre bestillinger: fritekst). */
   destination: string | null;
+  /** Brukeren som bestilte på kontoret (eldre bestillinger). */
   driver: UserRef | null;
   status: 'bestilt' | 'lastes' | 'ferdig' | 'avlyst';
   expected_at: string | null;
@@ -454,10 +457,55 @@ export interface BulkOrderView {
   started_at: string | null;
   finished_at: string | null;
   total_tonnes: number;
+  /** Sum veid tonn (når stegene er veid). */
+  weighed_tonnes: number | null;
+  driver_profile: { id: string; name: string; phone: string } | null;
+  vehicle: { id: string; reg_no: string; description: string | null } | null;
+  hauler: { id: string; name: string; own: boolean } | null;
+  customer: { id: string; name: string } | null;
+  project_no: string | null;
+  so_number: string | null;
+  /** Nødstopp trykket (og ikke fortsatt). */
+  stopped_at: string | null;
+  /** Følgeseddel nr. (når lastingen er ferdig). */
+  delivery_no: number | null;
+  has_pdf: boolean;
+  booked_by: 'sjafor' | 'kontor';
   steps: {
     id: string; seq: number; quality_id: string; quality_name: string; color: string; tonnes: number;
-    target: 'bil' | 'henger' | null; pause_after_sec: number; started_at: string | null; finished_at: string | null;
+    target: 'bil' | 'henger' | null; started_at: string | null; finished_at: string | null; weighed_tonnes: number | null;
   }[];
+}
+
+export interface Hauler { id: string; name: string; own: boolean; phone: string | null; active: boolean }
+export interface BulkCustomer { id: string; name: string; requires_project: boolean; email: string | null; notes: string | null; active: boolean }
+export interface DriverProfile {
+  id: string; name: string; phone: string; hauler: { id: string; name: string; own: boolean }; lang: string; active: boolean;
+  has_pin: boolean; last_login_at: string | null;
+}
+export interface Vehicle { id: string; reg_no: string; hauler_id: string; description: string | null; has_trailer: boolean; active: boolean }
+export interface BulkRegistry { haulers: Hauler[]; customers: BulkCustomer[]; drivers: DriverProfile[]; vehicles: Vehicle[] }
+
+export interface BulkLogEntry { id: number; at: string; kind: string; data: Record<string, unknown>; by: string | null }
+
+/** Én veiing (ett ferdig steg). */
+export interface BulkWeighing {
+  step_id: string; order_id: string; at: string; delivery_no: number | null; quality_name: string; color: string; target: 'bil' | 'henger' | null;
+  ordered: number; weighed: number | null; vehicle: string; driver: string | null; hauler: string | null; customer: string | null;
+  project_no: string | null; so_number: string | null;
+}
+
+export type BulkGroup = 'kvalitet' | 'kunde' | 'bil' | 'sjafor' | 'transportor' | 'prosjekt' | 'dag';
+export interface BulkReportRow { key: string; label: string; loads: number; ordered: number; weighed: number; minutes_avg: number | null }
+export interface BulkReport { from: string; to: string; group: BulkGroup; rows: BulkReportRow[]; total: Omit<BulkReportRow, 'key' | 'label'> }
+
+/** Sjåførvisningen: sjåføren, bilene til transportfirmaet, kunder, kvaliteter og sjåførens bestillinger. */
+export interface DriverMe {
+  driver: { id: string; name: string; phone: string; lang: string; hauler: { id: string; name: string } };
+  vehicles: Vehicle[];
+  customers: { id: string; name: string; requires_project: boolean }[];
+  qualities: BulkQuality[];
+  orders: BulkOrderView[];
 }
 
 export interface ProductionOrderView {

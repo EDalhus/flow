@@ -6,7 +6,7 @@ Internt logistikksystem for kaia på Flatholmen i Ålesund. Menyen har fire hove
 |---|---|
 | **Båter** | Kart med AIS, anløp, kaibok og båtregister (underfaner øverst). Kartet kan vises som mørkt, lyst, satellitt eller hybrid; valget huskes per nettleser. |
 | **Biler** | Kundebiler som henter pall og BB på en SO fra Dynamics 365 (SO-nummer 20XXXXX, påkrevd), sortert på forventet dag (ikke klokkeslett). Markeres «Hentet» når de har vært her. |
-| **Bulkbil** | Egne biler som henter salt i bulk. Sjåføren bestiller kvalitet (havsalt, steinsalt, blandet salt, veisalt) og tonn på bilen, og kan legge til henger som et ekstra steg med pause (min:sek) imellom. Kontoret ser køen og kan fjerne en bestilling som ble feil eller ikke hentes; lastingen startes ikke fra Flow. |
+| **Bulkbil** | Utlevering av salt i bulk til egne og eksterne biler. Sjåførene har en egen visning på `/sjafor` (telefon + PIN, alle Flow-språk) der de velger bil, kunde (prosjektnummer når kunden krever det), kvalitet og tonn – nå eller frem i tid – og selv starter lastingen, taster veid tonn fra vekta for bil og henger, trykker nødstopp og fortsetter. Når lastingen er ferdig lages en følgeseddel (PDF, alltid på norsk). Kontoret har kø, dagens veiinger, rapporter (per kvalitet, kunde, bil, sjåfør, transportør, prosjekt og dag, med CSV) og registre for sjåfører, biler, kunder og transportfirma. |
 | **Produksjon** | To pakkelinjer med 30 t silo hver. Viser hva som pakkes i bigbags nå, hva som er neste inn i siloen (med varsel ved kvalitetsbytte), beregnet nivå i siloen og når hjullasteren skal fylle eller stoppe. |
 
 **Søk øverst på alle sider** finner sider, båter, anløp, biler, bulkbiler og folk i Flow. Med BarentsWatch-nøklene på plass søker det også i AIS (Kystverkets data) på navn, MMSI, IMO eller kallesignal – også båter som ikke er i båtregisteret. Fra treffet kan båten legges til i båtregisteret, og «Vis i kartet» viser hvor den er nå. BarentsWatch kan ikke søke på navn, så Flow henter alle fartøy de har sett siste 24 timer i norske farvann og filtrerer selv (listen holdes i minnet i tre minutter). Båter som ikke har vært i området det siste døgnet, blir ikke funnet.
@@ -23,7 +23,7 @@ Rapporter og **Innstillinger** ligger nederst i menyen. Under Innstillinger → 
 
 **Kartbakgrunn:** Mørk og lys er flate sjøkart i Kystverket-stil (hav, land, veier og navn – uten terreng), laget av vektorfliser fra OpenFreeMap (OpenStreetMap-data, ingen nøkkel). Satellitt og hybrid bruker Esri World Imagery. Esris vilkår kan kreve en ArcGIS-konto ved kommersiell bruk; flyfoto fra Norge i bilder kan brukes i stedet hvis dere har tilgang.
 
-**MVP:** Silonivået beregnes fra registrert påfylling (API-et `POST /api/production/fills`; knappene for påfylling er fjernet fra skjermene) og pakkehastigheten (standard 10 t/t per linje). Når sensorene på siloene kobles på, erstattes det beregnede nivået med målt verdi. Bulkbil viser og teller ned; styring av traktene kan kobles på senere.
+**MVP:** Silonivået beregnes fra registrert påfylling (API-et `POST /api/production/fills`; knappene for påfylling er fjernet fra skjermene) og pakkehastigheten (standard 10 t/t per linje). Når sensorene på siloene kobles på, erstattes det beregnede nivået med målt verdi. Styring av traktene og vekta på utlastingen kan kobles på senere.
 
 Alt kjører i én Cloudflare Worker:
 
@@ -98,6 +98,7 @@ Access kan slås på når som helst, uten kodeendringer. Når `ACCESS_AUD` og `A
    Du finner dem også senere under **Zero Trust → Access → Applications → (flow) → Configure → Additional settings → Application Audience (AUD) Tag**.
 4. Velg **Manage Cloudflare Access** og rediger policyen. Under *Include* velger du **Emails** og legger inn e-postene som skal ha tilgang. Bruk *Emails ending in* hvis alle har firma-e-post.
 5. Innloggingsmetode: «verifiserte e-postadresser» betyr **One-time PIN**. Den er aktiv som standard under **Zero Trust → Settings → Authentication**. Brukeren skriver inn e-posten sin og får en engangskode.
+6. **Sjåførvisningen:** sjåførene logger inn med telefon + PIN i Flow, ikke via Access. Legg til en ekstra Access-applikasjon (eller policy) med handlingen **Bypass** for stiene `/sjafor` og `/api/driver/*`, ellers møter sjåførene Access-innloggingen. Sjåfør-API-et gir bare tilgang til sjåførens egne lastinger.
 
 Kilder: [Cloudflare Access for Workers](https://developers.cloudflare.com/workers/configuration/cloudflare-access/), [Validate JWTs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/).
 
@@ -229,4 +230,6 @@ Logger finnes under **Workers & Pages → flow → Observability/Logs**, og bygg
 - Varsler på e-post eller push i tillegg til bjella.
 - Import av ekte historikk til rapportene, slik at de oppdiktede tallene erstattes.
 - Silosensorer i stedet for beregnet nivå, og styring av traktene for bulkbil.
+- Vekta på utlastingen via API, slik at veid tonn kommer automatisk (feltet `weighed_source` skiller allerede mellom sjåfør, vekt og kontor), og kobling begge veier mot utlastingsanlegget.
+- Sende følgeseddelen på e-post til kunden og kontoret. PDF-en lages og lagres i R2 allerede; det som mangler er en e-posttjeneste (nøkkel som secret i Cloudflare).
 - Skjerm for å endre pakkehastighet og silostørrelse per linje. API-et finnes (`PATCH /api/production/lines/:id`).

@@ -1,35 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { bulkDemand, bulkPhase, formatMinSec, parseMinSec } from '../../shared/domain/bulk.ts';
+import { bulkDemand, bulkPhase, normalizePhone } from '../../shared/domain/bulk.ts';
 import { siloState } from '../../shared/domain/production.ts';
 import { api } from './fixtures.ts';
 
 const T0 = Date.parse('2030-04-01T08:00:00Z');
 const iso = (min: number) => new Date(T0 + min * 60_000).toISOString();
 const step = (seq: number, extra: Partial<Parameters<typeof bulkPhase>[1][number]> = {}) =>
-  ({ seq, quality_id: 'havsalt', tonnes: 10, pause_after_sec: 0, started_at: null, finished_at: null, ...extra });
+  ({ seq, quality_id: 'havsalt', tonnes: 10, started_at: null, finished_at: null, ...extra });
 
-describe('bulk: steg og pause', () => {
-  it('går fra venter til laster, pause og ferdig', () => {
-    expect(bulkPhase('bestilt', [step(1), step(2)], T0)).toEqual({ kind: 'venter' });
-    expect(bulkPhase('lastes', [step(1, { started_at: iso(0) }), step(2)], T0 + 60_000)).toEqual({ kind: 'laster', step: 1 });
-    // Steg 1 ferdig etter 5 min, pause 2:30 → steg 2 starter 7:30.
-    const s = [step(1, { started_at: iso(0), finished_at: iso(5), pause_after_sec: 150 }), step(2, { started_at: iso(7.5) })];
-    expect(bulkPhase('lastes', s, T0 + 6 * 60_000)).toEqual({ kind: 'pause', next: 2, untilMs: T0 + 7.5 * 60_000 });
-    expect(bulkPhase('lastes', s, T0 + 8 * 60_000)).toEqual({ kind: 'laster', step: 2 });
-    expect(bulkPhase('ferdig', s, T0)).toEqual({ kind: 'ferdig' });
+describe('bulk: steg, pause og nødstopp', () => {
+  it('går fra venter til laster, pause (flytt til henger), nødstopp og ferdig', () => {
+    expect(bulkPhase('bestilt', [step(1), step(2)])).toEqual({ kind: 'venter' });
+    expect(bulkPhase('lastes', [step(1, { started_at: iso(0) }), step(2)])).toEqual({ kind: 'laster', step: 1 });
+    const s = [step(1, { started_at: iso(0), finished_at: iso(5) }), step(2)];
+    expect(bulkPhase('lastes', s)).toEqual({ kind: 'pause', next: 2 });
+    expect(bulkPhase('lastes', [step(1, { started_at: iso(0) })], iso(2))).toEqual({ kind: 'stoppet', step: 1 });
+    expect(bulkPhase('ferdig', s)).toEqual({ kind: 'ferdig' });
   });
 
-  it('summerer det traktene trenger, og leser mm:ss', () => {
+  it('summerer det traktene trenger, og normaliserer telefonnummer', () => {
     const demand = bulkDemand([
       { status: 'bestilt', steps: [step(1, { quality_id: 'blandet', tonnes: 16 }), step(2, { tonnes: 12 })] },
       { status: 'lastes', steps: [step(1, { tonnes: 8, finished_at: iso(1) }), step(2, { quality_id: 'blandet', tonnes: 4 })] },
       { status: 'ferdig', steps: [step(1, { tonnes: 99 })] },
     ]);
     expect(demand).toEqual({ blandet: 20, havsalt: 12 });
-    expect(parseMinSec('2:30')).toBe(150);
-    expect(parseMinSec('45')).toBe(45);
-    expect(parseMinSec('2:75')).toBeNull();
-    expect(formatMinSec(150)).toBe('2:30');
+    expect(normalizePhone('400 10 203')).toBe('4740010203');
+    expect(normalizePhone('+47 400 10 203')).toBe('4740010203');
+    expect(normalizePhone('0046 70 123 45 67')).toBe('46701234567');
   });
 });
 
@@ -65,29 +63,6 @@ describe('API: biler, bulk og produksjon', () => {
     expect(picked.json.picked_up_by.id).toBe('u_ola');
     expect((await api(`/trucks/${res.json.id}/pickup`, { as: 'ola', body: { undo: true } })).json.picked_up_at).toBeNull();
     expect((await api('/trucks', { as: 'kari', body: { customer: 'X', expected_date: '2030-04-02', goods: [] } })).status).toBe(400);
-  });
-
-  it('bulk: bestill i steg, start, pause og ferdig', async () => {
-    const order = await api('/bulk/orders', {
-      as: 'ola',
-      body: { truck: 'Bil 2', destination: 'Fiskebruket', steps: [
-        { quality_id: 'blandet', tonnes: 16, target: 'henger', pause_after_sec: 150 },
-        { quality_id: 'havsalt', tonnes: 12, target: 'bil', pause_after_sec: 999 },
-      ] },
-    });
-    expect(order.status).toBe(201);
-    expect(order.json.steps.map((s: { quality_name: string; pause_after_sec: number }) => [s.quality_name, s.pause_after_sec]))
-      .toEqual([['Blandet salt', 150], ['Havsalt', 0]]); // siste steg har aldri pause
-    const id = order.json.id;
-    expect((await api(`/bulk/orders/${id}/start`, { as: 'ola', body: {} })).json.status).toBe('lastes');
-    const afterStep1 = await api(`/bulk/orders/${id}/next`, { as: 'ola', body: {} });
-    const s2start = Date.parse(afterStep1.json.steps[1].started_at);
-    expect(s2start - Date.parse(afterStep1.json.steps[0].finished_at)).toBe(150_000);
-    // Under pausen: «neste» starter steg 2 med en gang; så ferdig.
-    await api(`/bulk/orders/${id}/next`, { as: 'ola', body: {} });
-    const done = await api(`/bulk/orders/${id}/next`, { as: 'ola', body: {} });
-    expect(done.json.status).toBe('ferdig');
-    expect((await api('/bulk/orders', { as: 'ola', body: { truck: 'Bil 2', steps: [{ quality_id: 'gull', tonnes: 5 }] } })).status).toBe(400);
   });
 
   it('produksjon: ordre, start, påfylling og ferdig', async () => {

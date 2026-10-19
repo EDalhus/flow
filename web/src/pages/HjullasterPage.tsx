@@ -101,12 +101,13 @@ function TruckCard({ order: o }: { order: BulkOrderView }) {
   }
   return (
     <article className="glass" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, borderRadius: 24,
-      ...(o.status === 'lastes' ? { borderColor: 'rgba(128,239,222,.45)' } : {}) }}>
+      ...(o.stopped_at ? { borderColor: '#E5484D' } : o.status === 'lastes' ? { borderColor: 'rgba(128,239,222,.45)' } : {}) }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 26 }}>{o.truck}</span>
-        <span className="muted n" style={{ fontSize: 18 }}>{tr('bestilt {tid}', { tid: osloTime(o.created_at) })}</span>
+        <span className="muted n" style={{ fontSize: 18 }}>{o.expected_at && o.status === 'bestilt' ? tr('ca. {tid}', { tid: osloTime(o.expected_at) }) : tr('bestilt {tid}', { tid: osloTime(o.created_at) })}</span>
       </div>
-      <span style={{ fontSize: 20, color: 'var(--fg-75)' }}>{tr('Sjåfør: {navn}', { navn: o.driver?.name ?? tr('ukjent') })}{o.destination ? <span className="muted"> · {tr('til {sted}', { sted: o.destination })}</span> : null}</span>
+      {o.stopped_at && <div role="alert" style={{ borderRadius: 14, padding: '10px 14px', background: '#E5484D', color: '#fff', fontSize: 22 }}>{tr('NØDSTOPP')} · {tr('stoppet {tid}', { tid: osloTime(o.stopped_at) })}</div>}
+      <span style={{ fontSize: 20, color: 'var(--fg-75)' }}>{tr('Sjåfør: {navn}', { navn: o.driver_profile?.name ?? o.driver?.name ?? tr('ukjent') })}{(o.customer?.name ?? o.destination) ? <span className="muted"> · {tr('til {sted}', { sted: o.customer?.name ?? o.destination ?? '' })}</span> : null}</span>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {[...byQuality.values()].map(q => (
           <span key={q.name} style={{ ['--q' as string]: q.color, display: 'flex', alignItems: 'center', gap: 10, borderRadius: 16, padding: '12px 18px', fontSize: 22,

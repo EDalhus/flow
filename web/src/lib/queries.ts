@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  AisView, BoatDetail, BoatView, BulkOrderView, OrderDetail, OrderLogEntry, OrderView, BulkQuality, CollisionView, Me, MessageView, NotificationView, PackingLineView,
+  AisView, BoatDetail, BoatView, BulkGroup, BulkLogEntry, BulkOrderView, BulkRegistry, BulkReport, BulkWeighing, OrderDetail, OrderLogEntry, OrderView, BulkQuality, CollisionView, Me, MessageView, NotificationView, PackingLineView,
   PortCallView, ProductReport, QualityReport, Quay, QuayLogView, TruckOrderView, UserPrefs, UserView, WeeklyReport,
 } from '../../../shared/api.ts';
 import type { Settings } from '../../../shared/domain/types.ts';
@@ -273,8 +273,26 @@ function useBulkMutation<V>(fn: (v: V) => Promise<BulkOrderView>) {
 }
 export const useCreateBulkOrder = () => useBulkMutation((body: BulkOrderCreateInput) => api<BulkOrderView>('/bulk/orders', { body }));
 /** Start, neste steg eller avlys. */
+export type BulkActionName = 'start' | 'step-done' | 'stop' | 'continue' | 'cancel';
 export const useBulkAction = () =>
-  useBulkMutation(({ id, action }: { id: string; action: 'start' | 'next' | 'cancel' }) => api<BulkOrderView>(`/bulk/orders/${id}/${action}`, { body: {} }));
+  useBulkMutation(({ id, action, weighed }: { id: string; action: BulkActionName; weighed?: number }) =>
+    api<BulkOrderView>(`/bulk/orders/${id}/${action}`, { body: action === 'step-done' ? { weighed_tonnes: weighed } : {} }));
+export const useBulkLog = (id: string | null) =>
+  useQuery({ queryKey: ['bulk', 'log', id], queryFn: () => api<BulkLogEntry[]>(`/bulk/orders/${id}/log`), enabled: !!id });
+export const useBulkRegistry = () => useQuery({ queryKey: ['bulk', 'registry'], queryFn: () => api<BulkRegistry>('/bulk/registry') });
+export const useBulkWeighings = (from: string, to: string) =>
+  useQuery({ queryKey: ['bulk', 'weighings', from, to], queryFn: () => api<BulkWeighing[]>(`/bulk/weighings?from=${from}&to=${to}`), refetchInterval: 30_000 });
+export const useBulkReport = (from: string, to: string, group: BulkGroup) =>
+  useQuery({ queryKey: ['bulk', 'report', from, to, group], queryFn: () => api<BulkReport>(`/bulk/report?from=${from}&to=${to}&group=${group}`), placeholderData: keepPreviousData });
+/** Lagre i registrene: kind = haulers | customers | drivers | vehicles; id = oppdater. */
+export function useSaveRegistry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ kind, id, body }: { kind: 'haulers' | 'customers' | 'drivers' | 'vehicles'; id?: string; body: Record<string, unknown> }) =>
+      api(`/bulk/registry/${kind}${id ? `/${id}` : ''}`, { method: id ? 'PATCH' : 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bulk'] }),
+  });
+}
 
 export const useProduction = () =>
   // Silonivået er beregnet fra klokka, så visningen tegnes på nytt uansett; data hentes sjeldnere.

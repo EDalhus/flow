@@ -529,25 +529,94 @@ for (const [offset, customer, carrier, reg, goods, picked] of TRUCKS) {
   goods.forEach(([p, unit, pallet, qty], i) => add('truck_order_goods', { id: id('tg'), order_id: tid, sku_id: S(p, unit, pallet).id, quantity: qty, sort: i }));
 }
 
-// Bulkbil: én ferdig i dag, én som venter og én bestilling for i ettermiddag.
-const BULK: [string, string | null, string, 'bestilt' | 'ferdig', number, [string, number, 'bil' | 'henger' | null, number][]][] = [
-  ['Bil 1 · SU 20 110', 'Vartdal Fisk', 'per', 'ferdig', 6 * 60 + 30, [['blandet', 16, 'henger', 120], ['havsalt', 12, 'bil', 0]]],
-  ['Bil 2 · SU 20 144', 'Fjordlaks', 'lars', 'bestilt', 9 * 60 + 15, [['veisalt', 18, 'henger', 90], ['steinsalt', 14, 'bil', 0]]],
-  ['Bil 1 · SU 20 110', 'Hessa Seafood', 'per', 'bestilt', 9 * 60 + 40, [['havsalt', 28, null, 0]]],
+// Bulkbil: transportfirma, sjåfører (PIN 1234 i demo), biler og kunder; historikk for rapportene og dagens kø.
+add('haulers', { id: 'h_egne', name: 'Egne biler', own: 1, phone: null, active: 1 });
+add('haulers', { id: 'h_tafjord', name: 'Tafjord Transport', own: 0, phone: '+47 701 22 400', active: 1 });
+add('haulers', { id: 'h_vegdrift', name: 'Vegdrift Sunnmøre', own: 0, phone: '+47 700 45 900', active: 1 });
+const BULK_CUSTOMERS: [string, string, boolean, string | null][] = [
+  ['bc_vartdal', 'Vartdal Fisk', false, 'innkjop@vartdalfisk.no'], ['bc_fjordlaks', 'Fjordlaks', false, null],
+  ['bc_hessa', 'Hessa Seafood', false, 'post@hessaseafood.no'], ['bc_vegvesen', 'Statens vegvesen', true, 'faktura@vegvesen.no'],
+  ['bc_kommune', 'Ålesund kommune', true, null],
 ];
-for (const [truck, dest, driver, status, minute, steps] of BULK) {
-  const bid = id('bo');
-  const created = at(TODAY, minute);
-  const done = status === 'ferdig';
-  add('bulk_orders', {
-    id: bid, truck, destination: dest, driver_id: U(driver), status, expected_at: null, notes: null, version: 1, created_at: created,
-    started_at: done ? plusMin(created, 10) : null, finished_at: done ? plusMin(created, 40) : null,
-  });
-  steps.forEach(([q, t, target, pause], i) => add('bulk_order_steps', {
-    id: id('bs'), order_id: bid, seq: i + 1, quality_id: q, tonnes: t, target, pause_after_sec: i === steps.length - 1 ? 0 : pause,
-    started_at: done ? plusMin(created, 10 + i * 15) : null, finished_at: done ? plusMin(created, 20 + i * 15) : null,
-  }));
+for (const [cid, name, proj, email] of BULK_CUSTOMERS) add('bulk_customers', { id: cid, name, requires_project: proj ? 1 : 0, email, notes: null, active: 1 });
+const VEHICLES: [string, string, string, string | null, boolean][] = [
+  ['ve_1', 'SU 20 110', 'h_egne', 'Bil 1', true], ['ve_2', 'SU 20 144', 'h_egne', 'Bil 2', true],
+  ['ve_3', 'EL 12 908', 'h_tafjord', 'Scania', true], ['ve_4', 'VH 55 031', 'h_vegdrift', 'Strøbil', false],
+];
+for (const [vid, reg, hauler, desc, trailer] of VEHICLES) add('vehicles', { id: vid, reg_no: reg, hauler_id: hauler, description: desc, has_trailer: trailer ? 1 : 0, active: 1 });
+const DRIVERS: [string, string, string, string, string][] = [
+  ['dr_per', 'Per Hansen', '4741010001', 'h_egne', 'nb'], ['dr_lars', 'Lars Brekke', '4741010002', 'h_egne', 'nb'],
+  ['dr_tomas', 'Tomas Kazlauskas', '4741010003', 'h_tafjord', 'lt'], ['dr_siv', 'Siv Remøy', '4741010004', 'h_vegdrift', 'nb'],
+];
+/** Samme PBKDF2 som worker/lib/pin.ts, med fast salt så seed.sql blir lik hver gang. */
+async function hashPin(pin: string, salt: string) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: Buffer.from(salt, 'hex'), iterations: 100_000 }, key, 256);
+  return { hash: Buffer.from(bits).toString('hex'), salt };
 }
+for (const [i, [did, name, phone, hauler, lang]] of DRIVERS.entries()) {
+  const pin = await hashPin('1234', (i + 1).toString(16).padStart(32, 'a'));
+  add('drivers', { id: did, name, phone, hauler_id: hauler, pin_hash: pin.hash, pin_salt: pin.salt, lang, failed_logins: 0, locked_until: null, last_login_at: null, active: 1 });
+}
+const VEHICLE_OF: Record<string, string> = { dr_per: 've_1', dr_lars: 've_2', dr_tomas: 've_3', dr_siv: 've_4' };
+const REG = Object.fromEntries(VEHICLES.map(v => [v[0], v[1]]));
+const CUST = Object.fromEntries(BULK_CUSTOMERS.map(c => [c[0], c[1]]));
+let deliveryNo = 1000;
+type BulkStep = [string, number, 'bil' | 'henger', number | null];
+function addBulk(o: { day: string; minute: number; driver: string; customer: string; status: 'bestilt' | 'lastes' | 'ferdig'; steps: BulkStep[];
+  project?: string | null; expected?: number | null; doneSteps?: number; log?: boolean }) {
+  const bid = id('bo');
+  const created = at(o.day, o.minute);
+  const done = o.status === 'ferdig';
+  const started = o.status === 'bestilt' ? null : plusMin(created, 8);
+  const vid = VEHICLE_OF[o.driver];
+  const doneSteps = done ? o.steps.length : o.doneSteps ?? 0;
+  const finished = done ? plusMin(started!, o.steps.length * 14 + 4) : null;
+  add('bulk_orders', {
+    id: bid, truck: REG[vid], destination: CUST[o.customer], driver_id: null, status: o.status, expected_at: o.expected == null ? null : at(o.day, o.expected),
+    notes: null, version: 1, created_at: created, started_at: started, finished_at: finished,
+    driver_profile_id: o.driver, vehicle_id: vid, customer_id: o.customer, project_no: o.project ?? null, so_number: rnd() < 0.3 ? soNumber() : null,
+    stopped_at: null, delivery_no: done ? ++deliveryNo : null, pdf_key: null, booked_by: 'sjafor',
+  });
+  o.steps.forEach(([q, t, target, w], i) => add('bulk_order_steps', {
+    id: id('bs'), order_id: bid, seq: i + 1, quality_id: q, tonnes: t, target, pause_after_sec: 0,
+    started_at: started && (i < doneSteps || i === 0) ? plusMin(started, i * 14) : null, finished_at: started && i < doneSteps ? plusMin(started, i * 14 + 10) : null,
+    weighed_tonnes: i < doneSteps ? w : null, weighed_source: i < doneSteps ? 'sjafor' : null,
+  }));
+  if (o.log) {
+    add('bulk_log', { order_id: bid, user_id: null, driver_id: o.driver, kind: 'booked', data: '{}', at: created });
+    if (started) add('bulk_log', { order_id: bid, user_id: null, driver_id: o.driver, kind: 'started', data: '{}', at: started });
+    o.steps.slice(0, doneSteps).forEach(([q, t, target, w], i) => add('bulk_log', {
+      order_id: bid, user_id: null, driver_id: o.driver, kind: 'weighed', data: JSON.stringify({ seq: i + 1, quality: q, target, ordered: t, weighed: w }), at: plusMin(started!, i * 14 + 10),
+    }));
+    if (finished) add('bulk_log', { order_id: bid, user_id: null, driver_id: o.driver, kind: 'finished', data: '{}', at: finished });
+  }
+}
+const QUAL = ['havsalt', 'veisalt', 'steinsalt', 'blandet'] as const;
+const weigh = (t: number) => Math.round((t + (rnd() - 0.5) * 0.6) * 100) / 100;
+// Historikk: 60 dager med 2–5 lastinger per hverdag (veisalt til vegvesen og kommune, fiskesalt til fiskebrukene).
+for (let d = -60; d < 0; d++) {
+  const day = addDays(TODAY, d);
+  const wd = new Date(`${day}T12:00:00Z`).getUTCDay();
+  if (wd === 0 || wd === 6) continue;
+  const n = 2 + Math.floor(rnd() * 4);
+  for (let k = 0; k < n; k++) {
+    const driver = pick(DRIVERS)[0];
+    const road = driver === 'dr_siv' || (driver === 'dr_tomas' && rnd() < 0.5);
+    const customer = road ? pick(['bc_vegvesen', 'bc_kommune']) : pick(['bc_vartdal', 'bc_fjordlaks', 'bc_hessa']);
+    const q = road ? 'veisalt' : pick(QUAL.filter(x => x !== 'veisalt'));
+    const t1 = pick([14, 16, 18]);
+    const steps: BulkStep[] = [[q, t1, 'bil', weigh(t1)]];
+    if (driver !== 'dr_siv' && rnd() < 0.6) { const t2 = pick([10, 12, 14]); steps.push([road ? 'veisalt' : pick(QUAL), t2, 'henger', weigh(t2)]); }
+    addBulk({ day, minute: 6 * 60 + k * 110 + Math.floor(rnd() * 40), driver, customer, status: 'ferdig', steps, project: road ? `P-${2600 + Math.floor(rnd() * 40)}` : null });
+  }
+}
+// I dag: to ferdige, én som laster henger (pause etter bil), én i kø og én bestilt til i ettermiddag.
+addBulk({ day: TODAY, minute: 6 * 60 + 30, driver: 'dr_per', customer: 'bc_vartdal', status: 'ferdig', steps: [['blandet', 16, 'bil', 15.86], ['havsalt', 12, 'henger', 12.08]], log: true });
+addBulk({ day: TODAY, minute: 7 * 60 + 10, driver: 'dr_siv', customer: 'bc_vegvesen', status: 'ferdig', project: 'P-2631', steps: [['veisalt', 18, 'bil', 17.94]], log: true });
+addBulk({ day: TODAY, minute: 9 * 60 + 5, driver: 'dr_tomas', customer: 'bc_kommune', status: 'lastes', project: 'P-2640', doneSteps: 1, steps: [['veisalt', 16, 'bil', 16.12], ['veisalt', 12, 'henger', null]], log: true });
+addBulk({ day: TODAY, minute: 9 * 60 + 15, driver: 'dr_lars', customer: 'bc_fjordlaks', status: 'bestilt', steps: [['steinsalt', 14, 'bil', null], ['havsalt', 10, 'henger', null]], log: true });
+addBulk({ day: TODAY, minute: 8 * 60, driver: 'dr_per', customer: 'bc_hessa', status: 'bestilt', expected: 14 * 60 + 30, steps: [['havsalt', 18, 'bil', null]], log: true });
 
 // Produksjon: linje 1 pakker Hav salt, linje 2 Stein salt; neste ordre er et kvalitetsbytte.
 const PROD: [string, string, number, 'ferdig' | 'pakker' | 'planlagt', number | null, number[]][] = [
@@ -574,7 +643,8 @@ PROD.forEach(([line, product, tonnes, status, start, fills], i) => {
 
 const CLEAR = [
   // Kvaliteter (bulk_qualities) og pakkelinjer (packing_lines) er faste rader fra migrasjonen og beholdes.
-  'bulk_order_steps', 'bulk_orders', 'silo_fills', 'production_orders', 'truck_order_goods', 'truck_orders',
+  // haulers tømmes også; «Egne biler» (h_egne) legges inn igjen over.
+  'bulk_log', 'driver_sessions', 'bulk_order_steps', 'bulk_orders', 'vehicles', 'drivers', 'bulk_customers', 'haulers', 'silo_fills', 'production_orders', 'truck_order_goods', 'truck_orders',
   'boat_photos', 'ais_area', 'audit_log', 'ais_track', 'ais_positions', 'quay_log_photos', 'quay_log_categories', 'quay_logs', 'notifications',
   'message_mentions', 'messages', 'crew_slots', 'order_log', 'port_call_orders', 'order_lines', 'sales_orders', 'port_calls', 'quays', 'skus', 'products', 'boats',
   'agents', 'settings', 'shifts', 'crew_skills', 'user_roles', 'users',

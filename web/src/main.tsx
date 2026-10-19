@@ -21,6 +21,7 @@ const BilerPage = lazy(() => import('./pages/BilerPage.tsx').then(m => ({ defaul
 const BulkPage = lazy(() => import('./pages/BulkPage.tsx').then(m => ({ default: m.BulkPage })));
 const ProduksjonPage = lazy(() => import('./pages/ProduksjonPage.tsx').then(m => ({ default: m.ProduksjonPage })));
 const HjullasterPage = lazy(() => import('./pages/HjullasterPage.tsx').then(m => ({ default: m.HjullasterPage })));
+const DriverApp = lazy(() => import('./driver/DriverApp.tsx').then(m => ({ default: m.DriverApp })));
 const RapporterPage = lazy(() => import('./pages/RapporterPage.tsx').then(m => ({ default: m.RapporterPage })));
 
 const queryClient = new QueryClient({
@@ -94,12 +95,21 @@ function App() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(
+// Sjåførvisningen har egen innlogging og deler ingenting med resten av Flow.
+const isDriver = location.pathname === '/sjafor' || location.pathname.startsWith('/sjafor/');
+
+createRoot(document.getElementById('root')!).render(isDriver ? (
+  <StrictMode>
+    <Suspense fallback={<main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }} className="loading">Flow</main>}>
+      <DriverApp />
+    </Suspense>
+  </StrictMode>
+) : (
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <App />
       </BrowserRouter>
     </QueryClientProvider>
-  </StrictMode>,
-);
+  </StrictMode>
+));

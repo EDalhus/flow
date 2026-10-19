@@ -16,11 +16,15 @@ import reports from './routes/reports.ts';
 import search from './routes/search.ts';
 import type { AppEnv } from './types.ts';
 import orders from './routes/orders.ts';
+import driver from './routes/driver.ts';
 
 export const app = new Hono<AppEnv>().basePath('/api');
 
 // Helsesjekk uten innlogging (for overvåking); avslører ingen data.
 app.get('/health', c => c.json({ ok: true }));
+
+// Sjåførvisningen har egen innlogging (telefon + PIN) og ligger utenfor resten av Flow.
+app.route('/driver', driver);
 
 app.use('*', requireUser);
 
