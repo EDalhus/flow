@@ -573,7 +573,7 @@ export interface AskAction {
 /** Tidligere spørsmål og svar i samme samtale (for oppfølgingsspørsmål). */
 export interface AskTurn { role: 'user' | 'assistant'; content: string }
 /** Svar fra «Spør Flow». */
-export interface AskAnswer { question: string; answer: string; tools: string[]; actions: AskAction[] }
+export interface AskAnswer { question: string; answer: string; tools: string[]; actions: AskAction[]; sources: { url: string; title: string }[] }
 /** Morgenbrief: første gang man åpner Flow hver dag. */
 export interface MorningBrief { day: string; text: string }
 /** Kaibok skrevet med egne ord, tolket av Claude (brukeren godkjenner). */

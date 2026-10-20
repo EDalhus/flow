@@ -126,7 +126,8 @@ const AGENTS = {
 for (const [key, [name, phone]] of Object.entries(AGENTS)) add('agents', { id: `ag_${key}`, name, phone });
 
 type Flag = 'green' | 'yellow' | 'red' | 'none';
-const BOATS: { key: string; name: string; agent: keyof typeof AGENTS; contact: string; phone: string; flag: Flag; flagReason: string | null; note: string; sub: [number, number, number] | null; logs: number }[] = [
+// Ekte båter kan få MMSI, IMO og kallesignal (fra AIS), så de vises med posisjon på kartet og i søket.
+const BOATS: { key: string; name: string; mmsi?: string; imo?: string; callsign?: string; agent: keyof typeof AGENTS; contact: string; phone: string; flag: Flag; flagReason: string | null; note: string; sub: [number, number, number] | null; logs: number }[] = [
   { key: 'havbris', name: 'MV Havbris', agent: 'nordvest', contact: 'Bro', phone: '+47 400 10 212', flag: 'green', flagReason: 'Ingen avvik siste 6 anløp.', note: 'Ingen avvik siste 6 anløp. Mannskapet hjelper til med surring.', sub: [4.8, 4.7, 4.3], logs: 14 },
   { key: 'lyngoy', name: 'Lyngøy', agent: 'kystagenten', contact: 'Skipper', phone: '+47 400 10 262', flag: 'green', flagReason: 'Ryddig og presis.', note: 'Ryddig og presis.', sub: [4.5, 4.4, 4.3], logs: 5 },
   { key: 'senja', name: 'Senja Trader', agent: 'nordvest', contact: 'Bro', phone: '+47 400 10 242', flag: 'green', flagReason: 'Ingen avvik siste 4 anløp.', note: 'Ingen avvik siste 4 anløp.', sub: [4.3, 4.0, 4.1], logs: 8 },
@@ -141,7 +142,7 @@ const BOATS: { key: string; name: string; agent: keyof typeof AGENTS; contact: s
 const B = (key: string) => `b_${key}`;
 for (const b of BOATS) {
   add('boats', {
-    id: B(b.key), name: b.name, imo: null, mmsi: null, callsign: null, agent_id: `ag_${b.agent}`,
+    id: B(b.key), name: b.name, imo: b.imo ?? null, mmsi: b.mmsi ?? null, callsign: b.callsign ?? null, agent_id: `ag_${b.agent}`,
     ship_contact: `${b.contact}, ${b.name}`, ship_phone: b.phone, note: b.note,
     flag_auto: b.flag, flag_auto_reason: b.flagReason,
   });

@@ -14,7 +14,7 @@ import { loadSettings } from './settings.ts';
 
 export const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
-const MAX_ROUNDS = 8;
+const MAX_ROUNDS = 12;
 
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -82,6 +82,35 @@ export const TOOLS = {
         },
         varer: goods.results, mannskap: crew.results, siste_chat: (msgs.results as unknown[]).reverse(),
         bilder_lastet_opp: (photos.results[0] as { n: number }).n, tidligere_kaiboker: prev.results,
+      };
+    },
+  }),
+  ais_sok: tool({
+    description: 'Slå opp fartøy i AIS (BarentsWatch, norske farvann siste døgn) på navn, MMSI eller IMO – flere søk på én gang. Gir navn, MMSI, IMO, kallesignal, type, lengde og når de sist ble sett, og om de allerede finnes i båtregisteret. Båter langt unna Norge finnes ikke her.',
+    input: z.object({ sok: z.array(z.string().min(2).max(60)).min(1).max(40) }),
+    schema: { type: 'object', required: ['sok'], properties: { sok: { type: 'array', items: { type: 'string' }, description: 'Navn, MMSI eller IMO' } } },
+    run: async (env, i) => {
+      const { results } = await env.DB.prepare('SELECT id, name, imo, mmsi FROM boats').all<{ id: string; name: string; imo: string | null; mmsi: string | null }>();
+      const inReg = (name?: string | null, imo?: string | null, mmsi?: string | null) => results.find(b =>
+        (name && b.name.toLowerCase() === name.toLowerCase()) || (imo && b.imo === imo) || (mmsi && b.mmsi === mmsi));
+      let fleet: Awaited<ReturnType<typeof fetchAllLatest>> = [];
+      let aisFeil: string | null = null;
+      if (!env.BW_CLIENT_ID || !env.BW_CLIENT_SECRET) aisFeil = 'AIS-søk er ikke satt opp (BarentsWatch-nøkler mangler).';
+      else try { fleet = await fetchAllLatest({ clientId: env.BW_CLIENT_ID, clientSecret: env.BW_CLIENT_SECRET }); } catch (e) { aisFeil = e instanceof Error ? e.message : 'AIS feilet'; }
+      return {
+        ais_feil: aisFeil,
+        resultater: i.sok.map(q => {
+          const digits = q.replace(/\D/g, '');
+          const reg = inReg(q, digits.length === 7 ? digits : null, digits.length === 9 ? digits : null);
+          return {
+            sok: q,
+            i_batregisteret: reg ? { navn: reg.name, link: `/baater?id=${reg.id}` } : null,
+            ais: matchVessels(fleet, q, 3).map(v => ({
+              navn: v.name?.trim(), mmsi: String(v.mmsi), imo: v.imoNumber ? String(v.imoNumber) : null, kallesignal: v.callSign?.trim() ?? null,
+              type: v.shipType, lengde: v.shipLength ?? null, sist_sett: v.msgtime ?? null,
+            })),
+          };
+        }),
       };
     },
   }),
@@ -404,6 +433,14 @@ Jobber:
 - Etter forslaget: skriv én kort setning om hva kortet gjør (ikke gjenta alle detaljene).
 - Du kan ikke slette data, endre tilganger eller registre for sjåfører; forklar da hvor i Flow det gjøres.
 
+Nettsøk (web_search):
+- Bruk nettsøk når brukeren ber om noe som ikke finnes i Flow, f.eks. flåten til et rederi, IMO/MMSI for en båt, eller fakta om et skip. Søk heller noen få gode søk enn mange.
+- Flåtelister: bruk rederiets egen flåteside først, og skipsregistre/AIS-sider (f.eks. VesselFinder, MarineTraffic, Equasis-utdrag) for å bekrefte IMO.
+- IMO er 7 siffer og må høre til riktig skip. MMSI (9 siffer) og kallesignal: helst fra ais_sok; ellers bare fra en pålitelig kilde. Finn aldri på numre – mangler et nummer, legg inn båten uten.
+- Etter nettsøk: kjør ais_sok med navnene eller IMO-ene for å hente MMSI/kallesignal og se hvilke som allerede er i båtregisteret.
+- Flere båter: én nye_bater-jobb (maks 60; del opp hvis flere). Båter som finnes fra før hoppes over. I detaljer: antall nye, antall med MMSI, og ev. båter du var usikker på.
+- Skriv navn slik de er (f.eks. «Wagenborg» som «Egbert Wagenborg», ikke store bokstaver). Nevn kort hvilke kilder du brukte.
+
 Ferdigstille anløp og kaibok i chatten (lever_kaibok):
 - Finn anløpet (anlop for i dag/i går; spør hvis flere passer), og hent kaibok_grunnlag. Er kaiboka levert, si det.
 - Intervju brukeren som en erfaren formann: ÉTT kort spørsmål om gangen, og bygg på svarene og fakta (f.eks. «AIS viser at båten kom 52 min etter ETA – stemmer det, og hvorfor?»). Dekk: gikk det som planlagt / avvik? Ved avvik: hva skjedde, når i anløpet, omfang (antall paller/BB, tonn, skade), årsak, hvem var involvert, hva ble gjort der og da, og om noe må følges opp (kunde, rederi, forsikring, HMS-melding). Deretter punktlighet, samarbeid med mannskapet og båtens utstyr/kran (spør om en vurdering hvis det ikke går fram), og om noe er nyttig å vite neste gang båten kommer.
@@ -415,7 +452,10 @@ Ferdigstille anløp og kaibok i chatten (lever_kaibok):
 
 type Block = { type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: unknown };
 type Msg = { role: 'user' | 'assistant'; content: unknown };
-export interface AskResult { answer: string; tools: string[]; model: string; actions: AskAction[] }
+export interface AskResult { answer: string; tools: string[]; model: string; actions: AskAction[]; sources: { url: string; title: string }[] }
+
+/** Anthropics nettsøk (kjøres hos Anthropic; må være slått på for organisasjonen i Claude Console). */
+const WEB_SEARCH = { type: 'web_search_20250305', name: 'web_search', max_uses: 8 };
 
 /** Ett kall til Anthropic Messages API, med forståelige feil. */
 async function callClaude(env: Env, body: Record<string, unknown>, fetcher: Fetcher): Promise<{ content: Block[]; stop_reason: string }> {
@@ -431,11 +471,17 @@ async function callClaude(env: Env, body: Record<string, unknown>, fetcher: Fetc
     console.error('anthropic', res.status, text.slice(0, 500));
     if (res.status === 401 || res.status === 403) throw new AskError(502, 'Nøkkelen til Claude (ANTHROPIC_API_KEY) er ugyldig.');
     if (res.status === 429 || res.status === 529) throw new AskError(503, 'Claude er opptatt akkurat nå. Prøv igjen om litt.');
-    throw new AskError(502, 'Fikk ikke svar fra Claude.');
+    const err = new AskError(502, 'Fikk ikke svar fra Claude.');
+    if (res.status === 400 && /web_search/i.test(text)) err.webSearch = true;
+    throw err;
   }
   return res.json();
 }
-const textOf = (content: Block[]) => content.filter((b): b is Extract<Block, { type: 'text' }> => b.type === 'text').map(b => b.text).join('\n').trim();
+// Med nettsøk deles svaret i mange tekstbiter (med kildehenvisninger), så de settes sammen uten linjeskift.
+const textOf = (content: Block[]) => content.filter((b): b is Extract<Block, { type: 'text' }> => b.type === 'text').map(b => b.text).join('').trim();
+/** Kildene (fra nettsøk) i et svar. */
+const sourcesOf = (content: Block[]) => content.flatMap(b => (b.type === 'text' ? (b as { citations?: { url?: string; title?: string }[] }).citations ?? [] : []))
+  .filter((c): c is { url: string; title?: string } => typeof c.url === 'string');
 const toolList = (names: string[], extra: Record<string, unknown>[] = []) => {
   const all: Record<string, unknown>[] = [
     ...names.map(name => { const t = (TOOLS as Record<string, Tool<z.ZodType>>)[name] ?? (name === 'oppslag' ? LOOKUP : null); return { name, description: t!.description, input_schema: t!.schema }; }),
@@ -451,10 +497,17 @@ async function converse(env: Env, opts: { system: string; messages: Msg[]; tools
   const model = env.AI_MODEL?.trim() || DEFAULT_MODEL;
   const messages = [...opts.messages];
   const used: string[] = [];
+  const sources = new Map<string, string>();
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const data = await callClaude(env, { model, max_tokens: opts.maxTokens ?? 1500, system: opts.system, tools: opts.tools, messages }, fetcher);
+    for (const s of sourcesOf(data.content)) if (!sources.has(s.url)) sources.set(s.url, s.title ?? s.url);
+    for (const b of data.content) if ((b as { type: string }).type === 'server_tool_use') used.push((b as unknown as { name: string }).name);
+    // Nettsøk som tar tid: Claude pauser, og vi ber den fortsette.
+    if (data.stop_reason === 'pause_turn') { messages.push({ role: 'assistant', content: data.content }); continue; }
     const calls = data.content.filter((b): b is Extract<Block, { type: 'tool_use' }> => b.type === 'tool_use');
-    if (data.stop_reason !== 'tool_use' || !calls.length) return { answer: textOf(data.content), tools: used, model };
+    if (data.stop_reason !== 'tool_use' || !calls.length) {
+      return { answer: textOf(data.content), tools: used, model, sources: [...sources].map(([url, title]) => ({ url, title })) };
+    }
     messages.push({ role: 'assistant', content: data.content });
     const results = [];
     for (const c of calls) {
@@ -477,7 +530,9 @@ export async function ask(env: Env, question: string, lang: Lang, user: { id: st
   if (!env.ANTHROPIC_API_KEY?.trim()) throw new AskError(503, 'Spør Flow er ikke satt opp (ANTHROPIC_API_KEY mangler).');
   const actions: AskAction[] = [];
   const messages: Msg[] = [...history.slice(-40).map(t => ({ role: t.role, content: t.content })), { role: 'user', content: question }];
-  const r = await converse(env, { system: systemPrompt(lang, user.name, user.roles), messages, tools: toolList([...Object.keys(TOOLS), 'oppslag'], [PROPOSE]) }, fetcher,
+  const tools = toolList([...Object.keys(TOOLS), 'oppslag'], [PROPOSE]);
+  const withWeb = env.AI_WEB_SEARCH?.trim() !== 'off';
+  const run = (t: Record<string, unknown>[]) => converse(env, { system: systemPrompt(lang, user.name, user.roles), messages, tools: t, maxTokens: 4000 }, fetcher,
     async (name, input) => {
       if (name !== 'foresla_handling') return undefined;
       const p = await propose(env.DB, user.id, input);
@@ -485,6 +540,14 @@ export async function ask(env: Env, question: string, lang: Lang, user: { id: st
       actions.push(p.action);
       return { ok: true, melding: 'Forslaget vises for brukeren med «Utfør». Ikke utført ennå.' };
     });
+  let r;
+  try {
+    r = await run(withWeb ? [WEB_SEARCH, ...tools] : tools);
+  } catch (e) {
+    // Nettsøk ikke slått på for organisasjonen hos Anthropic: prøv uten.
+    if (!(withWeb && e instanceof AskError && e.webSearch)) throw e;
+    r = await run(tools);
+  }
   return { ...r, answer: r.answer || (actions.length ? '' : 'Jeg fant ikke noe svar.'), actions };
 }
 
@@ -634,5 +697,7 @@ ${HELP_DRIVER}`,
 }
 
 export class AskError extends Error {
+  /** Feilen skyldes nettsøket (ikke slått på hos Anthropic). */
+  webSearch = false;
   constructor(public status: 502 | 503 | 504, message: string) { super(message); }
 }

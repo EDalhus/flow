@@ -13,6 +13,7 @@ const id = z.string().trim().min(1).max(64);
 const dt = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/, 'Tid som ISO 8601, f.eks. 2026-10-20T14:00:00+02:00');
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+/** body som liste = samme rute kjøres én gang per element (f.eks. mange båter). */
 interface Built { method: 'POST' | 'PATCH'; path: string; body: unknown }
 interface ActionDef<S extends z.ZodType> {
   description: string;
@@ -39,6 +40,15 @@ async function orderBySo(db: D1Database, so: string) {
   return r;
 }
 const str = (p: Record<string, unknown>) => ({ type: 'object', properties: p });
+
+/** Navn på båtene som allerede finnes i registeret (samme navn, IMO eller MMSI). */
+async function existingBoats(db: D1Database, boats: { name: string; imo?: string; mmsi?: string }[]): Promise<string[]> {
+  const { results } = await db.prepare('SELECT name, imo, mmsi FROM boats').all<{ name: string; imo: string | null; mmsi: string | null }>();
+  const names = new Set(results.map(r => r.name.toLowerCase()));
+  const imos = new Set(results.map(r => r.imo).filter(Boolean));
+  const mmsis = new Set(results.map(r => r.mmsi).filter(Boolean));
+  return boats.filter(b => names.has(b.name.trim().toLowerCase()) || (b.imo && imos.has(b.imo.replace(/\D/g, ''))) || (b.mmsi && mmsis.has(b.mmsi.trim()))).map(b => b.name);
+}
 
 export const ACTIONS = {
   flytt_anlop: action({
@@ -147,9 +157,31 @@ export const ACTIONS = {
     description: 'Legg til en båt i båtregisteret (navn, ev. MMSI 9 siffer, IMO 7 siffer, kallesignal).',
     input: z.object({ name: z.string().min(1), mmsi: z.string().optional(), imo: z.string().optional(), callsign: z.string().optional() }),
     schema: { ...str({ name: { type: 'string' }, mmsi: { type: 'string' }, imo: { type: 'string' }, callsign: { type: 'string' } }), required: ['name'] },
-    build: async (_db, i) => ({
-      method: 'POST', path: '/boats', body: check(boatCreate, { name: i.name, mmsi: i.mmsi ?? null, imo: i.imo ?? null, callsign: i.callsign ?? null }),
-    }),
+    build: async (db, i) => {
+      const dup = await existingBoats(db, [i]);
+      if (dup.length) throw new Error(`Finnes allerede i båtregisteret: ${dup.join(', ')}`);
+      return { method: 'POST', path: '/boats', body: check(boatCreate, { name: i.name, mmsi: i.mmsi ?? null, imo: i.imo ?? null, callsign: i.callsign ?? null }) };
+    },
+  }),
+  nye_bater: action({
+    description: 'Legg til mange båter i båtregisteret på én gang (f.eks. hele flåten til et rederi), maks 60. Båter som allerede finnes (samme navn, IMO eller MMSI) hoppes over automatisk.',
+    input: z.object({ bater: z.array(z.object({ name: z.string().min(1), mmsi: z.string().optional(), imo: z.string().optional(), callsign: z.string().optional() })).min(1).max(60) }),
+    schema: {
+      ...str({ bater: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, mmsi: { type: 'string' }, imo: { type: 'string' }, callsign: { type: 'string' } }, required: ['name'] } } }),
+      required: ['bater'],
+    },
+    build: async (db, i) => {
+      const dup = new Set(await existingBoats(db, i.bater));
+      const seen = new Set<string>();
+      const list = i.bater.filter(b => {
+        const k = b.name.trim().toLowerCase();
+        if (dup.has(b.name) || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      }).map(b => check(boatCreate, { name: b.name.trim(), mmsi: b.mmsi?.trim() || null, imo: b.imo?.replace(/^IMO\s*/i, '').trim() || null, callsign: b.callsign?.trim() || null }));
+      if (!list.length) throw new Error('Alle båtene finnes allerede i båtregisteret.');
+      return { method: 'POST', path: '/boats', body: list };
+    },
   }),
   send_melding: action({
     description: 'Skriv en melding i chatten på et anløp (port_call_id). @Navn varsler personen.',
@@ -228,6 +260,7 @@ export function linkFor(kind: string, result: Record<string, unknown>, path: str
   const so = (body as { so_number?: string })?.so_number;
   if (kind === 'ny_salgsordre' && so) return `/anlop?so=${so}`;
   if (kind === 'ny_bat') return result.id ? `/baater?id=${result.id}` : '/baater';
+  if (kind === 'nye_bater') return '/baater';
   return { avlys_anlop: '/anlop', legg_so_pa_anlop: '/anlop?vis=ordre', avlys_salgsordre: '/anlop?vis=ordre', ny_bilhenting: '/biler', marker_hentet: '/biler', ny_bulkbestilling: '/bulk', ny_produksjonsordre: '/produksjon' }[kind] ?? null;
 }
 

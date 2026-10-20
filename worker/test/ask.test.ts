@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { looksLikeQuestion, parseActions, parseDay, parseScope } from '../../shared/domain/search.ts';
 import { propose } from '../lib/actions.ts';
 import { ANTHROPIC_URL, TOOLS, ask, periodReport, runTool, translateTexts } from '../lib/ask.ts';
-import { api, at, call } from './fixtures.ts';
+import { api, at, call, soNumber } from './fixtures.ts';
 
 const ADA = { id: 'u_admin', name: 'Ada', roles: ['admin'] };
 
@@ -75,7 +75,8 @@ describe('Spør Flow', () => {
     expect(await runTool(env, 'salg', { from: 'i fjor', to: '2030-01-01' })).toMatchObject({ feil: 'Ugyldige parametere' });
     expect(await runTool(env, 'salg', { from: '2030-01-01', to: '2029-01-01' })).toMatchObject({ feil: expect.stringMatching(/to må være/) });
     expect(await runTool(env, 'slett_alt', {})).toMatchObject({ feil: expect.stringMatching(/Ukjent/) });
-    expect(Object.keys(TOOLS)).toHaveLength(10);
+    expect(Object.keys(TOOLS)).toHaveLength(11);
+    expect(await runTool(env, 'ais_sok', { sok: ['Alfa'] })).toMatchObject({ ais_feil: expect.stringMatching(/ikke satt opp/), resultater: [{ i_batregisteret: { navn: 'Alfa' } }] });
     expect(await runTool(env, 'hjelp', {})).toMatchObject({ handbok: expect.stringContaining('Ny sjåfør') });
   });
 
@@ -143,11 +144,14 @@ describe('Spør Flow: jobber', () => {
       .toMatchObject({ ok: false, feil: expect.stringMatching(/Fant ikke/) });
     expect(await propose(env.DB, 'u_jonas', { handling: 'ny_bilhenting', oppsummering: 'Ny henting', parametere: { customer: 'X', so_number: '123', expected_date: '2030-06-04', goods: [{ sku_id: 's_hav_bb', quantity: 2 }] } }))
       .toMatchObject({ ok: false, feil: expect.stringMatching(/so_number/) });
-    const p = await propose(env.DB, 'u_jonas', { handling: 'ny_bat', oppsummering: 'Legg til Alfa', parametere: { name: 'Alfa' } });
-    expect(p.ok).toBe(true);
-    if (!p.ok) return;
-    const r = await api(`/ask/actions/${p.action.id}/confirm`, { body: {} });
-    expect(r.json).toMatchObject({ status: 'feilet', error: expect.any(String) }); // navnet finnes fra før
+    expect(await propose(env.DB, 'u_jonas', { handling: 'ny_bat', oppsummering: 'Legg til Alfa', parametere: { name: 'Alfa' } }))
+      .toMatchObject({ ok: false, feil: expect.stringMatching(/finnes allerede/i) });
+    // Feil fra selve ruten (SO-nummeret tas mellom forslag og utførelse) vises på kortet.
+    const so = soNumber();
+    const p = await propose(env.DB, 'u_jonas', { handling: 'ny_salgsordre', oppsummering: `Ny SO ${so}`, parametere: { so_number: so, customer: 'X', lines: [{ sku_id: 's_hav_bb', quantity: 2 }] } });
+    if (!p.ok) throw new Error(p.feil);
+    await api('/orders', { body: { so_number: so, customer: 'Y', lines: [{ sku_id: 's_hav_bb', quantity: 1, direction: 'ut' }] } });
+    expect((await api(`/ask/actions/${p.action.id}/confirm`, { body: {} })).json).toMatchObject({ status: 'feilet', error: expect.any(String) });
     const q = await propose(env.DB, 'u_jonas', { handling: 'ny_bat', oppsummering: 'Legg til Zulu', parametere: { name: 'Zulu' } });
     if (!q.ok) throw new Error('forventet ok');
     expect((await api(`/ask/actions/${q.action.id}/cancel`, { body: {} })).json.status).toBe('avbrutt');
@@ -223,5 +227,54 @@ describe('Spør Flow: ferdigstill og kaibok i chatten', () => {
     // Kan ikke leveres to ganger.
     expect(await propose(env.DB, 'u_jonas', { handling: 'lever_kaibok', oppsummering: 'Igjen', parametere: { port_call_id: c.id, had_deviation: false, r_punctuality: 5, r_cooperation: 5, r_equipment: 5 } }))
       .toMatchObject({ ok: false, feil: expect.stringMatching(/allerede levert/) });
+  });
+});
+
+describe('Spør Flow: nettsøk og mange båter', () => {
+  it('sender nettsøk, fortsetter etter pause, samler kilder og lager én samlejobb', async () => {
+    let n = 0;
+    const fetcher = async (_u: string, init: RequestInit) => {
+      const b = JSON.parse(init.body as string);
+      n++;
+      if (n === 1) {
+        expect(b.tools[0]).toMatchObject({ type: 'web_search_20250305', name: 'web_search' });
+        return Response.json({ stop_reason: 'pause_turn', content: [{ type: 'server_tool_use', id: 'w1', name: 'web_search', input: { query: 'Wagenborg fleet' } }] });
+      }
+      if (n === 2) {
+        expect(b.messages.at(-1).role).toBe('assistant'); // fortsetter etter pause
+        return Response.json({ stop_reason: 'tool_use', content: [
+          { type: 'web_search_tool_result', tool_use_id: 'w1', content: [] },
+          { type: 'tool_use', id: 't1', name: 'foresla_handling', input: { handling: 'nye_bater', oppsummering: 'Legg til 3 Wagenborg-båter', parametere: { bater: [
+            { name: 'Egbert Wagenborg', imo: '9364568' }, { name: 'Alfa' }, { name: 'Egbert Wagenborg', imo: '9364568' }, { name: 'Kroonborg', imo: 'IMO 9396579' },
+          ] } } },
+        ] });
+      }
+      return Response.json({ stop_reason: 'end_turn', content: [
+        { type: 'text', text: 'Jeg fant ' }, { type: 'text', text: 'to nye båter.', citations: [{ type: 'web_search_result_location', url: 'https://www.wagenborg.com/fleet', title: 'Fleet' }] },
+      ] });
+    };
+    const r = await ask({ ...env, ANTHROPIC_API_KEY: 'k' }, 'legg til alle båtene til wagenborg', 'nb', { id: 'u_kari', name: 'Kari', roles: ['salg'] }, [], fetcher);
+    expect(r.answer).toBe('Jeg fant to nye båter.');
+    expect(r.sources).toEqual([{ url: 'https://www.wagenborg.com/fleet', title: 'Fleet' }]);
+    expect(r.tools).toContain('web_search');
+    expect(r.actions).toHaveLength(1);
+    const done = await api(`/ask/actions/${r.actions[0].id}/confirm`, { body: {}, as: 'kari' });
+    expect(done.json).toMatchObject({ status: 'utfort', link: '/baater', error: null });
+    const boats = (await api('/boats')).json as { name: string; imo: string | null }[];
+    expect(boats.filter(b => /Wagenborg|Kroonborg/.test(b.name)).map(b => [b.name, b.imo]).sort()).toEqual([['Egbert Wagenborg', '9364568'], ['Kroonborg', '9396579']]);
+    // Alle finnes nå: forslaget avvises før brukeren ser det.
+    expect(await propose(env.DB, 'u_kari', { handling: 'nye_bater', oppsummering: 'Igjen', parametere: { bater: [{ name: 'Kroonborg' }] } }))
+      .toMatchObject({ ok: false, feil: expect.stringMatching(/finnes allerede/i) });
+  });
+
+  it('prøver uten nettsøk når det ikke er slått på hos Anthropic', async () => {
+    let n = 0;
+    const fetcher = async (_u: string, init: RequestInit) => {
+      const b = JSON.parse(init.body as string);
+      if (n++ === 0) return new Response('{"error":{"message":"web_search is not enabled for this organization"}}', { status: 400 });
+      expect(b.tools.some((t: { name: string }) => t.name === 'web_search')).toBe(false);
+      return Response.json({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Uten nettsøk.' }] });
+    };
+    expect((await ask({ ...env, ANTHROPIC_API_KEY: 'k' }, 'hei der borte', 'nb', ADA, [], fetcher)).answer).toBe('Uten nettsøk.');
   });
 });

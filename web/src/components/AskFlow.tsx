@@ -72,7 +72,18 @@ export function AskFlow({ question, context, onBack, go }: {
                       style={{ minHeight: 34, fontSize: 13, padding: '0 14px', border: '1px solid rgba(128,239,222,.35)' }}>{c}</button>)}
                   </div>
                 )}
+                {t.a.actions.length > 1 && <RunAll ids={t.a.actions.map(a => a.id)} />}
                 {t.a.actions.map(a => <ActionCard key={a.id} initial={a} go={go} />)}
+                {t.a.sources?.length > 0 && (
+                  <details style={{ fontSize: 12, color: 'var(--fg-62)' }}>
+                    <summary style={{ cursor: 'pointer' }}>{tr('Kilder fra nettet ({n})', { n: t.a.sources.length })}</summary>
+                    <ul style={{ margin: '6px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {t.a.sources.slice(0, 12).map(s => (
+                        <li key={s.url}><a href={s.url} target="_blank" rel="noreferrer noopener" style={{ color: 'var(--aqua)' }}>{s.title || new URL(s.url).hostname}</a> <span className="muted">· {new URL(s.url).hostname}</span></li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </>
             );
           })()}
@@ -102,6 +113,12 @@ function ActionCard({ initial, go }: { initial: AskAction; go: (to: string) => v
     mutationFn: (what: 'confirm' | 'cancel') => api<AskAction>(`/ask/actions/${a.id}/${what}`, { body: {} }),
     onSuccess: r => { setA(r); if (r.status === 'utfort') qc.invalidateQueries(); },
   });
+  // «Utfør alle» sender en hendelse til hvert kort som fortsatt er et forslag.
+  useEffect(() => {
+    const run = (e: Event) => { if ((e as CustomEvent<number[]>).detail.includes(a.id) && a.status === 'foreslatt' && !act.isPending) act.mutate('confirm'); };
+    window.addEventListener('flow:run-actions', run);
+    return () => window.removeEventListener('flow:run-actions', run);
+  }, [a.id, a.status, act]);
   const done = a.status === 'utfort', failed = a.status === 'feilet', off = a.status === 'avbrutt';
   return (
     <div style={{ borderRadius: 16, padding: 14, display: 'flex', flexDirection: 'column', gap: 8,
@@ -113,7 +130,7 @@ function ActionCard({ initial, go }: { initial: AskAction; go: (to: string) => v
       {a.details.length > 0 && (
         <ul className="md-list md-ul" style={{ fontSize: 13, color: 'var(--fg-75)' }}>{a.details.map((d, i) => <li key={i}>{d}</li>)}</ul>
       )}
-      {failed && a.error && <span style={{ fontSize: 13, color: 'var(--bad-fg)' }}>{tx(a.error)}</span>}
+      {a.error && (failed || done) && <span style={{ fontSize: 13, color: failed ? 'var(--bad-fg)' : 'var(--warn-fg)' }}>{tx(a.error)}</span>}
       {act.isError && <div className="error-box">{errorText(act.error)}</div>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {a.status === 'foreslatt' && (
@@ -149,5 +166,16 @@ export function AskSheet({ question, context, onClose }: { question: string; con
         <AskFlow question={question} context={context} onBack={onClose} go={to => { onClose(); nav(to); }} />
       </div>
     </div>
+  );
+}
+
+/** Flere forslag i samme svar: utfør alle på én gang (hvert kort kjøres for seg, og viser sitt resultat). */
+function RunAll({ ids }: { ids: number[] }) {
+  const [sent, setSent] = useState(false);
+  return (
+    <button type="button" className="btn btn-w" disabled={sent} style={{ minHeight: 36, fontSize: 13, alignSelf: 'flex-start' }}
+      onClick={() => { setSent(true); window.dispatchEvent(new CustomEvent('flow:run-actions', { detail: ids })); }}>
+      {tr('Utfør alle ({n})', { n: ids.length })}
+    </button>
   );
 }

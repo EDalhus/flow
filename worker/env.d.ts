@@ -15,6 +15,8 @@ interface __FlowOptionalEnv {
   AI_MODEL?: string;
   /** Valgfri modell for oversettelse (standard claude-haiku-5-5). */
   AI_TRANSLATE_MODEL?: string;
+  /** «off» slår av nettsøk i Spør Flow. */
+  AI_WEB_SEARCH?: string;
 }
 interface Env extends __FlowOptionalEnv {}
 declare namespace Cloudflare {

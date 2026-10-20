@@ -38,7 +38,7 @@ app.post('/', body(z.object({
     const r = await ask(c.env, question, l ?? user.prefs.lang ?? 'nb', { id: user.id, name: user.name, roles: user.roles }, history);
     await db.prepare('INSERT INTO ai_questions (user_id, question, answer, tools, model, ms) VALUES (?, ?, ?, ?, ?, ?)')
       .bind(user.id, question, r.answer, JSON.stringify(r.tools), r.model, Date.now() - t0).run();
-    return c.json({ question, answer: r.answer, tools: r.tools, actions: r.actions } satisfies AskAnswer);
+    return c.json({ question, answer: r.answer, tools: r.tools, actions: r.actions, sources: r.sources } satisfies AskAnswer);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Ukjent feil';
     await db.prepare('INSERT INTO ai_questions (user_id, question, ms, error) VALUES (?, ?, ?, ?)').bind(user.id, question, Date.now() - t0, msg).run();
@@ -68,9 +68,28 @@ app.post('/actions/:id/confirm', async c => {
   const claimed = await c.env.DB.prepare("UPDATE ai_actions SET status = 'utfort', done_at = ? WHERE id = ? AND status = 'foreslatt'").bind(nowIso(), r.id).run();
   if (!claimed.meta.changes) throw fail(409, 'Jobben er allerede gjort.');
   const { app: api } = await import('../app.ts');
-  const res = await api.request(`/api${r.path}`, {
-    method: r.method, body: r.body, headers: { 'content-type': 'application/json', [INTERNAL_HEADER]: internalToken(c.get('user')) },
+  const run = (body: string) => api.request(`/api${r.path}`, {
+    method: r.method, body, headers: { 'content-type': 'application/json', [INTERNAL_HEADER]: internalToken(c.get('user')) },
   }, c.env, c.executionCtx);
+  const parsed = JSON.parse(r.body);
+  if (Array.isArray(parsed)) {
+    // Samlejobb (f.eks. mange båter): én forespørsel per element; feil på ett stopper ikke resten.
+    const errors: string[] = [];
+    let ok = 0;
+    for (const item of parsed) {
+      const res = await run(JSON.stringify(item));
+      if (res.ok) ok++;
+      else {
+        const e = await res.json().catch(() => ({})) as { error?: string };
+        errors.push(`${(item as { name?: string }).name ?? '?'}: ${e.error ?? `Feil ${res.status}`}`);
+      }
+    }
+    const status = ok ? 'utfort' : 'feilet';
+    const err = errors.length ? `${errors.length} av ${parsed.length} feilet – ${errors.slice(0, 5).join('; ')}${errors.length > 5 ? ' …' : ''}` : null;
+    await c.env.DB.prepare('UPDATE ai_actions SET status = ?, error = ?, result = ? WHERE id = ?').bind(status, err, JSON.stringify({ ok, errors }), r.id).run();
+    return c.json(view({ ...r, status, error: err }, ok ? linkFor(r.kind, {}, r.path, parsed) : null));
+  }
+  const res = await run(r.body);
   const text = await res.text();
   let data: Record<string, unknown> = {};
   try { data = text ? JSON.parse(text) : {}; } catch { /* ikke JSON */ }
