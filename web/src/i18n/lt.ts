@@ -800,7 +800,6 @@ export default {
   "Sum": "Iš viso",
   "Sum alle varer": "Visų prekių suma",
   "Svak": "Silpnai",
-  "Svar fra Claude basert på data i Flow. Kan ta feil – sjekk tallene før du bruker dem.": "Claude atsakymas pagal Flow duomenis. Gali būti klaidingas – patikrinkite skaičius prieš juos naudodami.",
   "Svar med tall fra Flow (Claude)": "Atsakymas su Flow skaičiais (Claude)",
   "Svært bra": "Labai gerai",
   "System": "Sistema",

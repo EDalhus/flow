@@ -800,7 +800,6 @@ export default {
   "Sum": "Total",
   "Sum alle varer": "Total all goods",
   "Svak": "Weak",
-  "Svar fra Claude basert på data i Flow. Kan ta feil – sjekk tallene før du bruker dem.": "Answer from Claude based on data in Flow. May be wrong – check the numbers before using them.",
   "Svar med tall fra Flow (Claude)": "Answer with numbers from Flow (Claude)",
   "Svært bra": "Very good",
   "System": "System",

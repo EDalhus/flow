@@ -230,7 +230,9 @@ export function GlobalSearch() {
 
       {open && (
         <div ref={list} id="gsearch-list" className="glass scroll" role="listbox" aria-label={tr('Søkeresultater')}
-          style={{ position: 'absolute', top: 54, left: 0, right: 0, ...(asking ? { right: 'auto', width: 'min(620px, calc(100vw - 32px))' } : {}), maxHeight: 'min(640px, calc(100vh - 120px))', padding: 10, zIndex: 40, background: 'rgba(var(--glass-rgb), .95)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          style={{ position: 'absolute', top: 54, left: 0, right: 0, maxHeight: 'min(640px, calc(100vh - 120px))', padding: 10, zIndex: 40, background: 'rgba(var(--glass-rgb), .95)', display: 'flex', flexDirection: 'column', gap: 4,
+            // «Spør Flow»: bredere, sentrert under søkefeltet og litt gjennomsiktig, så kartet synes bak.
+            ...(asking ? { left: '50%', right: 'auto', transform: 'translateX(-50%)', width: 'min(880px, calc(100vw - 32px))', maxHeight: 'min(760px, calc(100vh - 110px))', padding: '14px 18px', background: 'rgba(var(--glass-rgb), .72)', backdropFilter: 'blur(22px) saturate(1.2)', WebkitBackdropFilter: 'blur(22px) saturate(1.2)' } : {}) }}>
           {asking ? <AskFlow key={asking} question={asking} context={askContext} onBack={() => setAsking(null)} go={to => { reset(); nav(to); }} />
             : vessel ? <VesselCard v={vessel} onBack={() => setVessel(null)} go={to => { reset(); nav(to); }} /> : (
             <>

@@ -100,7 +100,6 @@ export function AskFlow({ question, context, onBack, go }: {
         <button type="submit" className="icon-btn" disabled={!draft.trim() || m.isPending} aria-label={tr('Send')} style={{ width: 40, height: 40 }}><Send size={15} /></button>
       </form>
       {dict.error && <span className="sub" style={{ fontSize: 12 }}>{tr(dict.error)}</span>}
-      <span className="sub" style={{ fontSize: 11 }}>{tr('Svar fra Claude basert på data i Flow. Kan ta feil – sjekk tallene før du bruker dem.')}</span>
     </div>
   );
 }
