@@ -69,6 +69,7 @@ export function logText(e: OrderLogEntry): string {
         ? tr('Flyttet {varer} fra {fra} til {til}', { varer: goods(d.lines), fra: callText(d.from as LogCall), til: callText(d.to as LogCall) })
         : tr('Flyttet fra {fra} til {til}', { fra: callText(d.from as LogCall), til: callText(d.to as LogCall) });
     case 'unassigned':
+      if (d.deleted) return tr('Tatt av båten fordi anløpet ble slettet: {anløp}', { anløp: callText(d.from as LogCall) });
       if (d.reason) return tr('Tatt av båten fordi anløpet ble avlyst: {anløp} ({grunn})', { anløp: callText(d.from as LogCall), grunn: s(d.reason) });
       return d.lines ? tr('Tok {varer} av båten ({anløp})', { varer: goods(d.lines), anløp: callText(d.from as LogCall) }) : tr('Tatt av båten ({anløp})', { anløp: callText(d.from as LogCall) });
     case 'boat_changed': return tr('Byttet båt: {fra} → {til}', { fra: s(d.from), til: s(d.to) });

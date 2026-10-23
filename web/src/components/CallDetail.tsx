@@ -5,7 +5,7 @@ import { CREW_ROLE_LABEL, CREW_ROLES, type CrewRole } from '../../../shared/doma
 import { api, errorText } from '../lib/api.ts';
 import { dayRelative, ddmm, fr, hmFromIso, serviceDate, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
 import { osloToUtc } from '../../../shared/time.ts';
-import { useAssignOrder, useBoat, useBoats, useCallLog, useLoadOrder, useMe, useOrders, usePatchPortCall, usePutCrew, useUsers } from '../lib/queries.ts';
+import { useAssignOrder, useBoat, useBoats, useCallLog, useCancelPortCall, useDeletePortCall, useLoadOrder, useMe, useOrders, usePatchPortCall, usePutCrew, useUsers } from '../lib/queries.ts';
 import { useNavigate } from 'react-router';
 import { CallOrders, OrderLog } from './Orders.tsx';
 import { canCrew, canPlan, canQuayLog } from '../lib/roles.ts';
@@ -110,6 +110,7 @@ export function CallDetail({ call, tab, onTab, onOpenKaibok, onOpenAlerts, onClo
               <Sparkle size={15} />{tr('Ferdigstill i chat med Flow')}
             </button>
           ) : null}
+          {canPlan(me.data) && !call.has_quay_log && call.status !== 'ferdig' && <CallRemove call={call} onGone={() => onClose?.()} />}
           {chat && <AskSheet question={tr('Ferdigstill {båt} og fyll ut kaiboka', { båt: call.boat.name })} context={`port_call_id: ${call.id}`} onClose={() => setChat(false)} />}
         </div>
       )}
@@ -394,3 +395,30 @@ function BoatBrief({ boatId }: { boatId: string }) {
   );
 }
 
+/** Avlys (med begrunnelse, anløpet blir stående som avlyst) eller slett anløpet helt (f.eks. lagt inn ved en feil). */
+function CallRemove({ call, onGone }: { call: PortCallView; onGone: () => void }) {
+  const cancel = useCancelPortCall();
+  const del = useDeletePortCall();
+  const busy = cancel.isPending || del.isPending;
+  const so = call.orders.length;
+  const soText = so ? ` ${tr('{n} SO/PO går tilbake til «venter på båt».', { n: so })}` : '';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, paddingTop: 12, borderTop: '1px solid var(--line-soft)' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {call.status !== 'avlyst' && (
+          <button type="button" className="btn" disabled={busy} style={{ minHeight: 36, fontSize: 13 }} onClick={() => {
+            const reason = prompt(`${tr('Avlys anløpet for {båt}? Skriv en kort begrunnelse.', { båt: call.boat.name })}${soText}`);
+            if (reason && reason.trim().length >= 3) cancel.mutate({ id: call.id, reason: reason.trim() });
+          }}>{tr('Avlys anløpet')}</button>
+        )}
+        <button type="button" className="btn" disabled={busy} style={{ minHeight: 36, fontSize: 13, color: 'var(--bad-fg)', borderColor: 'rgba(229,72,77,.45)' }} onClick={() => {
+          if (confirm(`${tr('Slette anløpet for {båt} helt? Chat og mannskap for anløpet slettes også, og det kan ikke angres.', { båt: call.boat.name })}${soText}`)) {
+            del.mutate(call.id, { onSuccess: onGone });
+          }
+        }}>{del.isPending ? tr('Sletter …') : tr('Slett anløpet')}</button>
+      </div>
+      <span className="sub" style={{ fontSize: 12 }}>{tr('Avlys: anløpet blir stående som avlyst i historikken. Slett: brukes når anløpet ble lagt inn ved en feil.')}</span>
+      {(cancel.isError || del.isError) && <div className="error-box">{errorText(cancel.error ?? del.error)}</div>}
+    </div>
+  );
+}

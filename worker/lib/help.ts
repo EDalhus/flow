@@ -24,7 +24,7 @@ export const HELP_FLOW = `
 - Båten kan bli ferdig en annen dag enn den kommer: i anløpet → «Endre» ved klokkeslett → sett «Ferdig (dag)» og ETD (maks 14 døgn). Anløpet vises da alle dagene det varer.
 - Legge en SO på en båt: åpne SO-en → «Legg på båt», eller i anløpspanelet → «Legg til SO som venter på båt …». En båt kan ta flere SO-er; lasterekkefølgen settes under «Salgsordre · lasterekkefølge» i anløpspanelet. Bytte båt for én SO: åpne SO-en → «Bytt båt / flytt»; for hele anløpet: anløpspanelet → «Bytt båt».
 - Flytte et anløp (tid eller kai): åpne anløpet i kartet eller på /anlop → «Endre». Kollisjoner på kaia varsles i bjella med forslag («Løs»).
-- Avlyse: anløpspanelet → «Avlys anløpet» (begrunnelse kreves). Alle endringer logges (fanen Endringer).
+- Avlyse: anløpspanelet (Oversikt, nederst) → «Avlys anløpet» (begrunnelse kreves); anløpet blir stående som avlyst. Slette helt (lagt inn ved en feil): «Slett anløpet» samme sted. SO/PO-ene går tilbake til «venter på båt». Ikke mulig etter at kaiboka er levert. Alle endringer logges (fanen Endringer).
 - Chat per anløp: anløpspanelet → Chat. Skriv @Navn for å varsle noen.
 
 ## Kaibok

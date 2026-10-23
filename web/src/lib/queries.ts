@@ -134,6 +134,15 @@ export function useCancelPortCall() {
   });
 }
 
+/** Slett anløpet helt (SO-ene går tilbake til «venter på båt»). */
+export function useDeletePortCall() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<{ ok: true; orders: number }>(`/port-calls/${id}`, { method: 'DELETE' }),
+    onSuccess: () => { for (const k of ['port-calls', 'orders', 'order', 'search', 'collisions', 'boats']) qc.invalidateQueries({ queryKey: [k] }); },
+  });
+}
+
 export function useCreatePortCall() {
   const inv = useInvalidateCalls();
   return useMutation({

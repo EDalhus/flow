@@ -359,6 +359,33 @@ app.post('/:id/cancel', requireRole(...CAN.plan), body(portCallCancel), async c 
   return c.json(await loadCall(db, cur.id));
 });
 
+/**
+ * Slett et anløp helt (f.eks. lagt inn ved en feil). SO-ene på båten går tilbake til «venter på båt» og får det i
+ * loggen; chat, mannskap og varsler for anløpet slettes. Ikke mulig når kaiboka er levert (da er det historikk).
+ */
+app.delete('/:id', requireRole(...CAN.plan), async c => {
+  const user = c.get('user');
+  const db = c.env.DB;
+  const cur = await current(db, c.req.param('id'));
+  if (cur.completed_at || cur.has_log) throw fail(409, 'Kaibok er levert for anløpet, og det kan ikke slettes.');
+  const snap = logCall(await callSnapshot(db, cur.id));
+  const orders = await ordersOnCall(db, cur.id);
+  const photos = await db.prepare('SELECT r2_key, thumb_key FROM quay_log_photos WHERE port_call_id = ?').bind(cur.id).all<{ r2_key: string; thumb_key: string | null }>();
+  await db.batch([
+    db.prepare('UPDATE order_lines SET port_call_id = NULL WHERE port_call_id = ?').bind(cur.id),
+    ...orders.map(o => logStatement(db, { orderId: o.id, callId: cur.id, userId: user.id, kind: 'unassigned', data: { from: snap, deleted: true } })),
+    db.prepare(`INSERT INTO audit_log (user_id, entity, entity_id, action, diff) VALUES (?, 'port_call', ?, 'delete', ?)`)
+      .bind(user.id, cur.id, JSON.stringify({ boat: cur.boat_name, eta: cur.eta, etd: cur.etd, quay_id: cur.quay_id, type: cur.type })),
+    // Chat, mannskap, varsler og båt-koblinger følger med (ON DELETE CASCADE).
+    db.prepare('DELETE FROM port_calls WHERE id = ?').bind(cur.id),
+  ]);
+  // Bilder lastet opp til en kaibok som aldri ble levert.
+  const keys = photos.results.flatMap(p => [p.r2_key, ...(p.thumb_key ? [p.thumb_key] : [])]);
+  if (keys.length) c.executionCtx.waitUntil(c.env.PHOTOS.delete(keys).catch(e => console.error('sletting av bilder', e)));
+  publish(c, { type: 'port_call.changed', id: cur.id });
+  return c.json({ ok: true, orders: orders.length });
+});
+
 export default app;
 
 /** GET /api/collisions?from&to – alle kollisjoner i perioden, til dashbordet. */

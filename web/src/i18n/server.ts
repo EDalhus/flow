@@ -99,6 +99,6 @@ export const SERVER_TEXTS = [
   // Claude: jobber, brief og kaibok
   'Fant ikke forslaget.', 'Jobben er allerede gjort.', 'Forslaget er ikke aktivt lenger.', 'Forslaget er for gammelt. Spør på nytt, så lager Flow et nytt.',
   'Claude klarte ikke å fylle ut kaiboka. Prøv å beskrive litt mer.', 'Gi nettleseren tilgang til mikrofonen.', 'Talegjenkjenningen stoppet.',
-  'Fant ikke båten.', 'Velg en periode på maks ett år.',
+  'Fant ikke båten.', 'Velg en periode på maks ett år.', 'Kaibok er levert for anløpet, og det kan ikke slettes.',
   'Noe gikk galt.', 'Feil {kode}',
 ];

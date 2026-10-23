@@ -217,3 +217,23 @@ describe('løs bulk med båt', () => {
     expect((await api('/products')).json.find((p: { id: string }) => p.id === 'p_hav').skus.map((s: { unit: string }) => s.unit)).toContain('bulk');
   });
 });
+
+describe('slette anløp', () => {
+  it('sletter anløpet helt, SO-ene går tilbake til «venter på båt», og ikke når kaiboka er levert', async () => {
+    const c = (await api('/port-calls', { body: call('2030-08-01', '08:00', '12:00') })).json;
+    const so = soNumber();
+    await api('/orders', { body: { so_number: so, customer: 'Slett AS', lines: [{ sku_id: 's_hav_bb', quantity: 5, direction: 'ut' }], placement: { kind: 'call', port_call_id: c.id } } });
+    await api(`/port-calls/${c.id}/messages`, { body: { body: 'Feil båt lagt inn' } });
+    expect((await api(`/port-calls/${c.id}`, { method: 'DELETE', as: 'admin' })).json).toEqual({ ok: true, orders: 1 });
+    expect((await api(`/port-calls/${c.id}`)).status).toBe(404);
+    const o = (await api(`/orders/${so}`)).json;
+    expect(o).toMatchObject({ status: 'venter', calls: [] });
+    expect(o.log.map((l: { kind: string; data: { deleted?: boolean } }) => [l.kind, l.data.deleted ?? null])).toContainEqual(['unassigned', true]);
+    // Admin kan også slette. Med levert kaibok: nei.
+    const d = (await api('/port-calls', { body: call('2030-08-02', '08:00', '12:00') })).json;
+    expect((await api(`/port-calls/${d.id}`, { method: 'DELETE', as: 'admin' })).status).toBe(200);
+    const e = (await api('/port-calls', { body: call('2030-08-03', '08:00', '12:00') })).json;
+    await api(`/port-calls/${e.id}/quay-log`, { body: { had_deviation: false, ratings: { punctuality: 4, cooperation: 4, equipment: 4 } } });
+    expect((await api(`/port-calls/${e.id}`, { method: 'DELETE' })).status).toBe(409);
+  });
+});
