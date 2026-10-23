@@ -112,7 +112,7 @@ export type LineDraft = { id?: string; sku_id: string; quantity: string; directi
 type SkuOption = Sku & { name: string };
 
 const skuLabel = (s: SkuOption) =>
-  s.unit === 'BB' ? `${s.name} – BB` : `${s.name} – 25 kg × ${s.bags_per_unit} · ${s.pallet_type === 'srs' ? tr('SRS-pall') : tr('Europall')}`;
+  s.unit === 'BB' ? `${s.name} – BB` : s.unit === 'bulk' ? `${s.name} – ${tr('løs bulk')}` : `${s.name} – 25 kg × ${s.bags_per_unit} · ${s.pallet_type === 'srs' ? tr('SRS-pall') : tr('Europall')}`;
 
 function useSkus(): SkuOption[] {
   const products = useProducts();
@@ -132,11 +132,18 @@ function LinesEditor({ lines, onChange, defaultDirection }: { lines: LineDraft[]
             <select className="inp" disabled={l.locked} value={l.sku_id || skus[0]?.id || ''} onChange={e => set(i, { sku_id: e.target.value })}>
               <optgroup label={tr('Bigbag (BB) 1000 kg')}>{skus.filter(s => s.unit === 'BB').map(s => <option key={s.id} value={s.id}>{skuLabel(s)}</option>)}</optgroup>
               <optgroup label={tr('Sekk på pall')}>{skus.filter(s => s.unit === 'pall').map(s => <option key={s.id} value={s.id}>{skuLabel(s)}</option>)}</optgroup>
+              <optgroup label={tr('Løs bulk (tonn)')}>{skus.filter(s => s.unit === 'bulk').map(s => <option key={s.id} value={s.id}>{skuLabel(s)}</option>)}</optgroup>
             </select>
           </label>
-          <label><span className="sr">{tr('Antall')}</span>
-            <input className="inp n" disabled={l.locked} inputMode="numeric" value={l.quantity} placeholder={tr('Antall')} onChange={e => set(i, { quantity: e.target.value.replace(/\D/g, '') })} />
-          </label>
+          {(() => {
+            // Løs bulk måles i tonn; BB og pall i antall.
+            const bulk = skus.find(s => s.id === (l.sku_id || skus[0]?.id))?.unit === 'bulk';
+            return (
+              <label><span className="sr">{bulk ? tr('Tonn') : tr('Antall')}</span>
+                <input className="inp n" disabled={l.locked} inputMode="numeric" value={l.quantity} placeholder={bulk ? tr('Tonn') : tr('Antall')} onChange={e => set(i, { quantity: e.target.value.replace(/\D/g, '') })} />
+              </label>
+            );
+          })()}
           <select className="inp" aria-label={tr('Retning')} disabled={l.locked} value={l.direction} onChange={e => set(i, { direction: e.target.value as 'inn' | 'ut' })} style={{ padding: '0 8px' }}>
             <option value="ut">{tr('Henting')}</option>
             <option value="inn">{tr('Levering')}</option>

@@ -16,7 +16,7 @@ const app = new Hono<AppEnv>();
 
 type LineRow = {
   id: string; sku_id: string; quantity: number; direction: 'inn' | 'ut'; port_call_id: string | null; sort: number;
-  product_name: string; unit: 'BB' | 'pall'; bags_per_unit: number | null; pallet_type: 'europall' | 'srs' | null;
+  product_name: string; unit: 'BB' | 'pall' | 'bulk'; bags_per_unit: number | null; pallet_type: 'europall' | 'srs' | null;
   /** Anløpet er avsluttet (kaibok levert) – linjen er låst. */
   locked: number;
 };
@@ -43,7 +43,7 @@ const checkVersion = (o: OrderRow, version: number) => {
 async function skuInfo(db: D1Database, skuIds: string[]) {
   const { results } = await db.prepare(`SELECT s.id, p.name AS product_name, s.unit, s.bags_per_unit, s.pallet_type FROM skus s
                                         JOIN products p ON p.id = s.product_id WHERE s.active = 1 AND s.id IN (SELECT value FROM json_each(?))`)
-    .bind(JSON.stringify([...new Set(skuIds)])).all<{ id: string; product_name: string; unit: 'BB' | 'pall'; bags_per_unit: number | null; pallet_type: 'europall' | 'srs' | null }>();
+    .bind(JSON.stringify([...new Set(skuIds)])).all<{ id: string; product_name: string; unit: 'BB' | 'pall' | 'bulk'; bags_per_unit: number | null; pallet_type: 'europall' | 'srs' | null }>();
   const map = new Map(results.map(r => [r.id, r]));
   return (sku: string, quantity: number) => { const s = map.get(sku); return s ? goodsLabel({ ...s, quantity }) : sku; };
 }

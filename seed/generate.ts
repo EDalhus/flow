@@ -151,15 +151,17 @@ const HISTORY_BOATS = BOATS.filter(b => b.logs > 0).map(b => b.key);
 
 // ---------------------------------------------------------------- produkter
 
-const PRODUCTS = ['Hav salt', 'Stein salt', 'Blandet salt', 'Fint Rafinert salt', 'Sukker', 'MG Kombi', 'Marsel Hav salt', 'Sukker salt 1:2', 'Nitrite'];
+const PRODUCTS = ['Hav salt', 'Stein salt', 'Blandet salt', 'Fint Rafinert salt', 'Sukker', 'MG Kombi', 'Marsel Hav salt', 'Sukker salt 1:2', 'Nitrite', 'Vei salt'];
 const P = (name: string) => `p_${PRODUCTS.indexOf(name) + 1}`;
 PRODUCTS.forEach((name, i) => add('products', { id: P(name), name, sort: i + 1 }));
 
-type Sku = { id: string; product: string; unit: 'BB' | 'pall'; pallet: 'europall' | 'srs' | null; kg: number };
+type Unit = 'BB' | 'pall' | 'bulk';
+type Sku = { id: string; product: string; unit: Unit; pallet: 'europall' | 'srs' | null; kg: number };
 const SKUS: Sku[] = [];
 let skuSort = 0;
-function sku(product: string, unit: 'BB' | 'pall', pallet: 'europall' | 'srs' | null, bags: number | null) {
-  const s: Sku = { id: `s_${PRODUCTS.indexOf(product) + 1}_${unit === 'BB' ? 'bb' : pallet}`, product, unit, pallet, kg: bags ? bags * 25 : 1000 };
+function sku(product: string, unit: Unit, pallet: 'europall' | 'srs' | null, bags: number | null) {
+  // Samme id for bulk som migrering 0015 bruker (s_bulk_<produkt-id>).
+  const s: Sku = { id: unit === 'bulk' ? `s_bulk_${P(product)}` : `s_${PRODUCTS.indexOf(product) + 1}_${unit === 'BB' ? 'bb' : pallet}`, product, unit, pallet, kg: bags ? bags * 25 : 1000 };
   SKUS.push(s);
   add('skus', { id: s.id, product_id: P(product), unit, bags_per_unit: bags, bag_kg: bags ? 25 : null, pallet_type: pallet, kg_per_unit: s.kg, sort: ++skuSort });
 }
@@ -168,7 +170,9 @@ for (const [p, bags] of [['Hav salt', 40], ['Sukker salt 1:2', 40], ['Nitrite', 
   sku(p, 'pall', 'europall', bags);
   sku(p, 'pall', 'srs', bags);
 }
-const S = (product: string, unit: 'BB' | 'pall', pallet: 'europall' | 'srs' | null = null) => {
+// Løst bulksalt med båt (antall = tonn).
+for (const p of ['Hav salt', 'Stein salt', 'Vei salt']) sku(p, 'bulk', null, null);
+const S = (product: string, unit: Unit, pallet: 'europall' | 'srs' | null = null) => {
   const s = SKUS.find(x => x.product === product && x.unit === unit && x.pallet === pallet);
   if (!s) throw new Error(`Ukjent SKU ${product} ${unit} ${pallet}`);
   return s;
@@ -424,7 +428,7 @@ const PLANNED: Planned[] = [
     goods: [{ sku: S('Hav salt', 'pall', 'europall'), qty: 120, dir: 'ut' }, { sku: S('Sukker salt 1:2', 'pall', 'srs'), qty: 60, dir: 'ut' }],
     crew: [[T, 'lars'], [T, 'per'], [A, 'stian'], [K, 'morten']] },
   { key: 'a2', day: 0, boat: 'kystlast', type: 'levering', kai: 'Kai 1', start: '09:15', end: '12:30', seller: 'henrik', crane: true,
-    goods: [{ sku: S('Hav salt', 'BB'), qty: 300, dir: 'inn' }], crew: [[T, 'ola']] },
+    goods: [{ sku: S('Hav salt', 'bulk'), qty: 1200, dir: 'inn' }], crew: [[T, 'ola']] },
   { key: 'a3', day: 0, boat: 'polarstrand', type: 'henting', kai: 'Kai 1', start: '11:45', end: '14:30', seller: 'kari',
     orders: [{ customer: 'Fjordlaks', goods: [1] }, { customer: 'Brødrene Sperre', goods: [0] }],
     goods: [{ sku: S('Blandet salt', 'BB'), qty: 80, dir: 'ut' }, { sku: S('Fint Rafinert salt', 'pall', 'europall'), qty: 40, dir: 'ut' }],
@@ -440,7 +444,7 @@ const PLANNED: Planned[] = [
   { key: 'a7', day: 2, boat: 'havbris', type: 'henting', kai: 'Kai 1', start: '13:00', end: '16:00', seller: 'kari',
     goods: [{ sku: S('Blandet salt', 'BB'), qty: 90, dir: 'ut' }], crew: [[T, null], [T, null], [A, null], [K, null]] },
   { key: 'a8', day: 5, boat: 'senja', type: 'levering', kai: 'Kai 2', start: '07:00', end: '10:00', seller: 'henrik',
-    goods: [{ sku: S('Sukker', 'BB'), qty: 60, dir: 'inn' }], crew: [[T, null], [A, null], [K, null]] },
+    goods: [{ sku: S('Stein salt', 'bulk'), qty: 1500, dir: 'inn' }, { sku: S('Vei salt', 'bulk'), qty: 600, dir: 'inn' }], crew: [[T, null], [A, null], [K, null]] },
 ];
 const plannedIds: Record<string, string> = { a0: explicitCallIds.fjordvik };
 const plannedOrders: Record<string, { soId: string; so: string }[]> = {};

@@ -157,7 +157,8 @@ INSERT INTO products (id, name, sort) VALUES
   ('p_6', 'MG Kombi', 6),
   ('p_7', 'Marsel Hav salt', 7),
   ('p_8', 'Sukker salt 1:2', 8),
-  ('p_9', 'Nitrite', 9);
+  ('p_9', 'Nitrite', 9),
+  ('p_10', 'Vei salt', 10);
 INSERT INTO skus (id, product_id, unit, bags_per_unit, bag_kg, pallet_type, kg_per_unit, sort) VALUES
   ('s_1_bb', 'p_1', 'BB', NULL, NULL, NULL, 1000, 1),
   ('s_2_bb', 'p_2', 'BB', NULL, NULL, NULL, 1000, 2),
@@ -173,7 +174,10 @@ INSERT INTO skus (id, product_id, unit, bags_per_unit, bag_kg, pallet_type, kg_p
   ('s_9_europall', 'p_9', 'pall', 42, 25, 'europall', 1050, 12),
   ('s_9_srs', 'p_9', 'pall', 42, 25, 'srs', 1050, 13),
   ('s_4_europall', 'p_4', 'pall', 42, 25, 'europall', 1050, 14),
-  ('s_4_srs', 'p_4', 'pall', 42, 25, 'srs', 1050, 15);
+  ('s_4_srs', 'p_4', 'pall', 42, 25, 'srs', 1050, 15),
+  ('s_bulk_p_1', 'p_1', 'bulk', NULL, NULL, NULL, 1000, 16),
+  ('s_bulk_p_2', 'p_2', 'bulk', NULL, NULL, NULL, 1000, 17),
+  ('s_bulk_p_10', 'p_10', 'bulk', NULL, NULL, NULL, 1000, 18);
 INSERT INTO port_calls (id, boat_id, type, quay_id, eta, etd, time_known, service_date, seller_id, created_by, boat_crane, responsible_user_id, arrived_at, departed_at, completed_at, source, created_at) VALUES
   ('pc_00001', 'b_fjordvik', 'levering', 'q_kai2', '2026-10-16T03:30:00.000Z', '2026-10-16T05:00:00.000Z', 1, '2026-10-16', 'u_kari', 'u_mari', 0, 'u_per', '2026-10-16T03:30:00.000Z', '2026-10-16T05:17:00.000Z', '2026-10-16T05:04:00.000Z', 'app', '2026-10-12T22:00:00.000Z'),
   ('pc_00002', 'b_havbris', 'levering', 'q_kai2', '2026-10-04T06:30:00.000Z', '2026-10-04T10:00:00.000Z', 1, '2026-10-04', 'u_kari', 'u_kari', 0, 'u_ola', '2026-10-04T06:39:00.000Z', '2026-10-04T10:15:00.000Z', '2026-10-04T10:40:00.000Z', 'app', '2026-09-25T22:00:00.000Z'),
@@ -3616,7 +3620,7 @@ INSERT INTO order_lines (id, sales_order_id, port_call_id, sku_id, quantity, dir
   ('ol_01959', 'so_00712', 'pc_00712', 's_9_europall', 9, 'ut', 4),
   ('ol_01960', 'so_00713', 'pc_a1', 's_1_europall', 120, 'ut', 0),
   ('ol_01961', 'so_00714', 'pc_a1', 's_8_srs', 60, 'ut', 0),
-  ('ol_01962', 'so_00715', 'pc_a2', 's_1_bb', 300, 'inn', 0),
+  ('ol_01962', 'so_00715', 'pc_a2', 's_bulk_p_1', 1200, 'inn', 0),
   ('ol_01963', 'so_00716', 'pc_a3', 's_4_europall', 40, 'ut', 0),
   ('ol_01964', 'so_00717', 'pc_a3', 's_3_bb', 80, 'ut', 0),
   ('ol_01965', 'so_00718', 'pc_a4', 's_7_bb', 200, 'inn', 0),
@@ -3624,10 +3628,11 @@ INSERT INTO order_lines (id, sales_order_id, port_call_id, sku_id, quantity, dir
   ('ol_01967', 'so_00720', 'pc_a5', 's_6_bb', 150, 'ut', 0),
   ('ol_01968', 'so_00721', 'pc_a6', 's_4_bb', 250, 'inn', 0),
   ('ol_01969', 'so_00722', 'pc_a7', 's_3_bb', 90, 'ut', 0),
-  ('ol_01970', 'so_00723', 'pc_a8', 's_5_bb', 60, 'inn', 0),
-  ('ol_01971', 'so_00724', NULL, 's_1_bb', 180, 'ut', 0),
-  ('ol_01972', 'so_00725', NULL, 's_3_bb', 60, 'ut', 0),
-  ('ol_01973', 'so_00725', NULL, 's_1_europall', 40, 'ut', 1);
+  ('ol_01970', 'so_00723', 'pc_a8', 's_bulk_p_2', 1500, 'inn', 0),
+  ('ol_01971', 'so_00723', 'pc_a8', 's_bulk_p_10', 600, 'inn', 1),
+  ('ol_01972', 'so_00724', NULL, 's_1_bb', 180, 'ut', 0),
+  ('ol_01973', 'so_00725', NULL, 's_3_bb', 60, 'ut', 0),
+  ('ol_01974', 'so_00725', NULL, 's_1_europall', 40, 'ut', 1);
 INSERT INTO port_call_orders (port_call_id, sales_order_id, load_seq) VALUES
   ('pc_00001', 'so_00001', 1),
   ('pc_00002', 'so_00002', 1),

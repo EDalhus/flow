@@ -206,3 +206,14 @@ describe('anløp over flere dager', () => {
     expect((await api(`/port-calls/${c.json.id}`, { method: 'PATCH', body: { version: c.json.version, etd: at('2030-07-20', '12:00') } })).status).toBe(400);
   });
 });
+
+describe('løs bulk med båt', () => {
+  it('bulk-vare måles i tonn og vises som «… t … (bulk)»', async () => {
+    const c = (await api('/port-calls', { body: call('2030-07-15', '08:00', '20:00') })).json;
+    const o = await api('/orders', { body: { kind: 'PO', so_number: 'PO-BULK1', customer: 'Salt AS', lines: [{ sku_id: 's_hav_bulk', quantity: 1200, direction: 'inn' }],
+      placement: { kind: 'call', port_call_id: c.id } } });
+    expect(o.status).toBe(201);
+    expect(o.json).toMatchObject({ tonnes: 1200, lines: [{ unit: 'bulk', label: '1200 t Hav salt (bulk)' }] });
+    expect((await api('/products')).json.find((p: { id: string }) => p.id === 'p_hav').skus.map((s: { unit: string }) => s.unit)).toContain('bulk');
+  });
+});

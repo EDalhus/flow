@@ -9,7 +9,7 @@ import { api } from './api.ts';
 
 export type { Quay };
 export type Product = { id: string; name: string; skus: Sku[] };
-export type Sku = { id: string; product_id: string; unit: 'BB' | 'pall'; bags_per_unit: number | null; bag_kg: number | null; pallet_type: 'europall' | 'srs' | null; kg_per_unit: number };
+export type Sku = { id: string; product_id: string; unit: 'BB' | 'pall' | 'bulk'; bags_per_unit: number | null; bag_kg: number | null; pallet_type: 'europall' | 'srs' | null; kg_per_unit: number };
 export type Agent = { id: string; name: string; phone: string | null };
 
 // Oppslag som sjelden endres.

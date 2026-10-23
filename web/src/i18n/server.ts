@@ -14,7 +14,7 @@ export const SERVER_TEXTS = [
   'Fyll nå', 'Fyll snart', 'Nok i siloen', 'Stopp – nok til å fullføre ordren', 'Ingen ordre pakkes',
   'Alle', 'Rødt', 'Gult', 'Grønt',
   'Grønt', 'Gult varsel', 'Rødt flagg', 'Ingen historikk',
-  'Pakkelinje {n}', 'BB + pall', 'Pall', 'BB',
+  'Pakkelinje {n}', 'BB + pall', 'Pall', 'BB', 'Bulk', 'BB + bulk', 'Pall + bulk', 'BB + pall + bulk', '{n} t {produkt} (bulk)',
   '{n} pall {produkt} · 25 kg × {sekker} · Europall', '{n} pall {produkt} · 25 kg × {sekker} · SRS-pall',
   'Flyttet {båt} til {kai} (fra varsel om kollisjon).', 'Utsatt {båt} til {tid} (fra varsel om kollisjon).',
   'Tid ikke satt',

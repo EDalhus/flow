@@ -17,7 +17,7 @@ type Row = {
   notes: string | null; picked_up_at: string | null; cancelled_at: string | null; created_at: string;
   pu_id: string | null; pu_name: string | null; pu_short: string | null; pu_initials: string | null;
 };
-type GoodsRow = { id: string; order_id: string; sku_id: string; product_name: string; unit: 'BB' | 'pall'; pallet_type: 'europall' | 'srs' | null; bags_per_unit: number | null; kg_per_unit: number; quantity: number };
+type GoodsRow = { id: string; order_id: string; sku_id: string; product_name: string; unit: 'BB' | 'pall' | 'bulk'; pallet_type: 'europall' | 'srs' | null; bags_per_unit: number | null; kg_per_unit: number; quantity: number };
 
 async function load(db: D1Database, where: string, params: unknown[]): Promise<TruckOrderView[]> {
   const [orders, goods] = await db.batch([

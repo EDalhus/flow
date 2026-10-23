@@ -74,17 +74,17 @@ export const ROLE_NAMES: Record<string, string> = { salg: 'Salg', produksjon: 'P
 
 export const ratingColor = (v: number) => (v >= 4 ? '#5BD68A' : v >= 3 ? '#F7B955' : '#FF6B5E');
 
-/** Enhet: BB (bigbag) eller pall. */
-export const unitLabel = (u: string) => (u === 'pall' ? tr('pall') : u);
+/** Enhet: BB (bigbag), pall eller t (løs bulk, antall = tonn). */
+export const unitLabel = (u: string) => (u === 'pall' ? tr('pall') : u === 'bulk' ? 't' : u);
 
 /** Kort varetekst for lister: "120 pall Hav salt (Europall) · 60 pall Sukker salt 1:2 (SRS)" */
 export const goodsShort = (goods: GoodsView[]) =>
-  goods.map(g => `${g.quantity} ${unitLabel(g.unit)} ${g.product_name}${g.pallet_type ? ` (${g.pallet_type === 'srs' ? 'SRS' : tr('Europall')})` : ''}`).join(' · ');
+  goods.map(g => `${g.quantity} ${unitLabel(g.unit)} ${g.product_name}${g.pallet_type ? ` (${g.pallet_type === 'srs' ? 'SRS' : tr('Europall')})` : g.unit === 'bulk' ? ` (${tr('bulk')})` : ''}`).join(' · ');
 
 /** For detaljvisning: ["120 pall", "Hav salt · 25 kg × 40 · Europall"] */
 export const goodsParts = (g: GoodsView): [string, string] => [
   `${g.quantity} ${unitLabel(g.unit)}`,
-  g.unit === 'pall' ? `${g.product_name} · 25 kg × ${g.bags_per_unit} · ${g.pallet_type === 'srs' ? tr('SRS-pall') : tr('Europall')}` : g.product_name,
+  g.unit === 'pall' ? `${g.product_name} · 25 kg × ${g.bags_per_unit} · ${g.pallet_type === 'srs' ? tr('SRS-pall') : tr('Europall')}` : g.unit === 'bulk' ? `${g.product_name} · ${tr('løs bulk')}` : g.product_name,
 ];
 
 /** "07:30–11:00", eller "Tid ikke satt" når bare dagen er kjent. */

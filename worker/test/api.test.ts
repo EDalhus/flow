@@ -321,7 +321,7 @@ describe('rapporter', () => {
     expect((await api('/reports/weekly?year=2030&product_id=p_ukjent')).status).toBe(400);
 
     const products = await api('/reports/products?year=2030&direction=ut');
-    expect(products.json.rows).toContainEqual(expect.objectContaining({ name: 'Hav salt', packaging: 'BB + pall', forecast_tonnes_prev: 20 }));
+    expect(products.json.rows).toContainEqual(expect.objectContaining({ name: 'Hav salt', packaging: 'BB + pall + bulk', forecast_tonnes_prev: 20 }));
   });
 
   it('summerer tonn ut og inn siste N dager mot forrige periode', async () => {

@@ -62,7 +62,7 @@ export interface GoodsView {
   sku_id: string;
   product_id: string;
   product_name: string;
-  unit: 'BB' | 'pall';
+  unit: 'BB' | 'pall' | 'bulk';
   pallet_type: 'europall' | 'srs' | null;
   bags_per_unit: number | null;
   quantity: number;
@@ -440,7 +440,7 @@ export interface TruckOrderView {
   so_number: string;
   expected_date: string;
   notes: string | null;
-  goods: { id: string; sku_id: string; product_name: string; unit: 'BB' | 'pall'; quantity: number; tonnes: number; label: string }[];
+  goods: { id: string; sku_id: string; product_name: string; unit: 'BB' | 'pall' | 'bulk'; quantity: number; tonnes: number; label: string }[];
   tonnes: number;
   picked_up_at: string | null;
   picked_up_by: UserRef | null;

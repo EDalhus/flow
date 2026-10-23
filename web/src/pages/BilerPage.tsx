@@ -124,7 +124,8 @@ function NewTruckDrawer({ onClose, initial }: { onClose: () => void; initial: Re
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<Line[]>([{ sku_id: '', quantity: '24' }]);
 
-  const skus = (products.data ?? []).flatMap(p => p.skus.map(s => ({ ...s, name: p.name })));
+  // Løs bulk på bil går via Bulkbil; her hentes BB og pall.
+  const skus = (products.data ?? []).flatMap(p => p.skus.filter(s => s.unit !== 'bulk').map(s => ({ ...s, name: p.name })));
   const label = (s: (typeof skus)[number]) => (s.unit === 'BB' ? `${s.name} – BB` : `${s.name} – ${tr('pall')} ${s.bags_per_unit} × ${s.bag_kg} kg`);
   const goods = lines.map(l => ({ sku: skus.find(s => s.id === (l.sku_id || skus[0]?.id)), qty: Number(l.quantity) || 0 }));
   const tonnes = goods.reduce((t, g) => t + (g.sku ? (g.qty * g.sku.kg_per_unit) / 1000 : 0), 0);

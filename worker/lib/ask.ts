@@ -369,7 +369,7 @@ export async function runTool(env: Env, name: string, input: unknown): Promise<u
 
 /** Id-er Claude trenger for å foreslå jobber: kaier, varer (SKU), bulkregister, pakkelinjer og folk. */
 const LOOKUP = tool({
-  description: 'Slå opp id-er før du foreslår en jobb: kaier (quay_id), varer (sku_id/product_id med enhet), bulk (bil/vehicle_id, kunde/customer_id, sjåfør/driver_id, kvalitet/quality_id), pakkelinjer (line_id) og folk (user_id).',
+  description: 'Slå opp id-er før du foreslår en jobb: kaier (quay_id), varer (sku_id/product_id med enhet: BB, pall eller bulk – for bulk er antall = tonn), bulk (bil/vehicle_id, kunde/customer_id, sjåfør/driver_id, kvalitet/quality_id), pakkelinjer (line_id) og folk (user_id).',
   input: z.object({ hva: z.array(z.enum(['kaier', 'varer', 'bulk', 'pakkelinjer', 'folk'])).min(1) }),
   schema: { type: 'object', required: ['hva'], properties: { hva: { type: 'array', items: { type: 'string', enum: ['kaier', 'varer', 'bulk', 'pakkelinjer', 'folk'] } } } },
   run: async (env, i) => {

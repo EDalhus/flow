@@ -71,7 +71,7 @@ export const ACTIONS = {
     },
   }),
   ny_salgsordre: action({
-    description: 'Ny ordre fra Dynamics 365 med varer: SO (salgsordre, henting/utlevering, nummer 20xxxxx) eller PO (innkjøpsordre, levering inn til kaia, f.eks. PO-000123; varene har retning inn). Valgfritt: legg den rett på et eksisterende anløp (port_call_id). Varer: sku_id fra oppslag, antall enheter (BB eller pall).',
+    description: 'Ny ordre fra Dynamics 365 med varer: SO (salgsordre, henting/utlevering, nummer 20xxxxx) eller PO (innkjøpsordre, levering inn til kaia, f.eks. PO-000123; varene har retning inn). Valgfritt: legg den rett på et eksisterende anløp (port_call_id). Varer: sku_id fra oppslag, antall enheter (BB eller pall), eller tonn for løs bulk (enhet bulk).',
     input: z.object({
       kind: z.enum(['SO', 'PO']).default('SO'),
       so_number: z.string(), customer: z.string().min(1), wanted_date: day.optional(), notes: z.string().max(2000).optional(), port_call_id: id.optional(),

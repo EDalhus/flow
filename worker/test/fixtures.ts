@@ -26,7 +26,8 @@ export async function loadFixtures(db: D1Database) {
     db.prepare(`INSERT OR IGNORE INTO skus (id, product_id, unit, bags_per_unit, bag_kg, pallet_type, kg_per_unit) VALUES
       ('s_hav_bb', 'p_hav', 'BB', NULL, NULL, NULL, 1000),
       ('s_hav_eur', 'p_hav', 'pall', 40, 25, 'europall', 1000),
-      ('s_stein_bb', 'p_stein', 'BB', NULL, NULL, NULL, 1000)`),
+      ('s_stein_bb', 'p_stein', 'BB', NULL, NULL, NULL, 1000),
+      ('s_hav_bulk', 'p_hav', 'bulk', NULL, NULL, NULL, 1000)`),
   ]);
 }
 

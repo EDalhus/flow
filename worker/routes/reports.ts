@@ -31,8 +31,13 @@ app.get('/products', query(reportQuery.omit({ product_id: true })), async c => {
     loadFacts(c.env.DB, year),
     c.env.DB.prepare(`
       SELECT p.id, p.name,
-        CASE WHEN sum(s.unit = 'BB') > 0 AND sum(s.unit = 'pall') > 0 THEN 'BB + pall'
-             WHEN sum(s.unit = 'pall') > 0 THEN 'Pall' ELSE 'BB' END AS packaging
+        -- «BB», «Pall», «Bulk» eller kombinasjoner som «BB + pall + bulk».
+        upper(substr(ltrim(CASE WHEN sum(s.unit = 'BB') > 0 THEN 'BB' ELSE '' END
+          || CASE WHEN sum(s.unit = 'pall') > 0 THEN ' + pall' ELSE '' END
+          || CASE WHEN sum(s.unit = 'bulk') > 0 THEN ' + bulk' ELSE '' END, ' +'), 1, 1))
+        || substr(ltrim(CASE WHEN sum(s.unit = 'BB') > 0 THEN 'BB' ELSE '' END
+          || CASE WHEN sum(s.unit = 'pall') > 0 THEN ' + pall' ELSE '' END
+          || CASE WHEN sum(s.unit = 'bulk') > 0 THEN ' + bulk' ELSE '' END, ' +'), 2) AS packaging
       FROM products p JOIN skus s ON s.product_id = p.id AND s.active = 1
       GROUP BY p.id ORDER BY p.sort`).all<{ id: string; name: string; packaging: string }>(),
   ]);

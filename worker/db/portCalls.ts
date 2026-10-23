@@ -23,7 +23,7 @@ type CallRow = {
   ais_fetched_at: string | null; ais_sog: number | null; ais_in_geofence: number | null;
 };
 type GoodsRow = {
-  id: string; port_call_id: string; sales_order_id: string; sku_id: string; product_id: string; product_name: string; unit: 'BB' | 'pall';
+  id: string; port_call_id: string; sales_order_id: string; sku_id: string; product_id: string; product_name: string; unit: 'BB' | 'pall' | 'bulk';
   pallet_type: 'europall' | 'srs' | null; bags_per_unit: number | null; kg_per_unit: number; quantity: number; direction: Direction;
 };
 type OrderRow = { port_call_id: string; sales_order_id: string; so_number: string; kind: OrderKind; customer: string; load_seq: number; split: number };
@@ -42,6 +42,8 @@ const ref = (id: string | null, name: string | null, short: string | null, initi
   id ? { id, name: name ?? '', short_name: short ?? '', initials: initials ?? '' } : null;
 
 export function goodsLabel(g: Pick<GoodsRow, 'quantity' | 'unit' | 'product_name' | 'bags_per_unit' | 'pallet_type'>): string {
+  // Løst bulk: antall er tonn.
+  if (g.unit === 'bulk') return `${g.quantity} t ${g.product_name} (bulk)`;
   const base = `${g.quantity} ${g.unit} ${g.product_name}`;
   if (g.unit !== 'pall') return base;
   return `${base} · 25 kg × ${g.bags_per_unit} · ${g.pallet_type === 'srs' ? 'SRS-pall' : 'Europall'}`;
