@@ -8,6 +8,7 @@ import { publish } from '../lib/realtime.ts';
 import type { AppEnv, AuthUser } from '../types.ts';
 import { newCallStatements, validateRefs } from './portCalls.ts';
 import { assertFreeSo } from './trucks.ts';
+import { orderNo } from '../../shared/domain/orderNo.ts';
 
 // Salgsordre (SO) fra Dynamics 365. SO-en er sannheten for hva som skal over kaia; anløpet er båten.
 // Alle innloggede kan opprette og endre ordre. Alt føres i ordrens endringslogg.
@@ -102,8 +103,8 @@ app.post('/', body(orderCreate), async c => {
   const user = c.get('user');
   const db = c.env.DB;
   const dup = await db.prepare('SELECT id, customer FROM sales_orders WHERE so_number = ?').bind(i.so_number).first<{ id: string; customer: string }>();
-  if (dup) throw fail(409, `SO ${i.so_number} finnes allerede (${dup.customer}).`, { field: 'so_number', existing: dup.id });
-  await assertFreeSo(db, i.so_number);
+  if (dup) throw fail(409, `${orderNo(i.kind, i.so_number)} finnes allerede (${dup.customer}).`, { field: 'so_number', existing: dup.id });
+  if (i.kind === 'SO') await assertFreeSo(db, i.so_number);
   const seller = i.seller_id !== undefined ? i.seller_id : user.roles.includes('salg') ? user.id : null;
   await validateRefs(db, { seller_id: seller, skus: i.lines.map(l => l.sku_id) });
 
@@ -111,11 +112,11 @@ app.post('/', body(orderCreate), async c => {
   const place = await resolvePlacement(db, user, i.placement, typeOf(i.lines), seller);
   const statements = [
     ...place.statements,
-    db.prepare(`INSERT INTO sales_orders (id, so_number, customer, seller_id, wanted_date, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, i.so_number, i.customer, seller, i.wanted_date ?? null, i.notes, user.id),
+    db.prepare(`INSERT INTO sales_orders (id, kind, so_number, customer, seller_id, wanted_date, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, i.kind, i.so_number, i.customer, seller, i.wanted_date ?? null, i.notes, user.id),
     ...i.lines.map((l, n) => db.prepare(`INSERT INTO order_lines (id, sales_order_id, port_call_id, sku_id, quantity, direction, sort) VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .bind(newId('ol'), id, place.callId, l.sku_id, l.quantity, l.direction, n)),
-    logStatement(db, { orderId: id, callId: place.callId, userId: user.id, kind: 'created', data: { so_number: i.so_number } }),
+    logStatement(db, { orderId: id, callId: place.callId, userId: user.id, kind: 'created', data: { so_number: i.so_number, order_kind: i.kind } }),
     ...(place.callId
       ? [...syncLink(db, place.callId, id), logStatement(db, { orderId: id, callId: place.callId, userId: user.id, kind: 'assigned', data: { to: logCall(place.snapshot) } })]
       : []),
@@ -123,7 +124,7 @@ app.post('/', body(orderCreate), async c => {
   try {
     await db.batch(statements);
   } catch (e) {
-    if (isConstraintError(e)) throw fail(409, `SO ${i.so_number} finnes allerede.`, { field: 'so_number' });
+    if (isConstraintError(e)) throw fail(409, `${orderNo(i.kind, i.so_number)} finnes allerede.`, { field: 'so_number' });
     throw e;
   }
   if (place.callId) publish(c, { type: 'port_call.changed', id: place.callId });

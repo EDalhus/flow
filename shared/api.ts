@@ -1,5 +1,6 @@
 // Responstyper fra API-et. Brukes av frontend.
 import type { Collision, Suggestion } from './domain/collisions.ts';
+import type { OrderKind } from './domain/orderNo.ts';
 import type { SearchScope } from './domain/search.ts';
 import type { CallStatus, CallType, Category, CrewRole, Direction, Flag, UserRole } from './domain/types.ts';
 
@@ -115,6 +116,8 @@ export type QuayRef = { id: string; name: string; nickname: string | null; compa
 /** En SO på et anløp, i lasterekkefølge. */
 export interface CallOrder {
   id: string;
+  /** SO (salg) eller PO (innkjøp, leveringer). */
+  kind: OrderKind;
   so_number: string;
   customer: string;
   /** 1 = lastes/losses først. */
@@ -186,6 +189,7 @@ export interface OrderLine extends GoodsView {
 
 export interface OrderView {
   id: string;
+  kind: OrderKind;
   so_number: string;
   customer: string;
   seller: UserRef | null;
@@ -219,6 +223,7 @@ export interface OrderLogEntry {
   port_call_id: string | null;
   sales_order_id: string | null;
   so_number: string | null;
+  order_kind: OrderKind | null;
 }
 
 export interface OrderDetail extends OrderView {
@@ -590,7 +595,7 @@ export interface SearchResult {
   q: string;
   boats: { id: string; name: string; mmsi: string | null; flag: Flag }[];
   calls: { id: string; boat_name: string; service_date: string; eta: string; time_known: boolean; type: CallType | 'begge'; status: CallStatus }[];
-  orders: { id: string; so_number: string; customer: string; status: OrderStatus; boat_name: string | null; service_date: string | null }[];
+  orders: { id: string; kind: OrderKind; so_number: string; customer: string; status: OrderStatus; boat_name: string | null; service_date: string | null }[];
   trucks: { id: string; so_number: string; customer: string; expected_date: string; reg_no: string | null; picked_up: boolean }[];
   bulk: SearchBulk[];
   users: { id: string; name: string; title: string | null; phone: string | null }[];

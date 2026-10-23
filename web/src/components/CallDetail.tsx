@@ -3,7 +3,7 @@ import { BoatPhotos } from './BoatPhotos.tsx';
 import type { CollisionView, PortCallView, UserView } from '../../../shared/api.ts';
 import { CREW_ROLE_LABEL, CREW_ROLES, type CrewRole } from '../../../shared/domain/types.ts';
 import { api, errorText } from '../lib/api.ts';
-import { dayRelative, ddmm, fr, hmFromIso, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
+import { dayRelative, ddmm, fr, hmFromIso, serviceDate, telHref, telShort, timeRange, typeLabel } from '../lib/format.ts';
 import { osloToUtc } from '../../../shared/time.ts';
 import { useAssignOrder, useBoat, useBoats, useCallLog, useLoadOrder, useMe, useOrders, usePatchPortCall, usePutCrew, useUsers } from '../lib/queries.ts';
 import { useNavigate } from 'react-router';
@@ -17,6 +17,7 @@ import { Translated } from './Translated.tsx';
 import { useQuery } from '@tanstack/react-query';
 import { Markdown } from './Markdown.tsx';
 import { AskSheet } from './AskFlow.tsx';
+import { orderNo } from '../../../shared/domain/orderNo.ts';
 
 export type DetailTab = 'oversikt' | 'chat' | 'profil' | 'logg';
 
@@ -302,7 +303,7 @@ function AddOrder({ call }: { call: PortCallView }) {
         <>
           <select className="sel" aria-label={tr('SO som venter på båt')} value={pick} onChange={e => setPick(e.target.value)} style={{ flex: '1 1 180px' }}>
             <option value="">{tr('Legg til SO som venter på båt …')}</option>
-            {waiting.map(o => <option key={o.id} value={o.id}>SO {o.so_number} · {o.customer}{o.wanted_date ? ` · ${dayRelative(o.wanted_date)}` : ''}</option>)}
+            {waiting.map(o => <option key={o.id} value={o.id}>{orderNo(o.kind, o.so_number)} · {o.customer}{o.wanted_date ? ` · ${dayRelative(o.wanted_date)}` : ''}</option>)}
           </select>
           <button type="button" className="btn" disabled={!chosen || assign.isPending} style={{ minHeight: 38, fontSize: 13 }}
             onClick={() => chosen && assign.mutate({ id: chosen.id, version: chosen.version, placement: { kind: 'call', port_call_id: call.id } }, { onSuccess: () => setPick('') })}>
@@ -333,9 +334,14 @@ function TimeEditor({ call }: { call: PortCallView }) {
   const [open, setOpen] = useState(false);
   const [eta, setEta] = useState(call.time_known ? hmFromIso(call.eta) : '');
   const [etd, setEtd] = useState(call.time_known ? hmFromIso(call.etd) : '');
-  const ok = /^\d{2}:\d{2}$/.test(eta) && /^\d{2}:\d{2}$/.test(etd) && etd > eta;
+  // Båten kan bli ferdig en annen dag enn den kommer.
+  const [etaDay, setEtaDay] = useState(call.service_date);
+  const [etdDay, setEtdDay] = useState(call.time_known ? serviceDate(call.etd) : call.service_date);
+  const times = /^\d{2}:\d{2}$/.test(eta) && /^\d{2}:\d{2}$/.test(etd) && etaDay && etdDay
+    ? { eta: osloToUtc(etaDay, eta), etd: osloToUtc(etdDay, etd) } : null;
+  const ok = !!times && times.etd > times.eta;
   const save = () => ok && patch.mutate(
-    { id: call.id, version: call.version, eta: osloToUtc(call.service_date, eta), etd: osloToUtc(call.service_date, etd), time_known: true },
+    { id: call.id, version: call.version, ...times!, time_known: true },
     { onSuccess: () => setOpen(false) },
   );
   const clear = () => patch.mutate({ id: call.id, version: call.version, time_known: false }, { onSuccess: () => setOpen(false) });
@@ -355,10 +361,17 @@ function TimeEditor({ call }: { call: PortCallView }) {
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 16, background: 'rgba(var(--tint), .05)' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 8 }}>
+        <label className="field"><span>{tr('Kommer (dag)')}</span>
+          <input className="inp n" type="date" value={etaDay} onChange={e => { const d = e.target.value; setEtaDay(d); if (d && etdDay < d) setEtdDay(d); }} />
+        </label>
         <label className="field"><span>ETA</span><input className="inp n" type="time" value={eta} onChange={e => setEta(e.target.value)} autoFocus /></label>
+        <label className="field"><span>{tr('Ferdig (dag)')}</span>
+          <input className="inp n" type="date" value={etdDay} min={etaDay} onChange={e => setEtdDay(e.target.value)} />
+        </label>
         <label className="field"><span>ETD</span><input className="inp n" type="time" value={etd} onChange={e => setEtd(e.target.value)} /></label>
       </div>
+      {times && !ok && <span className="sub" style={{ color: 'var(--warn-fg)' }}>{tr('ETD må være etter ETA')}</span>}
       {patch.isError && <div className="error-box">{errorText(patch.error)}</div>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="btn btn-w" disabled={!ok || patch.isPending} onClick={save} style={{ minHeight: 38 }}>{tr('Lagre')}</button>

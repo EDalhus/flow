@@ -310,13 +310,13 @@ export const TOOLS = {
   }),
 
   salgsordre: tool({
-    description: 'Salgsordrer (SO fra Dynamics 365): søk på SO-nummer eller kunde, eller alle med ønsket dag i en periode. Viser varer, tonn, status og båt. Maks 20.',
-    input: z.object({ so_nummer: z.string().max(7).optional(), kunde: z.string().max(60).optional(), from: date.optional(), to: date.optional() }),
+    description: 'Ordre fra Dynamics 365 – SO (salgsordre, henting) og PO (innkjøpsordre, levering inn): søk på nummer eller kunde/leverandør, eller alle med ønsket dag i en periode. Viser varer, tonn, status og båt. Maks 20.',
+    input: z.object({ so_nummer: z.string().max(24).optional(), kunde: z.string().max(60).optional(), from: date.optional(), to: date.optional() }),
     schema: { type: 'object', properties: { so_nummer: { type: 'string' }, kunde: { type: 'string', description: 'Del av kundenavnet' }, from: dateProp('Ønsket dag fra'), to: dateProp('Ønsket dag til') } },
     run: async (env, i) => {
       const where: string[] = [];
       const params: unknown[] = [];
-      if (i.so_nummer) { where.push('so_number LIKE ?'); params.push(`%${i.so_nummer.replace(/\D/g, '')}%`); }
+      if (i.so_nummer) { where.push('so_number LIKE ?'); params.push(`%${i.so_nummer.toUpperCase().replace(/^(SO|PO)\s+/, '').replace(/[^A-Z0-9-]/g, '')}%`); }
       if (i.kunde) { where.push('customer LIKE ?'); params.push(`%${i.kunde.replace(/[%_]/g, '')}%`); }
       if (i.from) { where.push('wanted_date >= ?'); params.push(i.from); }
       if (i.to) { where.push('wanted_date <= ?'); params.push(i.to); }
@@ -325,7 +325,7 @@ export const TOOLS = {
       const orders = await loadOrders(env.DB, { ids: results.map(r => r.id) });
       return {
         ordrer: orders.map(o => ({
-          so: o.so_number, link: `/anlop?so=${o.so_number}`, kunde: o.customer, status: o.status, onsket_dag: o.wanted_date, tonn: r1(o.tonnes), kansellert: !!o.cancelled_at,
+          type: o.kind, nummer: o.so_number, link: `/anlop?so=${o.so_number}`, kunde_eller_leverandor: o.customer, status: o.status, onsket_dag: o.wanted_date, tonn: r1(o.tonnes), kansellert: !!o.cancelled_at,
           bat: o.calls.map(c => `${c.boat_name} ${c.service_date}`).join(', ') || null,
           varer: o.lines.map(l => `${l.quantity} ${l.unit} ${l.product_name}`),
         })),

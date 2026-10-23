@@ -135,7 +135,7 @@ app.get('/', query(z.object({ q: z.string().trim().min(1).max(80) })), async c =
     scope,
     boats: (boats.results as BoatRow[]).map(b => ({ id: b.id, name: b.name, mmsi: b.mmsi, flag: effectiveFlag(b) })),
     orders: orders.map(o => ({
-      id: o.id, so_number: o.so_number, customer: o.customer, status: o.status, boat_name: o.calls[0]?.boat_name ?? null,
+      id: o.id, kind: o.kind, so_number: o.so_number, customer: o.customer, status: o.status, boat_name: o.calls[0]?.boat_name ?? null,
       service_date: o.calls[0]?.service_date ?? o.wanted_date,
     })),
     calls: await loadCallRows((callIds.results as { id: string }[]).map(r => r.id)),

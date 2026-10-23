@@ -3,7 +3,7 @@ import { collisionsFor, findCollisions, type CollisionCall } from '../../shared/
 import { resolveResponsible } from '../../shared/domain/responsible.ts';
 import { CREW_ROLE_LABEL, type CallType, type CrewRole } from '../../shared/domain/types.ts';
 import { crewPut, loadOrderPut, portCallCancel, portCallCreate, portCallPatch, rangeQuery } from '../../shared/schemas.ts';
-import { osloTime, serviceDate, wholeDay } from '../../shared/time.ts';
+import { MAX_CALL_DAYS, osloTime, serviceDate, wholeDay } from '../../shared/time.ts';
 import { CAN, hasRole, requireRole } from '../auth/access.ts';
 import { callSnapshot, loadCallLog, logCall, logStatement, ordersOnCall, syncLink, type CallSnapshot } from '../db/orders.ts';
 import { attachCollisions, collisionContext, loadCall, viewCollision } from '../db/portCalls.ts';
@@ -97,7 +97,8 @@ function assertEditable(c: CurrentCall) {
 app.get('/', query(rangeQuery), async c => {
   const { from, to } = c.req.valid('query');
   const ctx = await collisionContext(c.env.DB, from, to);
-  const views = ctx.calls.filter(v => v.service_date >= from && v.service_date <= to && v.status !== 'avlyst');
+  // Med anløp som varer over flere dager: alt som overlapper perioden.
+  const views = ctx.calls.filter(v => serviceDate(v.etd) >= from && v.service_date <= to && v.status !== 'avlyst');
   const { all } = attachCollisions(views, ctx);
   return c.json({ calls: views, collisions: all });
 });
@@ -219,6 +220,7 @@ app.patch('/:id', requireRole(...CAN.plan), body(portCallPatch), async c => {
   };
   if (!next.time_known) Object.assign(next, wholeDay(serviceDate(next.eta)));
   if (Date.parse(next.etd) <= Date.parse(next.eta)) throw fail(400, 'ETD må være etter ETA.', { field: 'etd' });
+  if (Date.parse(next.etd) - Date.parse(next.eta) > MAX_CALL_DAYS * 86_400_000) throw fail(400, `Et anløp kan vare maks ${MAX_CALL_DAYS} døgn.`, { field: 'etd' });
   await validateRefs(db, { boat_id: input.boat_id, quay_id: input.quay_id, seller_id: input.seller_id ?? undefined });
 
   // Endringer som angår SO-ene på anløpet føres i loggen til hver av dem, og selgeren får beskjed.
@@ -363,6 +365,6 @@ export default app;
 export const collisionsRoute = new Hono<AppEnv>().get('/', query(rangeQuery), async c => {
   const { from, to } = c.req.valid('query');
   const ctx = await collisionContext(c.env.DB, from, to);
-  const views = ctx.calls.filter(v => v.service_date >= from && v.service_date <= to);
+  const views = ctx.calls.filter(v => serviceDate(v.etd) >= from && v.service_date <= to);
   return c.json({ collisions: attachCollisions(views, ctx).all });
 });

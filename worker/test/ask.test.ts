@@ -30,7 +30,8 @@ describe('søk: tolking av teksten', () => {
     expect(parseActions('ny bulk SU 20 110')).toEqual([{ kind: 'bulk', text: 'SU 20 110' }]);
     expect(parseActions('ny so 2043644')).toEqual([{ kind: 'so', text: '2043644' }]);
     expect(parseActions('legg til båt Coneste')).toEqual([{ kind: 'bat', text: 'Coneste' }]);
-    expect(parseActions('ny').map(a => a.kind)).toEqual(['bulk', 'bil', 'so', 'bat']);
+    expect(parseActions('ny').map(a => a.kind)).toEqual(['bulk', 'bil', 'so', 'po', 'bat']);
+    expect(parseActions('ny po PO-000123 Brødrene Sperre')).toEqual([{ kind: 'po', text: 'PO-000123 Brødrene Sperre' }]);
     expect(parseActions('nordkyn')).toEqual([]);
     expect(looksLikeQuestion('Hvilken båt har vi oftest problemer med?')).toBe(true);
     expect(looksLikeQuestion('hva er det mest populære produktet')).toBe(true);

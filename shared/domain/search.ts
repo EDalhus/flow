@@ -62,11 +62,12 @@ export function parseScope(raw: string): { scope: SearchScope | null; q: string 
   return scope ? { scope, q: m![2].trim() } : { scope: null, q: raw.trim() };
 }
 
-export type SearchActionKind = 'bulk' | 'bil' | 'so' | 'bat';
+export type SearchActionKind = 'bulk' | 'bil' | 'so' | 'po' | 'bat';
 export interface SearchAction { kind: SearchActionKind; text: string }
 const ACTION_WORDS: [RegExp, SearchActionKind][] = [
   [/^(?:ny|new)\s+(?:bulklasting|bulk|lasting|loading)\b\s*(.*)$/i, 'bulk'],
   [/^(?:ny|new)\s+(?:bilhenting|henting|bil|truck|pickup)\b\s*(.*)$/i, 'bil'],
+  [/^(?:ny|new)\s+(?:innkjøpsordre|po|purchase order)\b\s*(.*)$/i, 'po'],
   [/^(?:ny|nytt|new)\s+(?:salgsordre|so|ordre|anløp|anlop|order|call)\b\s*(.*)$/i, 'so'],
   [/^(?:(?:ny|new)\s+(?:båt|bat|boat)|legg til båt|legg til bat|add boat)\b\s*(.*)$/i, 'bat'],
 ];
@@ -77,7 +78,7 @@ export function parseActions(raw: string): SearchAction[] {
     const m = re.exec(q);
     if (m) return [{ kind, text: m[1].trim() }];
   }
-  if (/^(n|ny|nyt|nytt|ne|new|legg|legg til)$/i.test(q)) return (['bulk', 'bil', 'so', 'bat'] as const).map(kind => ({ kind, text: '' }));
+  if (/^(n|ny|nyt|nytt|ne|new|legg|legg til)$/i.test(q)) return (['bulk', 'bil', 'so', 'po', 'bat'] as const).map(kind => ({ kind, text: '' }));
   return [];
 }
 

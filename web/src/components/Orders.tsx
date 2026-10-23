@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import type { CallRef, CollisionView, LogCall, OrderDetail, OrderLogEntry, OrderStatus, PortCallView } from '../../../shared/api.ts';
 import { CREW_ROLES, CREW_ROLE_LABEL, FLAG_LABEL, type CrewRole } from '../../../shared/domain/types.ts';
 import type { OrderLineInput, Placement } from '../../../shared/schemas.ts';
-import { osloToUtc } from '../../../shared/time.ts';
+import { MAX_CALL_DAYS, osloToUtc, serviceDate } from '../../../shared/time.ts';
 import { api, errorText } from '../lib/api.ts';
 import { FLAG_STYLE, addDays, dayShort, ddmm, fr, hmFromIso, nb, osloTime, quayLabel, quayTitle, timeRange, todayOslo } from '../lib/format.ts';
 import { tr, tx } from '../lib/i18n.ts';
@@ -13,6 +13,7 @@ import {
 import { Close, Minus, Plus } from './Icons.tsx';
 import { Loading, QuayMark, Segmented, StatusBadge } from './ui.tsx';
 import { Translated } from './Translated.tsx';
+import { PO_PATTERN, SO_PATTERN, orderNo, type OrderKind } from '../../../shared/domain/orderNo.ts';
 
 // Salgsordre (SO): status, endringslogg, detaljpanel med flytting mellom båter, og skjema for ny ordre.
 
@@ -35,9 +36,9 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   );
 }
 
-/** «SO 2043644» i fast bredde. */
-export const SoNo = ({ n, style }: { n: string; style?: CSSProperties }) => (
-  <span className="n" style={{ fontWeight: 500, letterSpacing: '.02em', ...style }}>SO {n}</span>
+/** «SO 2043644» eller «PO-000123» (innkjøpsordre ved leveringer) i fast bredde. */
+export const SoNo = ({ n, kind, style }: { n: string; kind?: OrderKind; style?: CSSProperties }) => (
+  <span className="n" style={{ fontWeight: 500, letterSpacing: '.02em', ...style }}>{orderNo(kind, n)}</span>
 );
 
 // ---------------------------------------------------------------- endringslogg
@@ -53,7 +54,7 @@ const goods = (v: unknown) => (Array.isArray(v) ? v.map(x => tx(String(x))).join
 export function logText(e: OrderLogEntry): string {
   const d = e.data;
   switch (e.kind) {
-    case 'created': return tr('Opprettet SO {so}', { so: s(d.so_number) });
+    case 'created': return tr('Opprettet {so}', { so: orderNo(d.order_kind === 'PO' ? 'PO' : 'SO', s(d.so_number)) });
     case 'line_added': return tr('La til {vare}', { vare: goods(d.line) });
     case 'line_removed': return tr('Fjernet {vare}', { vare: goods(d.line) });
     case 'line_changed': return tr('Endret vare: {fra} → {til}', { fra: goods(d.from), til: goods(d.to) });
@@ -92,7 +93,7 @@ export function OrderLog({ entries, showSo, onSo }: { entries: OrderLogEntry[]; 
             <span style={{ color: 'var(--fg-85)' }}>
               {showSo && e.so_number && (
                 <button type="button" onClick={() => onSo?.(e.so_number!)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--aqua)', cursor: onSo ? 'pointer' : 'default', font: 'inherit', marginRight: 6 }}>
-                  SO {e.so_number}
+                  {orderNo(e.order_kind ?? 'SO', e.so_number)}
                 </button>
               )}
               {logText(e)}
@@ -164,10 +165,10 @@ type Roles = Record<CrewRole, number>;
 export type PlaceDraft =
   | { kind: 'none' }
   | { kind: 'call'; port_call_id: string }
-  | { kind: 'new'; boat_id: string; quay_id: string; date: string; timeKnown: boolean; eta: string; etd: string; crane: boolean; roles: Roles };
+  | { kind: 'new'; boat_id: string; quay_id: string; date: string; etdDate: string; timeKnown: boolean; eta: string; etd: string; crane: boolean; roles: Roles };
 
 export const newPlace = (date: string): PlaceDraft => ({
-  kind: 'new', boat_id: '', quay_id: '', date, timeKnown: false, eta: '12:00', etd: '15:00', crane: true, roles: { truck: 0, anhuker: 0, kaikran: 0 },
+  kind: 'new', boat_id: '', quay_id: '', date, etdDate: date, timeKnown: false, eta: '12:00', etd: '15:00', crane: true, roles: { truck: 0, anhuker: 0, kaikran: 0 },
 });
 
 function toPlacement(p: PlaceDraft, fallbackBoat: string, fallbackQuay: string): Placement | null {
@@ -175,11 +176,14 @@ function toPlacement(p: PlaceDraft, fallbackBoat: string, fallbackQuay: string):
   const boat = p.boat_id || fallbackBoat, quay = p.quay_id || fallbackQuay;
   if (!boat || !quay) return null;
   const eta = p.timeKnown ? osloToUtc(p.date, p.eta || '00:00') : osloToUtc(p.date, 0);
-  const etd = p.timeKnown ? osloToUtc(p.date, p.etd || '00:00') : osloToUtc(p.date, 23 * 60 + 59);
+  const etd = p.timeKnown ? osloToUtc(p.etdDate < p.date ? p.date : p.etdDate, p.etd || '00:00') : osloToUtc(p.date, 23 * 60 + 59);
   if (p.timeKnown && (!/^\d{2}:\d{2}$/.test(p.eta) || !/^\d{2}:\d{2}$/.test(p.etd) || etd <= eta)) return null;
   const crew = CREW_ROLES.flatMap(r => Array.from({ length: p.roles[r] }, () => ({ crew_role: r, user_id: null })));
   return { kind: 'new', call: { boat_id: boat, quay_id: quay, eta, etd, time_known: p.timeKnown, boat_crane: p.crane, crew } };
 }
+
+/** «Samme dag» eller dagen (for ETD-dag). */
+const sameDayLabel = (d: string, start: string) => (d === start ? tr('Samme dag') : dayShort(d));
 
 const callOption = (c: PortCallView) =>
   `${c.boat.name} · ${dayShort(c.service_date)} ${c.time_known ? osloTime(c.eta) : `(${tr('tid ikke satt')})`} · ${quayTitle(c.quay)}${c.orders.length ? ` · ${c.orders.length} SO` : ''}`;
@@ -244,7 +248,7 @@ function PlacePicker({ value, onChange, exclude = [], allowNone = true, date }: 
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <label className="field"><span>{tr('Dag')}</span>
-              <select className="inp" value={value.date} onChange={e => set({ date: e.target.value })}>
+              <select className="inp" value={value.date} onChange={e => set({ date: e.target.value, etdDate: value.etdDate < e.target.value ? e.target.value : value.etdDate })}>
                 {dates.map(d => <option key={d} value={d}>{dayShort(d)}</option>)}
               </select>
             </label>
@@ -254,9 +258,14 @@ function PlacePicker({ value, onChange, exclude = [], allowNone = true, date }: 
             </div>
           </div>
           {value.timeKnown && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 8 }}>
               <label className="field"><span>ETA</span><input className="inp n" type="time" value={value.eta} onChange={e => set({ eta: e.target.value })} /></label>
               <label className="field"><span>ETD</span><input className="inp n" type="time" value={value.etd} onChange={e => set({ etd: e.target.value })} /></label>
+              <label className="field"><span>{tr('Ferdig (dag)')}</span>
+                <select className="inp" value={value.etdDate} onChange={e => set({ etdDate: e.target.value })}>
+                  {Array.from({ length: MAX_CALL_DAYS + 1 }, (_, i) => addDays(value.date, i)).map(d => <option key={d} value={d}>{sameDayLabel(d, value.date)}</option>)}
+                </select>
+              </label>
             </div>
           )}
           <div className="field"><span>{tr('Mannskap (valgfritt – kan legges til senere)')}</span>
@@ -275,7 +284,7 @@ function PlacePicker({ value, onChange, exclude = [], allowNone = true, date }: 
               {tr('Båtens egen kran brukes')}
             </label>
           </div>
-          <CollisionCheck place={value} boat={boat?.id ?? ''} quay={value.quay_id || own[0]?.id || ''} onQuay={q => set({ quay_id: q })} onTimes={(a, b) => set({ timeKnown: true, eta: a, etd: b })} />
+          <CollisionCheck place={value} boat={boat?.id ?? ''} quay={value.quay_id || own[0]?.id || ''} onQuay={q => set({ quay_id: q })} onTimes={(a, b) => set({ timeKnown: true, date: serviceDate(a), etdDate: serviceDate(b), eta: hmFromIso(a), etd: hmFromIso(b) })} />
         </>
       )}
     </div>
@@ -284,7 +293,7 @@ function PlacePicker({ value, onChange, exclude = [], allowNone = true, date }: 
 
 /** Kollisjonssjekk for et nytt anløp mens skjemaet fylles ut, med forslag som kan brukes direkte. */
 function CollisionCheck({ place, boat, quay, onQuay, onTimes }: {
-  place: Extract<PlaceDraft, { kind: 'new' }>; boat: string; quay: string; onQuay: (q: string) => void; onTimes: (eta: string, etd: string) => void;
+  place: Extract<PlaceDraft, { kind: 'new' }>; boat: string; quay: string; onQuay: (q: string) => void; /** Forslag med ny tid (ISO; kan være andre dager). */ onTimes: (eta: string, etd: string) => void;
 }) {
   const [check, setCheck] = useState<{ collisions: CollisionView[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -315,7 +324,7 @@ function CollisionCheck({ place, boat, quay, onQuay, onTimes }: {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
           {unique.map(x => (
             <button key={x.text} type="button" className="btn" style={{ minHeight: 32, fontSize: 12 }}
-              onClick={() => (x.kind === 'move_quay' ? onQuay(x.quay_id) : onTimes(hmFromIso(x.eta), hmFromIso(x.etd)))}>{tx(x.text)}</button>
+              onClick={() => (x.kind === 'move_quay' ? onQuay(x.quay_id) : onTimes(x.eta, x.etd))}>{tx(x.text)}</button>
           ))}
         </div>
       )}
@@ -364,7 +373,7 @@ export function OrderPanel({ id, onClose, onOpenCall }: { id: string; onClose: (
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
           <span className="eyebrow">{tr('Salgsordre fra Dynamics 365')}</span>
-          <h2 id="so-h" style={{ margin: 0, fontSize: 30, fontWeight: 300 }}>{o ? <SoNo n={o.so_number} style={{ fontWeight: 300 }} /> : '…'}</h2>
+          <h2 id="so-h" style={{ margin: 0, fontSize: 30, fontWeight: 300 }}>{o ? <SoNo n={o.so_number} kind={o.kind} style={{ fontWeight: 300 }} /> : '…'}</h2>
           {o && <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><OrderStatusBadge status={o.status} /><span style={{ fontSize: 15 }}>{o.customer}</span></span>}
         </div>
         <button type="button" className="icon-btn pill" onClick={onClose} aria-label={tr('Lukk')} style={{ width: 38, height: 38, flex: 'none' }}><Close size={15} /></button>
@@ -538,8 +547,10 @@ function CancelOrder({ order: o, onDone, onCancel }: { order: OrderDetail; onDon
 // ---------------------------------------------------------------- ny SO
 
 /** Ny salgsordre fra Dynamics 365: SO-nummer, kunde, varer og båt (ingen ennå, planlagt båt eller ny båt). */
-export function NewOrderDrawer({ onClose, onCreated, initialCall, initialSo, initialCustomer }: {
+export function NewOrderDrawer({ onClose, onCreated, initialCall, initialSo, initialCustomer, initialKind }: {
   onClose: () => void; onCreated: (o: OrderDetail) => void; initialCall?: string; initialSo?: string; initialCustomer?: string;
+  /** «PO» = levering (innkjøpsordre). */
+  initialKind?: OrderKind;
 }) {
   const me = useMe();
   const users = useUsers();
@@ -552,21 +563,23 @@ export function NewOrderDrawer({ onClose, onCreated, initialCall, initialSo, ini
   const [customer, setCustomer] = useState(initialCustomer ?? '');
   const [sellerId, setSellerId] = useState('');
   const [wanted, setWanted] = useState(today);
-  const [type, setType] = useState<'ut' | 'inn'>('ut');
+  // Levering (varer inn) har PO-nummer (innkjøpsordre); henting har SO-nummer (salgsordre).
+  const [type, setType] = useState<'ut' | 'inn'>(initialKind === 'PO' || /^PO/i.test(initialSo ?? '') ? 'inn' : 'ut');
+  const kind: OrderKind = type === 'inn' ? 'PO' : 'SO';
   const [notes, setNotes] = useState('');
-  const [lines, setLines] = useState<LineDraft[]>([{ sku_id: '', quantity: '', direction: 'ut' }]);
+  const [lines, setLines] = useState<LineDraft[]>([{ sku_id: '', quantity: '', direction: type }]);
   const [place, setPlace] = useState<PlaceDraft>(initialCall ? { kind: 'call', port_call_id: initialCall } : { kind: 'none' });
   const sellers = (users.data ?? []).filter(u => u.roles.includes('salg'));
   const seller = sellerId || (me.data?.roles.includes('salg') ? me.data.id : '');
-  const soOk = /^20\d{5}$/.test(so.trim());
+  const soOk = (kind === 'PO' ? PO_PATTERN : SO_PATTERN).test(so.trim().toUpperCase());
   const boatFallback = [...(boats.data ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'nb'))[0]?.id ?? '';
   const quayFallback = (quays.data ?? []).find(q => !q.company)?.id ?? '';
   const placement = place.kind === 'call' && !place.port_call_id ? null : toPlacement(place, boatFallback, quayFallback);
   const input = toInput(lines, skus);
   const valid = soOk && customer.trim() && input.length > 0 && !!placement;
-  const setType2 = (t: 'ut' | 'inn') => { setType(t); setLines(lines.map(l => ({ ...l, direction: t }))); };
+  const setType2 = (t: 'ut' | 'inn') => { setType(t); setSo(''); setLines(lines.map(l => ({ ...l, direction: t }))); };
   const save = () => valid && create.mutate({
-    so_number: so.trim(), customer: customer.trim(), seller_id: seller || null, wanted_date: wanted || null, notes: notes.trim() || null,
+    kind, so_number: so.trim().toUpperCase(), customer: customer.trim(), seller_id: seller || null, wanted_date: wanted || null, notes: notes.trim() || null,
     lines: input, placement: placement!,
   }, { onSuccess: onCreated });
 
@@ -574,17 +587,23 @@ export function NewOrderDrawer({ onClose, onCreated, initialCall, initialSo, ini
     <aside className="glass scroll drawer" aria-labelledby="new-so-h"
       style={{ flex: '1 1 400px', maxWidth: 460, padding: 20, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 'calc(100vh - 120px)', position: 'sticky', top: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 id="new-so-h" style={{ margin: 0, fontSize: 24, fontWeight: 300 }}>{tr('Ny salgsordre')}</h2>
+        <h2 id="new-so-h" style={{ margin: 0, fontSize: 24, fontWeight: 300 }}>{kind === 'PO' ? tr('Ny innkjøpsordre (PO)') : tr('Ny salgsordre')}</h2>
         <button type="button" className="icon-btn pill" onClick={onClose} aria-label={tr('Lukk skjema')} style={{ width: 40, height: 40 }}><Close size={16} /></button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8 }}>
-        <label className="field"><span>{tr('SO-nummer')}</span>
-          <input className="inp n" value={so} onChange={e => setSo(e.target.value.replace(/\D/g, '').slice(0, 7))} inputMode="numeric" placeholder="20XXXXX" autoFocus
-            aria-invalid={!!so && !soOk} style={so && !soOk ? { borderColor: 'var(--bad-fg)' } : undefined} />
-        </label>
-        <label className="field"><span>{tr('Kunde')}</span><input className="inp" value={customer} onChange={e => setCustomer(e.target.value)} /></label>
+      <div className="field"><span>{tr('Type')}</span>
+        <Segmented label={tr('Type')} value={type} onChange={setType2} stretch options={[{ value: 'ut', label: tr('Henting') }, { value: 'inn', label: tr('Levering') }]} />
       </div>
-      {so && !soOk && <span className="sub" style={{ marginTop: -8, color: 'var(--bad-fg)' }}>{tr('SO-nummeret må være 20 og fem siffer, f.eks. 2043644.')}</span>}
+      <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 8 }}>
+        <label className="field"><span>{kind === 'PO' ? tr('PO-nummer') : tr('SO-nummer')}</span>
+          {kind === 'PO'
+            ? <input className="inp n" value={so} onChange={e => setSo(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20))} placeholder="PO-000123" autoFocus
+                aria-invalid={!!so && !soOk} style={so && !soOk ? { borderColor: 'var(--bad-fg)' } : undefined} />
+            : <input className="inp n" value={so} onChange={e => setSo(e.target.value.replace(/\D/g, '').slice(0, 7))} inputMode="numeric" placeholder="20XXXXX" autoFocus
+                aria-invalid={!!so && !soOk} style={so && !soOk ? { borderColor: 'var(--bad-fg)' } : undefined} />}
+        </label>
+        <label className="field"><span>{kind === 'PO' ? tr('Leverandør / kunde') : tr('Kunde')}</span><input className="inp" value={customer} onChange={e => setCustomer(e.target.value)} /></label>
+      </div>
+      {so && !soOk && <span className="sub" style={{ marginTop: -8, color: 'var(--bad-fg)' }}>{kind === 'PO' ? tr('PO-nummeret kan ha bokstaver, tall og bindestrek, f.eks. PO-000123.') : tr('SO-nummeret må være 20 og fem siffer, f.eks. 2043644.')}</span>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <label className="field"><span>{tr('Selger')}</span>
           <select className="inp" value={seller} onChange={e => setSellerId(e.target.value)}>
@@ -593,9 +612,6 @@ export function NewOrderDrawer({ onClose, onCreated, initialCall, initialSo, ini
         </label>
         <label className="field"><span>{tr('Ønsket dag')}</span><input className="inp n" type="date" value={wanted} onChange={e => setWanted(e.target.value)} /></label>
       </div>
-      <div className="field"><span>{tr('Type')}</span>
-        <Segmented label={tr('Type')} value={type} onChange={setType2} stretch options={[{ value: 'ut', label: tr('Henting') }, { value: 'inn', label: tr('Levering') }]} />
-      </div>
       <div className="field"><span>{tr('Varer')}</span><LinesEditor lines={lines} onChange={setLines} defaultDirection={type} /></div>
       <div className="field"><span>{tr('Båt')}</span>
         <PlacePicker value={place} onChange={p => setPlace(p.kind === 'new' ? { ...p, date: p.date || wanted } : p)} date={wanted || today} />
@@ -603,7 +619,7 @@ export function NewOrderDrawer({ onClose, onCreated, initialCall, initialSo, ini
       <label className="field"><span>{tr('Merknad')}</span><textarea className="inp" rows={2} value={notes} onChange={e => setNotes(e.target.value)} style={{ padding: 10 }} /></label>
       {create.isError && <div className="error-box" role="alert">{errorText(create.error)}</div>}
       <button type="button" className="btn btn-w" onClick={save} disabled={!valid || create.isPending} style={{ minHeight: 50 }}>
-        {create.isPending ? tr('Legger inn …') : tr('Legg inn SO')}
+        {create.isPending ? tr('Legger inn …') : kind === 'PO' ? tr('Legg inn PO') : tr('Legg inn SO')}
       </button>
     </aside>
   );
@@ -624,7 +640,7 @@ export function CallOrders({ call, onReorder, busy, onOpen, children }: {
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
             <span style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
               <button type="button" onClick={() => onOpen?.(o.so_number)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--aqua)', cursor: 'pointer', font: 'inherit' }}>
-                <SoNo n={o.so_number} />
+                <SoNo n={o.so_number} kind={o.kind} />
               </button>
               <span style={{ fontSize: 14 }}>{o.customer}</span>
               {o.split && <span className="muted" style={{ fontSize: 12 }}>· {tr('delt levering')}</span>}
@@ -633,8 +649,8 @@ export function CallOrders({ call, onReorder, busy, onOpen, children }: {
           </span>
           {onReorder && call.orders.length > 1 && (
             <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <button type="button" className="icon-btn pill" disabled={busy || i === 0} onClick={() => move(i, -1)} aria-label={tr('Flytt {so} opp', { so: `SO ${o.so_number}` })} style={{ width: 28, height: 28 }}>▲</button>
-              <button type="button" className="icon-btn pill" disabled={busy || i === call.orders.length - 1} onClick={() => move(i, 1)} aria-label={tr('Flytt {so} ned', { so: `SO ${o.so_number}` })} style={{ width: 28, height: 28 }}>▼</button>
+              <button type="button" className="icon-btn pill" disabled={busy || i === 0} onClick={() => move(i, -1)} aria-label={tr('Flytt {so} opp', { so: orderNo(o.kind, o.so_number) })} style={{ width: 28, height: 28 }}>▲</button>
+              <button type="button" className="icon-btn pill" disabled={busy || i === call.orders.length - 1} onClick={() => move(i, 1)} aria-label={tr('Flytt {so} ned', { so: orderNo(o.kind, o.so_number) })} style={{ width: 28, height: 28 }}>▼</button>
             </span>
           )}
         </div>

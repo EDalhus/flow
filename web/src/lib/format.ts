@@ -88,8 +88,12 @@ export const goodsParts = (g: GoodsView): [string, string] => [
 ];
 
 /** "07:30–11:00", eller "Tid ikke satt" når bare dagen er kjent. */
-export const timeRange = (c: Pick<PortCallView, 'eta' | 'etd'> & { time_known?: boolean }) =>
-  c.time_known === false ? tr('Tid ikke satt') : `${osloTime(c.eta)}–${osloTime(c.etd)}`;
+/** «08:00–14:00», eller med dag når båten blir ferdig en annen dag: «08:00 – ons 22.10 14:00». */
+export const timeRange = (c: Pick<PortCallView, 'eta' | 'etd'> & { time_known?: boolean }) => {
+  if (c.time_known === false) return tr('Tid ikke satt');
+  const a = serviceDate(c.eta), b = serviceDate(c.etd);
+  return a === b ? `${osloTime(c.eta)}–${osloTime(c.etd)}` : `${osloTime(c.eta)} – ${dayRelative(b)} ${osloTime(c.etd)}`;
+};
 export const typeLabel = (t: string) => (t === 'levering' ? tr('Levering') : t === 'begge' ? tr('Levering + henting') : tr('Henting'));
 
 export const telHref = (phone: string) => `tel:${phone.replace(/\s/g, '')}`;

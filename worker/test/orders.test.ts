@@ -178,3 +178,31 @@ describe('salgsordre', () => {
     expect(a.json.log.map((l: { kind: string }) => l.kind)).toEqual(['assigned', 'created']);
   });
 });
+
+describe('PO (innkjøpsordre) ved leveringer', () => {
+  it('lager PO med prefiks-nummer, og sjekker formatet for SO og PO', async () => {
+    const line = [{ sku_id: 's_hav_bb', quantity: 10, direction: 'inn' }];
+    const po = await api('/orders', { body: { kind: 'PO', so_number: 'po-000123', customer: 'GCR Minerals', lines: line } });
+    expect(po.status).toBe(201);
+    expect(po.json).toMatchObject({ kind: 'PO', so_number: 'PO-000123' });
+    expect((await api('/orders/PO-000123')).json).toMatchObject({ kind: 'PO', customer: 'GCR Minerals' });
+    expect((await api('/orders', { body: { kind: 'PO', so_number: 'PO 12', customer: 'X', lines: line } })).status).toBe(400);
+    expect((await api('/orders', { body: { kind: 'SO', so_number: 'PO-000124', customer: 'X', lines: line } })).status).toBe(400);
+    expect((await api('/orders', { body: { kind: 'PO', so_number: 'PO-000123', customer: 'Y', lines: line } })).json.error).toMatch(/PO-000123 finnes allerede/);
+    // Uten kind er det SO, som før.
+    expect((await api('/orders', { body: { so_number: soNumber(), customer: 'Z', lines: [{ sku_id: 's_hav_bb', quantity: 1, direction: 'ut' }] } })).json.kind).toBe('SO');
+  });
+});
+
+describe('anløp over flere dager', () => {
+  it('kan bli ferdig en annen dag, vises alle dagene, og maks 14 døgn', async () => {
+    const c = await api('/port-calls', { body: call('2030-07-01', '12:00', '13:00', { etd: at('2030-07-03', '15:00') }) });
+    expect(c.status).toBe(201);
+    for (const day of ['2030-07-01', '2030-07-02', '2030-07-03']) {
+      expect((await api(`/port-calls?from=${day}&to=${day}`)).json.calls.map((x: { id: string }) => x.id)).toContain(c.json.id);
+    }
+    expect((await api('/port-calls?from=2030-07-04&to=2030-07-04')).json.calls.map((x: { id: string }) => x.id)).not.toContain(c.json.id);
+    expect((await api('/port-calls', { body: call('2030-07-10', '12:00', '13:00', { etd: at('2030-07-30', '12:00') }) })).status).toBe(400);
+    expect((await api(`/port-calls/${c.json.id}`, { method: 'PATCH', body: { version: c.json.version, etd: at('2030-07-20', '12:00') } })).status).toBe(400);
+  });
+});

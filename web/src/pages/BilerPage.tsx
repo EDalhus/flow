@@ -57,13 +57,13 @@ export function BilerPage() {
             <span style={{ justifySelf: 'end' }}>
               {o.picked_up_at ? (
                 <button type="button" className="btn" disabled={!canPick || pickup.isPending} onClick={() => pickup.mutate({ id: o.id, undo: true })}
-                  title={tr('Angre henting')} style={{ minHeight: 38, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Check size={14} /> {tr('Hentet {tid}', { tid: osloTime(o.picked_up_at) })}
+                  title={tr('Angre utlevering')} style={{ minHeight: 38, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Check size={14} /> {tr('Utlevert {tid}', { tid: osloTime(o.picked_up_at) })}
                 </button>
               ) : (
                 <button type="button" className="btn btn-teal" disabled={!canPick || pickup.isPending} onClick={() => pickup.mutate({ id: o.id })}
                   style={{ minHeight: 38, fontSize: 12, color: '#F2F5F3' }}>
-                  {tr('Hentet')}
+                  {tr('Utlevert')}
                 </button>
               )}
             </span>
@@ -84,7 +84,7 @@ export function BilerPage() {
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <Segmented<Filter> label={tr('Vis')} value={filter} onChange={setFilter}
-              options={[{ value: 'aapne', label: tr('Ikke hentet') }, { value: 'alle', label: tr('Alle') }]} />
+              options={[{ value: 'aapne', label: tr('Ikke utlevert') }, { value: 'alle', label: tr('Alle') }]} />
             {canPlan(me.data) && (
               <button type="button" className="btn btn-w" onClick={() => setShowNew(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <Plus size={16} /> {tr('Ny henting')}
@@ -96,11 +96,11 @@ export function BilerPage() {
         <StatStrip items={[
           { label: tr('Ventes i dag'), value: String(todayOpen.length), note: `${fr(todayOpen.reduce((t, o) => t + o.tonnes, 0))} t` },
           { label: tr('Neste 7 dager'), value: String(weekOpen.length), note: `${fr(weekOpen.reduce((t, o) => t + o.tonnes, 0))} t` },
-          { label: tr('Forfalt'), value: String(all.filter(o => !o.picked_up_at && o.expected_date < today).length), note: tr('ikke hentet') },
+          { label: tr('Forfalt'), value: String(all.filter(o => !o.picked_up_at && o.expected_date < today).length), note: tr('ikke utlevert') },
         ]} />
 
         {orders.isPending && <Loading />}
-        {overdue.length > 0 && group(tr('Forfalt – ikke hentet'), overdue, 'bad')}
+        {overdue.length > 0 && group(tr('Forfalt – ikke utlevert'), overdue, 'bad')}
         {days.map(d => group(dayHeading(d, today), visible.filter(o => o.expected_date === d && !overdue.includes(o))))}
         {orders.isSuccess && !visible.length && <p className="empty">{tr('Ingen biler ventes.')}</p>}
       </div>

@@ -71,21 +71,22 @@ export const ACTIONS = {
     },
   }),
   ny_salgsordre: action({
-    description: 'Ny salgsordre (SO fra Dynamics 365, format 20xxxxx) med varer. Valgfritt: legg den rett på et eksisterende anløp (port_call_id). Varer: sku_id fra oppslag, antall enheter (BB eller pall), retning ut (salg) eller inn.',
+    description: 'Ny ordre fra Dynamics 365 med varer: SO (salgsordre, henting/utlevering, nummer 20xxxxx) eller PO (innkjøpsordre, levering inn til kaia, f.eks. PO-000123; varene har retning inn). Valgfritt: legg den rett på et eksisterende anløp (port_call_id). Varer: sku_id fra oppslag, antall enheter (BB eller pall).',
     input: z.object({
+      kind: z.enum(['SO', 'PO']).default('SO'),
       so_number: z.string(), customer: z.string().min(1), wanted_date: day.optional(), notes: z.string().max(2000).optional(), port_call_id: id.optional(),
       lines: z.array(z.object({ sku_id: id, quantity: z.number().int().min(1), direction: z.enum(['ut', 'inn']).default('ut') })).min(1).max(30),
     }),
     schema: {
       ...str({
-        so_number: { type: 'string' }, customer: { type: 'string' }, wanted_date: { type: 'string', description: 'YYYY-MM-DD' }, notes: { type: 'string' }, port_call_id: { type: 'string' },
+        kind: { type: 'string', enum: ['SO', 'PO'] }, so_number: { type: 'string', description: 'SO- eller PO-nummeret' }, customer: { type: 'string' }, wanted_date: { type: 'string', description: 'YYYY-MM-DD' }, notes: { type: 'string' }, port_call_id: { type: 'string' },
         lines: { type: 'array', items: { type: 'object', properties: { sku_id: { type: 'string' }, quantity: { type: 'integer' }, direction: { type: 'string', enum: ['ut', 'inn'] } }, required: ['sku_id', 'quantity'] } },
       }), required: ['so_number', 'customer', 'lines'],
     },
     build: async (db, i) => {
       if (i.port_call_id) await callVersion(db, i.port_call_id);
       const body = {
-        so_number: i.so_number.trim(), customer: i.customer, wanted_date: i.wanted_date ?? null, notes: i.notes ?? null, lines: i.lines,
+        kind: i.kind, so_number: i.so_number.trim().toUpperCase(), customer: i.customer, wanted_date: i.wanted_date ?? null, notes: i.notes ?? null, lines: i.kind === 'PO' ? i.lines.map(l => ({ ...l, direction: 'inn' as const })) : i.lines,
         placement: i.port_call_id ? { kind: 'call', port_call_id: i.port_call_id } : { kind: 'none' },
       };
       return { method: 'POST', path: '/orders', body: check(orderCreate, body) };
@@ -126,7 +127,7 @@ export const ACTIONS = {
     build: async (_db, i) => ({ method: 'POST', path: '/trucks', body: check(truckOrderCreate, { ...i, reg_no: i.reg_no ?? null, carrier: i.carrier ?? null, notes: i.notes ?? null }) }),
   }),
   marker_hentet: action({
-    description: 'Marker en bilhenting som hentet (id fra verktøyet bilhentinger).',
+    description: 'Marker en bilhenting som utlevert (varene er levert ut til kundebilen; id fra verktøyet bilhentinger).',
     input: z.object({ truck_order_id: id }),
     schema: { ...str({ truck_order_id: { type: 'string' } }), required: ['truck_order_id'] },
     build: async (db, i) => {

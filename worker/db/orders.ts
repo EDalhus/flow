@@ -2,6 +2,7 @@ import type { CallRef, LogCall, OrderDetail, OrderLine, OrderLogEntry, OrderStat
 import { quayLabel } from '../../shared/domain/quay.ts';
 import { loadSettings } from '../lib/settings.ts';
 import { goodsView, loadCalls, type GoodsRow } from './portCalls.ts';
+import type { OrderKind } from '../../shared/domain/orderNo.ts';
 
 // Salgsordre (SO): lesing, status og hjelpere for koblingen mellom ordrelinjer og anløp.
 //
@@ -11,7 +12,7 @@ import { goodsView, loadCalls, type GoodsRow } from './portCalls.ts';
 //   order_log         – endringslogg per SO (og per anløp via port_call_id)
 
 type OrderRow = {
-  id: string; so_number: string; customer: string; wanted_date: string | null; notes: string | null; version: number;
+  id: string; kind: OrderKind; so_number: string; customer: string; wanted_date: string | null; notes: string | null; version: number;
   cancelled_at: string | null; created_at: string;
   seller_id: string | null; seller_name: string | null; seller_short: string | null; seller_initials: string | null;
 };
@@ -20,7 +21,7 @@ type LineRow = GoodsRow & { port_call_id: string | null };
 export type OrderFilter = { ids: string[] } | { open: true; since: string } | { calls: string[] };
 
 const ORDER_SELECT = `
-  SELECT so.id, so.so_number, so.customer, so.wanted_date, so.notes, so.version, so.cancelled_at, so.created_at,
+  SELECT so.id, so.kind, so.so_number, so.customer, so.wanted_date, so.notes, so.version, so.cancelled_at, so.created_at,
          u.id AS seller_id, u.name AS seller_name, u.short_name AS seller_short, u.initials AS seller_initials
   FROM sales_orders so LEFT JOIN users u ON u.id = so.seller_id`;
 
@@ -87,7 +88,7 @@ export async function loadOrders(db: D1Database, filter: OrderFilter): Promise<O
     const seller: UserRef | null = o.seller_id
       ? { id: o.seller_id, name: o.seller_name ?? '', short_name: o.seller_short ?? '', initials: o.seller_initials ?? '' } : null;
     return {
-      id: o.id, so_number: o.so_number, customer: o.customer, seller, wanted_date: o.wanted_date, notes: o.notes,
+      id: o.id, kind: o.kind, so_number: o.so_number, customer: o.customer, seller, wanted_date: o.wanted_date, notes: o.notes,
       status: orderStatus(!!o.cancelled_at, ls, callStatus), version: o.version, lines: ls,
       tonnes: ls.reduce((s, l) => s + l.tonnes, 0), calls: refs, cancelled_at: o.cancelled_at, created_at: o.created_at,
     };
@@ -96,17 +97,18 @@ export async function loadOrders(db: D1Database, filter: OrderFilter): Promise<O
 
 type LogRow = {
   id: number; at: string; kind: OrderLogEntry['kind']; data: string; port_call_id: string | null; sales_order_id: string | null;
-  so_number: string | null; u_id: string | null; u_name: string | null; u_short: string | null; u_initials: string | null;
+  so_number: string | null; so_kind: OrderKind | null; u_id: string | null; u_name: string | null; u_short: string | null; u_initials: string | null;
 };
 
 const LOG_SELECT = `
-  SELECT g.id, g.at, g.kind, g.data, g.port_call_id, g.sales_order_id, so.so_number,
+  SELECT g.id, g.at, g.kind, g.data, g.port_call_id, g.sales_order_id, so.so_number, so.kind AS so_kind,
          u.id AS u_id, u.name AS u_name, u.short_name AS u_short, u.initials AS u_initials
   FROM order_log g LEFT JOIN sales_orders so ON so.id = g.sales_order_id LEFT JOIN users u ON u.id = g.user_id`;
 
 const toLog = (r: LogRow): OrderLogEntry => ({
   id: r.id, at: r.at, kind: r.kind, data: JSON.parse(r.data), port_call_id: r.port_call_id, sales_order_id: r.sales_order_id,
   so_number: r.so_number,
+  order_kind: r.so_kind,
   user: r.u_id ? { id: r.u_id, name: r.u_name ?? '', short_name: r.u_short ?? '', initials: r.u_initials ?? '' } : null,
 });
 

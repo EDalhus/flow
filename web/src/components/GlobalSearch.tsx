@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import type { BoatDetail, ExternalVessel, SearchBulk, SearchResult } from '../../../shared/api.ts';
+import { orderNo } from '../../../shared/domain/orderNo.ts';
 import { looksLikeQuestion, parseActions, parseDay, parseScope, type SearchAction } from '../../../shared/domain/search.ts';
 import { api, errorText } from '../lib/api.ts';
 import { FLAG_STYLE, STATUS_STYLE, addDays, dayRelative, ddmm, fr, osloTime, telHref, titleCase, todayOslo, typeLabel } from '../lib/format.ts';
@@ -26,7 +27,7 @@ const PAGES = [
   { label: 'Hjullasterskjerm', to: '/hjullaster' }, { label: 'Rapporter', to: '/rapporter' }, { label: 'Innstillinger', to: '/innstillinger' }, { label: 'Preferanser', to: '/innstillinger' },
 ];
 
-const ACTION_LABEL: Record<SearchAction['kind'], string> = { bulk: 'Ny bulklasting', bil: 'Ny bilhenting', so: 'Ny salgsordre', bat: 'Ny båt' };
+const ACTION_LABEL: Record<SearchAction['kind'], string> = { bulk: 'Ny bulklasting', bil: 'Ny bilhenting', so: 'Ny salgsordre', po: 'Ny innkjøpsordre (PO)', bat: 'Ny båt' };
 
 /** Hvor en handling fører, med det som er skrevet etter «ny …» fylt inn. */
 function actionTarget(a: SearchAction): string {
@@ -43,6 +44,14 @@ function actionTarget(a: SearchAction): string {
     return `/biler?${p}`;
   }
   if (a.kind === 'so') { if (so) p.set('so', so); if (rest) p.set('kunde', rest); return `/anlop?vis=ordre&${p}`; }
+  if (a.kind === 'po') {
+    p.set('type', 'PO');
+    const po = /\bPO-?[A-Z0-9-]+\b/i.exec(a.text)?.[0];
+    if (po) p.set('so', po.toUpperCase());
+    const kunde = (po ? a.text.replace(po, '') : a.text).trim();
+    if (kunde) p.set('kunde', kunde);
+    return `/anlop?vis=ordre&${p}`;
+  }
   if (/^\d{9}$/.test(a.text)) p.set('mmsi', a.text); else if (a.text) p.set('navn', a.text);
   return `/baater?${p}`;
 }
@@ -142,7 +151,7 @@ export function GlobalSearch() {
   });
   const truckEntry = (t: SearchResult['trucks'][number]): Entry => ({
     key: `truck:${t.id}`, title: `SO ${t.so_number} · ${t.customer}`, to: '/biler',
-    sub: `${dayRelative(t.expected_date)}${t.reg_no ? ` · ${t.reg_no}` : ''}${t.picked_up ? ` · ${tr('hentet')}` : ''}`,
+    sub: `${dayRelative(t.expected_date)}${t.reg_no ? ` · ${t.reg_no}` : ''}${t.picked_up ? ` · ${tr('utlevert')}` : ''}`,
   });
   const bulkEntry = (b: SearchBulk): Entry => b.status === 'ferdig' && b.delivery_no ? {
     key: `bulk:${b.id}`, title: tr('Følgeseddel nr. {n}', { n: b.delivery_no }), run: () => { window.open(`/api/bulk/orders/${b.id}/pdf`, '_blank'); },
@@ -182,7 +191,7 @@ export function GlobalSearch() {
         sub: [b.mmsi && `MMSI ${b.mmsi}`, b.flag !== 'none' && b.flag !== 'green' && FLAG_STYLE[b.flag].label].filter(Boolean).join(' · '),
       })));
       add(tr('Salgsordre'), d.orders.map(o => ({
-        key: `so:${o.so_number}`, title: `SO ${o.so_number} · ${o.customer}`, to: `/anlop?so=${o.so_number}`,
+        key: `so:${o.so_number}`, title: `${orderNo(o.kind, o.so_number)} · ${o.customer}`, to: `/anlop?so=${o.so_number}`,
         sub: [o.boat_name ?? tr('Venter på båt'), o.service_date && dayRelative(o.service_date), tr(ORDER_STATUS[o.status])].filter(Boolean).join(' · '),
       })));
       add(tr('Anløp'), d.calls.map(callEntry));

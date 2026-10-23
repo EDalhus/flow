@@ -204,12 +204,15 @@ function soNumber() {
 /** Legger inn en SO med linjer (på anløpet callId, eller uten båt). */
 function addOrder(o: { customer: string; seller: string | null; date: string; goods: Goods[]; callId: string | null; seq?: number; source: 'app' | 'import'; createdAt: string; by: string }) {
   const soId = id('so');
-  const so = soNumber();
-  add('sales_orders', { id: soId, so_number: so, customer: o.customer, seller_id: o.seller ? U(o.seller) : null, wanted_date: o.date, source: o.source, created_by: U(o.by), created_at: o.createdAt, updated_at: o.createdAt });
+  // Leveringer (alle varer inn) er innkjøpsordre (PO) i Dynamics 365; resten er salgsordre (SO).
+  const kind = o.goods.length && o.goods.every(g => g.dir === 'inn') ? 'PO' : 'SO';
+  const n = soNumber();
+  const so = kind === 'PO' ? `PO-0${n.slice(2)}` : n;
+  add('sales_orders', { id: soId, kind, so_number: so, customer: o.customer, seller_id: o.seller ? U(o.seller) : null, wanted_date: o.date, source: o.source, created_by: U(o.by), created_at: o.createdAt, updated_at: o.createdAt });
   o.goods.forEach((g, i) => add('order_lines', { id: id('ol'), sales_order_id: soId, port_call_id: o.callId, sku_id: g.sku.id, quantity: g.qty, direction: g.dir, sort: i }));
   if (o.callId) add('port_call_orders', { port_call_id: o.callId, sales_order_id: soId, load_seq: o.seq ?? 1 });
   if (o.source === 'app') {
-    add('order_log', { sales_order_id: soId, port_call_id: o.callId, user_id: U(o.by), kind: 'created', data: JSON.stringify({ so_number: so }), at: o.createdAt });
+    add('order_log', { sales_order_id: soId, port_call_id: o.callId, user_id: U(o.by), kind: 'created', data: JSON.stringify({ so_number: so, order_kind: kind }), at: o.createdAt });
   }
   return { soId, so };
 }

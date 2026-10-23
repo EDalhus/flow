@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { CATEGORIES, CREW_ROLES, FLAGS, USER_ROLES } from './domain/types.ts';
+import { MAX_CALL_DAYS } from './time.ts';
+import { PO_PATTERN, SO_PATTERN } from './domain/orderNo.ts';
 
 // Felles validering for API og skjemaer i frontend.
 
@@ -38,11 +40,15 @@ const portCallFields = {
 
 const etdAfterEta = (d: { eta?: string; etd?: string }) => !d.eta || !d.etd || Date.parse(d.etd) > Date.parse(d.eta);
 const etdMessage = { message: 'ETD må være etter ETA.', path: ['etd'] };
+/** Et anløp kan vare over flere dager, men maks MAX_CALL_DAYS døgn. */
+const notTooLong = (d: { eta?: string; etd?: string }) => !d.eta || !d.etd || Date.parse(d.etd) - Date.parse(d.eta) <= MAX_CALL_DAYS * 86_400_000;
+const tooLongMessage = { message: `Et anløp kan vare maks ${MAX_CALL_DAYS} døgn.`, path: ['etd'] };
 
 /** Nytt anløp. `orders`: SO-er som skal med (linjene som venter på båt flyttes hit). */
 export const portCallCreate = z
   .object({ ...portCallFields, crew: portCallFields.crew.default([]), orders: z.array(id).max(50).default([]) })
-  .refine(etdAfterEta, etdMessage);
+  .refine(etdAfterEta, etdMessage)
+  .refine(notTooLong, tooLongMessage);
 export type PortCallCreate = z.infer<typeof portCallCreate>;
 /** Det klienten sender (før standardverdier og transformasjoner). */
 export type PortCallCreateInput = z.input<typeof portCallCreate>;
@@ -54,7 +60,8 @@ export const portCallPatch = z
   .object({ ...patchFields, version: z.int().min(1) })
   .partial()
   .required({ version: true })
-  .refine(etdAfterEta, etdMessage);
+  .refine(etdAfterEta, etdMessage)
+  .refine(notTooLong, tooLongMessage);
 export type PortCallPatch = z.infer<typeof portCallPatch>;
 export type PortCallPatchInput = z.input<typeof portCallPatch>;
 
@@ -85,7 +92,8 @@ export const newCall = z
     boat_id: id, quay_id: id, eta: dateTime, etd: dateTime, time_known: z.boolean().optional(), boat_crane: z.boolean().optional(),
     crew: z.array(crewSlot).max(20).default([]),
   })
-  .refine(etdAfterEta, etdMessage);
+  .refine(etdAfterEta, etdMessage)
+  .refine(notTooLong, tooLongMessage);
 export type NewCall = z.infer<typeof newCall>;
 
 /** Hvor SO-en (eller linjene) skal: ingen båt ennå, et eksisterende anløp, eller et nytt anløp. */
@@ -97,13 +105,18 @@ export const placement = z.discriminatedUnion('kind', [
 export type Placement = z.infer<typeof placement>;
 
 export const orderCreate = z.object({
-  so_number: soNumber,
+  /** SO = salgsordre (20 + fem siffer). PO = innkjøpsordre ved leveringer (f.eks. PO-000123). */
+  kind: z.enum(['SO', 'PO']).default('SO'),
+  so_number: z.string().trim().toUpperCase(),
   customer: text(200).min(1, 'Skriv inn kunde.'),
   seller_id: id.nullable().optional(),
   wanted_date: date.nullable().optional(),
   notes: optionalText(2000),
   lines: z.array(orderLine).min(1, 'Legg til minst én vare.').max(30),
   placement: placement.default({ kind: 'none' }),
+}).superRefine((d, ctx) => {
+  if (d.kind === 'SO' && !SO_PATTERN.test(d.so_number)) ctx.addIssue({ code: 'custom', message: 'SO-nummeret må være 20 og fem siffer, f.eks. 2043644.', path: ['so_number'] });
+  if (d.kind === 'PO' && !PO_PATTERN.test(d.so_number)) ctx.addIssue({ code: 'custom', message: 'PO-nummeret kan ha bokstaver, tall og bindestrek, f.eks. PO-000123.', path: ['so_number'] });
 });
 export type OrderCreateInput = z.input<typeof orderCreate>;
 

@@ -31,7 +31,7 @@ export function AnlopPage() {
   const orders = useOrders();
   const [filter, setFilter] = useState<Filter>('uke');
   const [showNew, setShowNew] = useState(false);
-  const [prefill, clearPrefill] = usePrefill(['so', 'kunde', 'anlop']);
+  const [prefill, clearPrefill] = usePrefill(['so', 'kunde', 'anlop', 'type']);
   useEffect(() => { if (prefill) { setShowNew(true); setParams(p => { p.set('vis', 'ordre'); p.delete('so'); return p; }, { replace: true }); } }, [prefill]); // eslint-disable-line react-hooks/exhaustive-deps
   // Fra det globale søket: /anlop?q=båtnavn, /anlop?so=2043644
   const urlQ = params.get('q');
@@ -68,9 +68,9 @@ export function AnlopPage() {
               <Segmented<Filter> label={tr('Periode')} value={filter} onChange={setFilter}
                 options={[{ value: 'idag', label: tr('I dag') }, { value: 'uke', label: tr('Neste 7 dager') }, { value: 'kollisjon', label: tr('Kollisjoner') }]} />
             )}
-            <SearchBox value={q} onChange={setQ} placeholder={tr('Båt, SO eller kunde')} label={tr('Søk etter båt, SO-nummer eller kunde')} />
+            <SearchBox value={q} onChange={setQ} placeholder={tr('Båt, SO/PO eller kunde')} label={tr('Søk etter båt, SO-nummer eller kunde')} />
             <button type="button" className="btn btn-w" onClick={() => { openSo(null); setShowNew(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 46 }}>
-              <Plus size={16} strokeWidth={2.2} />{tr('Ny SO')}
+              <Plus size={16} strokeWidth={2.2} />{tr('Ny SO / PO')}
             </button>
           </div>
         </div>
@@ -110,7 +110,7 @@ export function AnlopPage() {
       {soKey ? (
         <OrderPanel id={soKey} onClose={() => openSo(null)} onOpenCall={id => nav(`/?id=${id}`)} />
       ) : showNew && (
-        <NewOrderDrawer key={prefill?.n} initialCall={prefill?.anlop} initialSo={prefill?.so} initialCustomer={prefill?.kunde} onClose={() => { setShowNew(false); clearPrefill(); }} onCreated={o => { setShowNew(false); openSo(o.so_number); }} />
+        <NewOrderDrawer key={prefill?.n} initialCall={prefill?.anlop} initialSo={prefill?.so} initialCustomer={prefill?.kunde} initialKind={prefill?.type === 'PO' ? 'PO' : undefined} onClose={() => { setShowNew(false); clearPrefill(); }} onCreated={o => { setShowNew(false); openSo(o.so_number); }} />
       )}
     </Page>
   );
@@ -133,7 +133,7 @@ function Row({ call: c, first, onSo, onOpen }: { call: PortCallView; first: bool
           <span key={o.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 14, minWidth: 0 }}>
             {c.orders.length > 1 && <span className="n" style={{ fontSize: 11, color: 'var(--fg-45)', width: 12 }}>{o.load_seq}.</span>}
             <button type="button" onClick={e => { e.stopPropagation(); onSo(o.so_number); }}
-              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--teal)', font: 'inherit', flex: 'none' }}><SoNo n={o.so_number} /></button>
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--teal)', font: 'inherit', flex: 'none' }}><SoNo n={o.so_number} kind={o.kind} /></button>
             <span style={{ color: 'var(--fg-75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customer} · {goodsShort(o.goods)}</span>
           </span>
         ))}
@@ -174,7 +174,7 @@ function OrderList({ orders, loading, needle, selected, onOpen }: {
             {l.map((o, i) => (
               <button key={o.id} type="button" className="orow" onClick={() => onOpen(o.so_number)} aria-pressed={selected === o.so_number || selected === o.id}
                 style={{ borderTop: i ? '1px solid rgba(var(--tint), .06)' : 'none', ...(selected === o.so_number ? { background: 'rgba(128,239,222,.12)' } : {}) }}>
-                <SoNo n={o.so_number} style={{ fontSize: 15 }} />
+                <SoNo n={o.so_number} kind={o.kind} style={{ fontSize: 15 }} />
                 <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                   <span style={{ fontSize: 15 }}>{o.customer}</span>
                   <span style={{ fontSize: 13, color: 'var(--fg-55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.lines.map(x => tx(x.label)).join(' · ')}</span>

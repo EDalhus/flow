@@ -6,8 +6,9 @@ import {
 import { effectiveFlag } from '../../shared/domain/flags.ts';
 import { quayLabel } from '../../shared/domain/quay.ts';
 import { deriveStatus, isActive } from '../../shared/domain/status.ts';
+import type { OrderKind } from '../../shared/domain/orderNo.ts';
 import type { CallType, CrewRole, Direction, Flag, Settings } from '../../shared/domain/types.ts';
-import { addDays, osloTime, serviceDate } from '../../shared/time.ts';
+import { MAX_CALL_DAYS, addDays, osloTime, osloToUtc, serviceDate } from '../../shared/time.ts';
 import { loadCapacity, loadSettings } from '../lib/settings.ts';
 
 type CallRow = {
@@ -25,7 +26,7 @@ type GoodsRow = {
   id: string; port_call_id: string; sales_order_id: string; sku_id: string; product_id: string; product_name: string; unit: 'BB' | 'pall';
   pallet_type: 'europall' | 'srs' | null; bags_per_unit: number | null; kg_per_unit: number; quantity: number; direction: Direction;
 };
-type OrderRow = { port_call_id: string; sales_order_id: string; so_number: string; customer: string; load_seq: number; split: number };
+type OrderRow = { port_call_id: string; sales_order_id: string; so_number: string; kind: OrderKind; customer: string; load_seq: number; split: number };
 type CrewRow = { id: string; port_call_id: string; crew_role: CrewRole; user_id: string | null; name: string | null; short_name: string | null; initials: string | null };
 
 /** Filter for hvilke anløp som lastes. Importert historikk vises aldri i planleggingen. */
@@ -33,7 +34,8 @@ export type CallFilter = { from: string; to: string } | { ids: string[] };
 
 function where(f: CallFilter): { sql: string; params: unknown[] } {
   if ('ids' in f) return { sql: `pc.id IN (SELECT value FROM json_each(?))`, params: [JSON.stringify(f.ids)] };
-  return { sql: `pc.source = 'app' AND pc.service_date BETWEEN ? AND ?`, params: [f.from, f.to] };
+  // Anløp som startet før perioden, men varer inn i den (ETD i perioden), tas med. Maks 14 døgn per anløp.
+  return { sql: `pc.source = 'app' AND pc.service_date BETWEEN ? AND ? AND pc.etd >= ?`, params: [addDays(f.from, -MAX_CALL_DAYS), f.to, osloToUtc(f.from, 0)] };
 }
 
 const ref = (id: string | null, name: string | null, short: string | null, initials: string | null): UserRef | null =>
@@ -88,7 +90,7 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
       WHERE cs.port_call_id IN (SELECT pc.id FROM port_calls pc WHERE ${w.sql})
       ORDER BY cs.sort`).bind(...w.params),
     db.prepare(`
-      SELECT o.port_call_id, o.sales_order_id, so.so_number, so.customer, o.load_seq,
+      SELECT o.port_call_id, o.sales_order_id, so.so_number, so.kind, so.customer, o.load_seq,
              EXISTS (SELECT 1 FROM order_lines l WHERE l.sales_order_id = o.sales_order_id AND l.port_call_id IS NOT o.port_call_id) AS split
       FROM port_call_orders o JOIN sales_orders so ON so.id = o.sales_order_id
       WHERE o.port_call_id IN (SELECT pc.id FROM port_calls pc WHERE ${w.sql})
@@ -105,7 +107,7 @@ export async function loadCalls(db: D1Database, filter: CallFilter, settings: Se
     const callOrders: CallOrder[] = (ordersBy.get(r.id) ?? []).map((o, i) => {
       const og = g.filter(x => x.sales_order_id === o.sales_order_id);
       return {
-        id: o.sales_order_id, so_number: o.so_number, customer: o.customer, load_seq: i + 1,
+        id: o.sales_order_id, kind: o.kind, so_number: o.so_number, customer: o.customer, load_seq: i + 1,
         tonnes: og.reduce((s, x) => s + x.tonnes, 0), goods: og, split: !!o.split,
       };
     });

@@ -19,8 +19,9 @@ export const HELP_FLOW = `
 - Mobilvisning for kaia: /m
 
 ## Salgsordre og anløp
-- SO er sannheten: et anløp er en båt som kommer for å levere eller hente varene på én eller flere SO-er.
-- Ny salgsordre: /anlop?vis=ordre → «Ny SO». SO-nummer fra Dynamics 365 (20 + fem siffer), kunde, varer (BB eller pall) og båt: «Ingen båt ennå», «Planlagt båt» eller «Ny båt» (lager anløpet).
+- Ordren er sannheten: et anløp er en båt som kommer for å hente varene på én eller flere SO-er (salgsordre), eller levere varer inn på PO-er (innkjøpsordre).
+- Ny ordre: /anlop?vis=ordre → «Ny SO / PO». Velg Type: Henting gir SO-nummer fra Dynamics 365 (20 + fem siffer); Levering gir PO-nummer (f.eks. PO-000123). Kunde/leverandør, varer (BB eller pall) og båt: «Ingen båt ennå», «Planlagt båt» eller «Ny båt» (lager anløpet).
+- Båten kan bli ferdig en annen dag enn den kommer: i anløpet → «Endre» ved klokkeslett → sett «Ferdig (dag)» og ETD (maks 14 døgn). Anløpet vises da alle dagene det varer.
 - Legge en SO på en båt: åpne SO-en → «Legg på båt», eller i anløpspanelet → «Legg til SO som venter på båt …». En båt kan ta flere SO-er; lasterekkefølgen settes under «Salgsordre · lasterekkefølge» i anløpspanelet. Bytte båt for én SO: åpne SO-en → «Bytt båt / flytt»; for hele anløpet: anløpspanelet → «Bytt båt».
 - Flytte et anløp (tid eller kai): åpne anløpet i kartet eller på /anlop → «Endre». Kollisjoner på kaia varsles i bjella med forslag («Løs»).
 - Avlyse: anløpspanelet → «Avlys anløpet» (begrunnelse kreves). Alle endringer logges (fanen Endringer).
@@ -35,7 +36,7 @@ export const HELP_FLOW = `
 - Ny båt: /baater → «Ny båt» (navn, MMSI for AIS, IMO, kallesignal, agent, kontakt om bord). Fra søket: finn båten i AIS → «Legg til i båtregisteret».
 
 ## Biler (kundebiler)
-- Ny henting: /biler → «Ny henting»: SO-nummer, kunde, transportør, reg.nr., forventet dag og varer. Marker «Hentet» når bilen har vært.
+- Ny henting: /biler → «Ny henting»: SO-nummer, kunde, transportør, reg.nr., forventet dag og varer. Trykk «Utlevert» når varene er levert ut til bilen.
 
 ## Bulkbil
 - Sjåførene laster selv i sjåførvisningen (/sjafor): logger inn med telefonnummer og PIN, velger bil, kunde (prosjektnummer hvis kunden krever det), kvalitet og tonn, nå eller ca. tid. Start lasting → veid tonn fra vekta → «Bil ferdig» → flytt henger → «Start henger» → ferdig. Følgeseddel (PDF) lages automatisk. NØDSTOPP-knappen stopper og varsler produksjonen.

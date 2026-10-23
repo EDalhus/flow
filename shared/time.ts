@@ -2,6 +2,9 @@
 
 export const TZ = 'Europe/Oslo';
 
+/** Et anløp kan vare over flere dager (ETD en annen dag enn ETA), men maks så mange døgn. */
+export const MAX_CALL_DAYS = 14;
+
 const partsFmt = new Intl.DateTimeFormat('en-CA', {
   timeZone: TZ,
   year: 'numeric', month: '2-digit', day: '2-digit',
